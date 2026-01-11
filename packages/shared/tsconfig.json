@@ -9,9 +9,9 @@
     "strict": true,
     "declaration": true,
     "outDir": "./dist",
-    "rootDir": "./",
+    "rootDir": "./src", // ここを修正
     "resolveJsonModule": true
   },
-  "include": ["**/*.ts", "**/*.js"],
+  "include": ["src/**/*.ts"], // ここを修正
   "exclude": ["node_modules", "dist"]
 }

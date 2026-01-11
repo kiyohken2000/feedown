@@ -146,6 +146,7 @@ export async function getDocument(path, idToken, config) {
             return null;
         }
         const doc = await response.json();
+        return fromFirestoreDocument(doc);
     }
     catch (error) {
         console.error('Error getting document:', error);

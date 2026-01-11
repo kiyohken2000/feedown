@@ -2,7 +2,7 @@ import requests
 import uuid
 
 # --- Configuration ---
-BASE_URL = "https://39ab0d28.feedown.pages.dev"
+BASE_URL = "https://a3b3aa89.feedown.pages.dev"
 # Use a unique email for each run to avoid registration errors
 TEST_EMAIL = f"testuser_{uuid.uuid4().hex[:8]}@example.com"
 TEST_PASSWORD = "password123"

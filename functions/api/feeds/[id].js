@@ -24,10 +24,8 @@ export async function onRequestDelete(context) {
         const config = getFirebaseConfig(env);
         // Check if feed exists
         const feedPath = `users/${uid}/feeds/${feedId}`;
-        console.log(`DEBUG: Checking feed existence for path: ${feedPath}`); // 追加
         const feed = await getDocument(feedPath, idToken, config);
         if (!feed) {
-            console.error(`DEBUG: Feed not found for path: ${feedPath}`); // 追加
             return new Response(JSON.stringify({ error: 'Feed not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
         }
         // Delete feed

@@ -189,6 +189,7 @@ export async function getDocument(
     }
 
     const doc: any = await response.json();
+    return fromFirestoreDocument(doc);
   } catch (error) {
     console.error('Error getting document:', error);
     return null;
