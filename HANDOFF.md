@@ -1,173 +1,74 @@
-# 引継ぎメモ - FeedOwn Pages Functions デプロイ
+# 引継ぎメモ - API `DELETE /api/feeds/{id}` の404エラー調査
 
-## 作業状況
+## 概要
 
-### 完了したこと
+`HANDOFF.md`の指示に基づき、Cloudflare Pages Functionsのデプロイとテストを実施しました。
+その過程で、`DELETE /api/feeds/{id}`エンドポイントが`404 Not Found`エラーを返す問題が特定され、その調査を行いました。
 
-1. **Firebase Admin SDK → REST API への書き換え完了**
-   - Cloudflare Workers環境でfirebase-adminパッケージが動作しない問題を解決
-   - Firebase REST APIを使用する新しいライブラリを作成: `functions/lib/firebase-rest.ts`
-   - 認証ヘルパーを更新: `functions/lib/auth.ts`
-   - 全8個のAPIエンドポイントを書き換え完了:
-     - `api/auth/register.ts` ✓
-     - `api/auth/login.ts` ✓
-     - `api/feeds/index.ts` (GET, POST) ✓
-     - `api/feeds/[id].ts` (DELETE) ✓
-     - `api/articles/index.ts` (GET) ✓
-     - `api/articles/[id]/read.ts` (POST) ✓
-     - `api/articles/[id]/favorite.ts` (POST, DELETE) ✓
-     - `api/refresh.ts` (POST) ✓
+**最終デプロイURL:** `https://39ab0d28.feedown.pages.dev`
 
-2. **既存のデプロイ状況**
-   - Workers: `https://feedown-worker.votepurchase.workers.dev` (デプロイ済み)
-   - Pages静的ファイル: `https://2b2ee2d7.feedown.pages.dev` (デプロイ済み)
-   - Pages Functions: 未デプロイ
+## 作業サマリー
 
-## 次にやること
+1.  **Pages Functionsのデプロイ完了**
+    -   Cloudflareの環境変数を設定。
+    -   TypeScriptの型エラー（`unknown`型関連）を`any`型を追加して修正し、コンパイルが通る状態にしました。
+    -   `HANDOFF.md`の指示に従い、Cloudflare Pagesへのデプロイを完了しました。
 
-### 1. Pages Functionsの環境変数設定
+2.  **E2Eテストスクリプトの作成**
+    -   デプロイしたAPIを検証するため、Python製のE2Eテストスクリプトを作成しました。
+    -   場所: `tests/api_test.py`
+    -   使い方: `tests/README.md`
 
-Cloudflare Pagesダッシュボードで以下の環境変数を設定してください:
+## 現在の状況と残っている問題
 
-**必須の環境変数:**
-```
-FIREBASE_API_KEY=<Firebaseプロジェクトの Web API Key>
-FIREBASE_PROJECT_ID=feedown-e78c4
-FIREBASE_AUTH_DOMAIN=feedown-e78c4.firebaseapp.com
-WORKER_URL=https://feedown-worker.votepurchase.workers.dev
-```
+`tests/api_test.py`によるテストの結果、`DELETE /api/feeds/{id}`を除く全てのAPIエンドポイントは正常に動作することを確認しました。
 
-**環境変数の取得方法:**
-1. Firebase Console → Project Settings → General
-2. "Your apps" セクションでWebアプリを選択
-3. `apiKey` をコピーして `FIREBASE_API_KEY` に設定
+-   [✓] `POST /api/auth/register`
+-   [✓] `POST /api/auth/login`
+-   [✓] `POST /api/feeds`
+-   [✓] `GET /api/feeds`
+-   [✓] `POST /api/refresh`
+-   [✓] `GET /api/articles`
+-   **[✗] `DELETE /api/feeds/{id}` (404 Not Found)**
 
-### 2. TypeScriptコンパイルの確認
+`Add Feed` API (POST) は成功し、FirestoreのドキュメントIDを返しますが、`Delete Feed` API (DELETE) は同じIDのドキュメントを見つけられず、404エラーになります。
 
-デプロイ前に、TypeScriptがエラーなくコンパイルできることを確認:
+## 調査済みのこと
 
-```bash
-cd functions
-npm run build
-# または
-npx tsc --noEmit
-```
+1.  **TypeScriptビルド漏れの確認**
+    -   当初、`.ts`ファイルの変更が`.js`に反映されていない可能性を疑いました。
+    -   `functions`ディレクトリで`npm run build`を再実行し、再デプロイしましたが問題は解決しませんでした。
 
-**注意:** 古い`lib/firebase.ts`がまだ存在している場合、import エラーが出る可能性があります。
-- `lib/firebase.ts` は削除またはリネーム（`.backup`等）してください
-- 新しいREST API版は `lib/firebase-rest.ts` です
+2.  **デバッグログの追加と確認**
+    -   `functions/api/feeds/[id].ts`にデバッグログを追加し、再デプロイしました。
+    -   Cloudflareのログから、DELETEリクエスト時に`getDocument`関数が`Feed not found`で失敗していることを確認しました。
+    -   ログに記録されたFirestoreのパスは`users/{uid}/feeds/{feedId}`の形式で、正しく構築されているように見えます。
 
-### 3. Webアプリの再ビルド
+## 次にやること（仮説と検証）
 
-functionsディレクトリをコピーしてからビルド:
+根本原因は、**「`Add Feed`でデータがFirestoreに正しく書き込めていない」**可能性が高いです。
 
-```bash
-cd /c/Users/all/develop/expo/feedown
-yarn workspace @feedown/web build
-cp -r functions apps/web/dist/_functions
-```
+以下の手順で調査を進めてください。
 
-### 4. Pagesへのデプロイ
+1.  **Firestoreデータの直接確認（最優先）**
+    -   `tests/api_test.py`を実行し、`Add Feed`が成功した時点でスクリプトを一時停止します。
+    -   `idToken`を[jwt.io](https://jwt.io/)などのサイトでデコードして`user_id`（これが`uid`）を取得します。
+    -   テストスクリプトの出力から`feedId`を特定します。
+    -   **Firebaseコンソール**で、`users/{uid}/feeds/{feedId}`のパスにドキュメントが**実際に存在するか**を直接確認してください。
 
-wrangler.tomlに `pages_build_output_dir` が設定済みなので、以下のコマンドでデプロイ:
+2.  **`createDocument`関数の調査**
+    -   もし上記1でドキュメントが存在しなかった場合、`lib/firebase-rest.ts`の`createDocument`関数が、実際には書き込みに失敗しているのに成功したかのようなレスポンスを返している可能性があります。
+    -   Firestore REST APIの仕様と突き合わせ、リクエストやレスポンスの処理に問題がないか詳細に確認してください。
 
-```bash
-cd /c/Users/all/develop/expo/feedown
-yarn wrangler pages deploy --commit-dirty=true
-```
+3.  **セキュリティルールの再確認**
+    -   Firestoreのセキュリティルールが、`createDocument`（書き込み）は許可するが、`getDocument`（読み込み）を（特定の条件下で）拒否するような設定になっていないか、再度確認してください。
 
-**期待される結果:**
-- エラーなくデプロイ完了
-- Pages Functions (8個のAPIエンドポイント) がデプロイされる
-- デプロイ後のURLが表示される (例: `https://xxxxx.feedown.pages.dev`)
+## 参考情報
 
-### 5. APIエンドポイントのテスト
-
-デプロイしたURLの `/api-test.html` にアクセスしてテスト:
-
-```
-https://xxxxx.feedown.pages.dev/api-test.html
-```
-
-**テスト手順:**
-1. **Register New User**: 新規ユーザーを登録
-   - Email: `test@example.com`
-   - Password: `password123`
-   - トークンが返ってくることを確認
-2. **Login**: 返ってきたトークンでログイン確認
-3. **Add Feed**: RSSフィードを追加
-4. **Get Feeds**: フィード一覧を取得
-5. **Refresh Feeds**: フィードを更新
-6. **Get Articles**: 記事一覧を取得
-
-各APIが正常に動作すれば、Phase 4完了です。
-
-## 既知の制限事項
-
-1. **XMLパーサー未実装**
-   - `functions/api/refresh.ts` の `parseRssXml()` はモック実装
-   - 実際にRSSを取得しても記事は保存されない
-   - 本番実装にはWorkers互換のXMLパーサーが必要
-
-2. **OPML機能未実装**
-   - Phase 5の機能
-   - `/api/opml/import` と `/api/opml/export` は未作成
-
-3. **クエリの制限**
-   - Firebase REST APIは複雑なクエリ（orderBy, whereの組み合わせ）に制限がある
-   - `articles/index.ts` では全記事を取得してクライアント側でフィルタリング
-   - パフォーマンス最適化が必要な場合は別途対応
-
-## トラブルシューティング
-
-### デプロイ時に "Could not resolve" エラーが出る場合
-
-**原因:** firebase-adminなど、Node.js組み込みモジュールを使うパッケージが残っている
-
-**解決策:**
-1. `functions/lib/firebase.ts` を削除
-2. すべてのエンドポイントが `firebase-rest.ts` をインポートしていることを確認
-3. `functions/package.json` から不要な依存関係を削除:
-   ```bash
-   cd functions
-   npm uninstall firebase-admin
-   ```
-
-### API呼び出しで401 Unauthorized が返る場合
-
-**原因:** 環境変数 `FIREBASE_API_KEY` が未設定
-
-**解決策:**
-1. Cloudflare Pagesダッシュボード → Settings → Environment variables
-2. Production環境に `FIREBASE_API_KEY` を追加
-3. 再デプロイ
-
-### Firebase認証エラーが出る場合
-
-**原因:** Firebase API Key が間違っているか、Firebaseプロジェクトの設定が不正
-
-**確認事項:**
-- Firebase Consoleで正しいAPI Keyを取得しているか
-- FirebaseプロジェクトIDが `feedown-e78c4` で正しいか
-- Firestore Security Rulesがデプロイされているか (`firebase deploy --only firestore:rules`)
-
-## 参考ファイル
-
-- **API仕様書**: `functions/API_VALIDATION_REPORT.md`
-- **Phase 4サマリー**: `functions/PHASE4_SUMMARY.md`
-- **デプロイチェックリスト**: `functions/DEPLOYMENT_CHECKLIST.md`
-- **設計書**: `DESIGN.md` (Section 7にモバイルアーキテクチャ追加済み)
-- **進捗管理**: `PROGRESS.md` (Phase 4を完了にマーク予定)
-
-## 連絡先・質問
-
-不明点があれば以下を確認:
-1. Cloudflare Workers/Pages ドキュメント: https://developers.cloudflare.com/pages/
-2. Firebase REST API ドキュメント: https://firebase.google.com/docs/reference/rest
-3. プロジェクトのGitHub Issues (ある場合)
+-   **API E2Eテストスクリプト:** `tests/api_test.py` (詳細は`tests/README.md`を参照)
+-   **DELETEエンドポイントのデバッグログ:** `functions/api/feeds/[id].ts`に実装済みです。Cloudflareダッシュボードのリアルタイムログで確認できます。
 
 ---
-
-**最終更新**: 2026-01-11
-**担当者**: Claude (AI Assistant)
-**次の担当者へ**: 環境変数設定 → デプロイ → テスト の順で進めてください
+**最終更新**: 2026-01-12
+**担当者**: Gemini
+**次の担当者へ**: 上記「次にやること」の検証をお願いします。

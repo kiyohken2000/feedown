@@ -77,7 +77,7 @@ export async function onRequestPost(context: any): Promise<Response> {
     );
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData: any = await response.json();
       console.error('Login failed:', errorData);
 
       if (errorData.error?.message === 'EMAIL_NOT_FOUND' || errorData.error?.message === 'INVALID_PASSWORD') {
@@ -93,7 +93,7 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
-    const data = await response.json();
+    const data: any = await response.json();
 
     return new Response(
       JSON.stringify({

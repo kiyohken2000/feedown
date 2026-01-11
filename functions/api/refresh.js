@@ -3,8 +3,8 @@
  * Refresh all feeds for authenticated user
  * Fetches RSS feeds via Workers, parses, and stores articles in Firestore
  */
-import { requireAuth } from '../lib/auth';
-import { getAdminFirestore } from '../lib/firebase';
+import { requireAuth, getFirebaseConfig } from '../lib/auth';
+import { listDocuments, updateDocument, setDocument, getDocument } from '../lib/firebase-rest';
 /**
  * POST /api/refresh
  * Trigger feed refresh for user
@@ -17,15 +17,11 @@ export async function onRequestPost(context) {
         if (authResult instanceof Response) {
             return authResult;
         }
-        const { uid } = authResult;
-        const db = getAdminFirestore(env);
+        const { uid, idToken } = authResult;
+        const config = getFirebaseConfig(env);
         // Get all user's feeds
-        const feedsSnapshot = await db
-            .collection('users')
-            .doc(uid)
-            .collection('feeds')
-            .get();
-        if (feedsSnapshot.empty) {
+        const feeds = await listDocuments(`users/${uid}/feeds`, idToken, config, 100);
+        if (feeds.length === 0) {
             return new Response(JSON.stringify({
                 message: 'No feeds to refresh',
                 stats: {
@@ -40,7 +36,7 @@ export async function onRequestPost(context) {
             });
         }
         const stats = {
-            totalFeeds: feedsSnapshot.docs.length,
+            totalFeeds: feeds.length,
             successfulFeeds: 0,
             failedFeeds: 0,
             newArticles: 0,
@@ -51,10 +47,9 @@ export async function onRequestPost(context) {
             return new Response(JSON.stringify({ error: 'Worker URL not configured' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
         }
         // Process each feed
-        for (const feedDoc of feedsSnapshot.docs) {
-            const feedId = feedDoc.id;
-            const feedData = feedDoc.data();
-            const feedUrl = feedData.url;
+        for (const feed of feeds) {
+            const feedId = feed.id;
+            const feedUrl = feed.url;
             try {
                 // Fetch RSS XML via Worker
                 const rssResponse = await fetch(`${workerUrl}/fetch?url=${encodeURIComponent(feedUrl)}`, {
@@ -66,34 +61,29 @@ export async function onRequestPost(context) {
                 if (!rssResponse.ok) {
                     console.error(`Failed to fetch feed ${feedId}: ${rssResponse.status}`);
                     stats.failedFeeds++;
-                    await updateFeedError(db, uid, feedId);
+                    await updateFeedError(uid, feedId, idToken, config);
                     continue;
                 }
                 const xmlText = await rssResponse.text();
                 // Parse RSS XML
                 const parsedFeed = await parseRssXml(xmlText);
                 // Store articles in Firestore
-                const newArticleCount = await storeArticles(db, uid, feedId, parsedFeed.items, feedData.title || parsedFeed.title);
+                const newArticleCount = await storeArticles(uid, feedId, parsedFeed.items, feed.title || parsedFeed.title, idToken, config);
                 stats.newArticles += newArticleCount;
                 stats.successfulFeeds++;
                 // Update feed metadata
-                await db
-                    .collection('users')
-                    .doc(uid)
-                    .collection('feeds')
-                    .doc(feedId)
-                    .update({
+                await updateDocument(`users/${uid}/feeds/${feedId}`, {
                     lastFetchedAt: new Date(),
                     lastSuccessAt: new Date(),
                     errorCount: 0,
-                    title: feedData.title || parsedFeed.title,
-                    description: feedData.description || parsedFeed.description || '',
-                });
+                    title: feed.title || parsedFeed.title,
+                    description: feed.description || parsedFeed.description || '',
+                }, idToken, config);
             }
             catch (error) {
                 console.error(`Error refreshing feed ${feedId}:`, error);
                 stats.failedFeeds++;
-                await updateFeedError(db, uid, feedId);
+                await updateFeedError(uid, feedId, idToken, config);
             }
         }
         return new Response(JSON.stringify({
@@ -126,10 +116,9 @@ async function parseRssXml(xmlText) {
 /**
  * Store articles in Firestore with TTL
  */
-async function storeArticles(db, uid, feedId, articles, feedTitle) {
+async function storeArticles(uid, feedId, articles, feedTitle, idToken, config) {
     if (articles.length === 0)
         return 0;
-    const batch = db.batch();
     let newArticleCount = 0;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
@@ -137,31 +126,25 @@ async function storeArticles(db, uid, feedId, articles, feedTitle) {
         // Generate article hash (feedId + guid)
         const articleHash = await generateArticleHash(feedId, article.guid);
         // Check if article already exists
-        const articleRef = db
-            .collection('users')
-            .doc(uid)
-            .collection('articles')
-            .doc(articleHash);
-        const existingArticle = await articleRef.get();
-        if (existingArticle.exists) {
+        const existingArticle = await getDocument(`users/${uid}/articles/${articleHash}`, idToken, config);
+        if (existingArticle) {
             continue; // Skip existing articles
         }
-        // Add new article to batch
-        batch.set(articleRef, {
+        // Add new article
+        const success = await setDocument(`users/${uid}/articles/${articleHash}`, {
             feedId,
             feedTitle,
             title: article.title,
             url: article.link,
-            description: article.content.substring(0, 10000), // Truncate to 10k chars
+            description: article.content?.substring(0, 10000) || '', // Truncate to 10k chars
             publishedAt: article.publishedAt,
             fetchedAt: now,
             expiresAt,
             author: article.author || null,
-        });
-        newArticleCount++;
-    }
-    if (newArticleCount > 0) {
-        await batch.commit();
+        }, idToken, config);
+        if (success) {
+            newArticleCount++;
+        }
     }
     return newArticleCount;
 }
@@ -180,14 +163,13 @@ async function generateArticleHash(feedId, guid) {
 /**
  * Update feed error count
  */
-async function updateFeedError(db, uid, feedId) {
-    const feedRef = db.collection('users').doc(uid).collection('feeds').doc(feedId);
-    const feedDoc = await feedRef.get();
-    if (feedDoc.exists) {
-        const errorCount = (feedDoc.data().errorCount || 0) + 1;
-        await feedRef.update({
+async function updateFeedError(uid, feedId, idToken, config) {
+    const feed = await getDocument(`users/${uid}/feeds/${feedId}`, idToken, config);
+    if (feed) {
+        const errorCount = (feed.errorCount || 0) + 1;
+        await updateDocument(`users/${uid}/feeds/${feedId}`, {
             lastFetchedAt: new Date(),
             errorCount,
-        });
+        }, idToken, config);
     }
 }

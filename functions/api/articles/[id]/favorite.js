@@ -3,8 +3,8 @@
  * POST: Add to favorites
  * DELETE: Remove from favorites
  */
-import { requireAuth } from '../../../lib/auth';
-import { getAdminFirestore } from '../../../lib/firebase';
+import { requireAuth, getFirebaseConfig } from '../../../lib/auth';
+import { setDocument, deleteDocument } from '../../../lib/firebase-rest';
 /**
  * POST /api/articles/:id/favorite
  * Add article to favorites
@@ -17,7 +17,7 @@ export async function onRequestPost(context) {
         if (authResult instanceof Response) {
             return authResult;
         }
-        const { uid } = authResult;
+        const { uid, idToken } = authResult;
         const articleId = params.id;
         if (!articleId) {
             return new Response(JSON.stringify({ error: 'Article ID is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
@@ -28,20 +28,18 @@ export async function onRequestPost(context) {
         if (!title || !url) {
             return new Response(JSON.stringify({ error: 'Article title and URL are required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
-        const db = getAdminFirestore(env);
+        const config = getFirebaseConfig(env);
         // Add to favorites
-        await db
-            .collection('users')
-            .doc(uid)
-            .collection('favorites')
-            .doc(articleId)
-            .set({
+        const success = await setDocument(`users/${uid}/favorites/${articleId}`, {
             title,
             url,
             description: description || '',
             feedTitle: feedTitle || '',
             savedAt: new Date(),
-        });
+        }, idToken, config);
+        if (!success) {
+            return new Response(JSON.stringify({ error: 'Failed to add to favorites' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        }
         return new Response(JSON.stringify({ success: true }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -64,19 +62,17 @@ export async function onRequestDelete(context) {
         if (authResult instanceof Response) {
             return authResult;
         }
-        const { uid } = authResult;
+        const { uid, idToken } = authResult;
         const articleId = params.id;
         if (!articleId) {
             return new Response(JSON.stringify({ error: 'Article ID is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
-        const db = getAdminFirestore(env);
+        const config = getFirebaseConfig(env);
         // Remove from favorites
-        await db
-            .collection('users')
-            .doc(uid)
-            .collection('favorites')
-            .doc(articleId)
-            .delete();
+        const success = await deleteDocument(`users/${uid}/favorites/${articleId}`, idToken, config);
+        if (!success) {
+            return new Response(JSON.stringify({ error: 'Failed to remove from favorites' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        }
         return new Response(JSON.stringify({ success: true }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },

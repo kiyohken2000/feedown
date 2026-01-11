@@ -2,8 +2,8 @@
  * /api/articles
  * GET: List articles with smart refresh logic
  */
-import { requireAuth } from '../../lib/auth';
-import { getAdminFirestore } from '../../lib/firebase';
+import { requireAuth, getFirebaseConfig } from '../../lib/auth';
+import { listDocuments } from '../../lib/firebase-rest';
 /**
  * GET /api/articles
  * Get articles for authenticated user
@@ -17,51 +17,49 @@ export async function onRequestGet(context) {
         if (authResult instanceof Response) {
             return authResult;
         }
-        const { uid } = authResult;
+        const { uid, idToken } = authResult;
         // Parse query parameters
         const url = new URL(request.url);
         const feedId = url.searchParams.get('feedId');
         const limit = parseInt(url.searchParams.get('limit') || '50');
         const offset = parseInt(url.searchParams.get('offset') || '0');
         const unreadOnly = url.searchParams.get('unreadOnly') === 'true';
-        const db = getAdminFirestore(env);
+        const config = getFirebaseConfig(env);
         // Smart refresh logic: check if we need to refresh
-        const shouldRefresh = await checkShouldRefresh(db, uid);
-        // Build articles query
-        let articlesQuery = db
-            .collection('users')
-            .doc(uid)
-            .collection('articles')
-            .where('expiresAt', '>', new Date()) // Only non-expired articles
-            .orderBy('expiresAt')
-            .orderBy('publishedAt', 'desc')
-            .limit(limit);
+        const shouldRefresh = await checkShouldRefresh(uid, idToken, config);
+        // Get all articles (REST API limitation: complex queries are difficult)
+        const allArticles = await listDocuments(`users/${uid}/articles`, idToken, config, 1000 // Get up to 1000 articles
+        );
+        // Filter non-expired articles
+        const now = new Date();
+        let articles = allArticles.filter(article => {
+            if (!article.expiresAt)
+                return false;
+            const expiresAt = new Date(article.expiresAt);
+            return expiresAt > now;
+        });
         // Filter by feed if specified
         if (feedId) {
-            articlesQuery = articlesQuery.where('feedId', '==', feedId);
+            articles = articles.filter(article => article.feedId === feedId);
         }
-        const articlesSnapshot = await articlesQuery.get();
         // Get read articles if filtering by unread
-        let readArticleIds = new Set();
         if (unreadOnly) {
-            const readSnapshot = await db
-                .collection('users')
-                .doc(uid)
-                .collection('readArticles')
-                .get();
-            readArticleIds = new Set(readSnapshot.docs.map(doc => doc.id));
+            const readArticles = await listDocuments(`users/${uid}/readArticles`, idToken, config, 1000);
+            const readArticleIds = new Set(readArticles.map(doc => doc.id));
+            articles = articles.filter(article => !readArticleIds.has(article.id));
         }
-        // Map articles
-        const articles = articlesSnapshot.docs
-            .map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-        }))
-            .filter(article => !unreadOnly || !readArticleIds.has(article.id));
+        // Sort by publishedAt descending
+        articles.sort((a, b) => {
+            const aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+            const bTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+            return bTime - aTime;
+        });
+        // Apply pagination
+        const paginatedArticles = articles.slice(offset, offset + limit);
         return new Response(JSON.stringify({
-            articles,
+            articles: paginatedArticles,
             shouldRefresh,
-            hasMore: articlesSnapshot.docs.length === limit,
+            hasMore: articles.length > offset + limit,
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -75,36 +73,28 @@ export async function onRequestGet(context) {
 /**
  * Check if feeds should be refreshed (last fetch > 6 hours ago)
  */
-async function checkShouldRefresh(db, uid) {
+async function checkShouldRefresh(uid, idToken, config) {
     try {
-        const feedsSnapshot = await db
-            .collection('users')
-            .doc(uid)
-            .collection('feeds')
-            .limit(1)
-            .get();
-        if (feedsSnapshot.empty) {
+        const feeds = await listDocuments(`users/${uid}/feeds`, idToken, config, 100);
+        if (feeds.length === 0) {
             return false; // No feeds to refresh
         }
-        // Check the most recently fetched feed
-        const feedsWithFetchTime = await db
-            .collection('users')
-            .doc(uid)
-            .collection('feeds')
-            .where('lastFetchedAt', '!=', null)
-            .orderBy('lastFetchedAt', 'desc')
-            .limit(1)
-            .get();
-        if (feedsWithFetchTime.empty) {
+        // Find the most recently fetched feed
+        const feedsWithFetchTime = feeds.filter(feed => feed.lastFetchedAt);
+        if (feedsWithFetchTime.length === 0) {
             return true; // Never fetched, should refresh
         }
-        const lastFetchedAt = feedsWithFetchTime.docs[0].data().lastFetchedAt?.toDate();
-        if (!lastFetchedAt) {
+        // Get the most recent lastFetchedAt
+        const mostRecentFetch = feedsWithFetchTime.reduce((latest, feed) => {
+            const fetchTime = new Date(feed.lastFetchedAt).getTime();
+            return fetchTime > latest ? fetchTime : latest;
+        }, 0);
+        if (mostRecentFetch === 0) {
             return true;
         }
         // Refresh if more than 6 hours ago
-        const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
-        return lastFetchedAt < sixHoursAgo;
+        const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
+        return mostRecentFetch < sixHoursAgo;
     }
     catch (error) {
         console.error('Check refresh error:', error);

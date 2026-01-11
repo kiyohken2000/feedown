@@ -44,7 +44,7 @@ export async function verifyIdToken(
       return null;
     }
 
-    const data = await response.json();
+    const data: any = await response.json();
 
     if (!data.users || data.users.length === 0) {
       return null;
@@ -86,7 +86,7 @@ export async function createUser(
       return null;
     }
 
-    const data = await response.json();
+    const data: any = await response.json();
     return {
       uid: data.localId,
       idToken: data.idToken,
@@ -188,8 +188,7 @@ export async function getDocument(
       return null;
     }
 
-    const doc = await response.json();
-    return fromFirestoreDocument(doc);
+    const doc: any = await response.json();
   } catch (error) {
     console.error('Error getting document:', error);
     return null;
@@ -228,7 +227,7 @@ export async function createDocument(
       return null;
     }
 
-    const doc = await response.json();
+    const doc: any = await response.json();
     const docId = doc.name.split('/').pop();
 
     return {
@@ -356,7 +355,7 @@ export async function listDocuments(
       return [];
     }
 
-    const data = await response.json();
+    const data: any = await response.json();
     const documents = data.documents || [];
 
     return documents.map((doc: any) => ({
@@ -427,7 +426,7 @@ export async function runQuery(
       return [];
     }
 
-    const results = await response.json();
+    const results: any = await response.json();
 
     return (results || [])
       .filter((result: any) => result.document)
