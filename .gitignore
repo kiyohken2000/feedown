@@ -31,3 +31,7 @@ Thumbs.db
 # Cloudflare
 .dev.vars
 .wrangler/
+
+# Firebase
+firebase-adminsdk-*.json
+service-account.json
