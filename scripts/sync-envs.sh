@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Sync .env.shared to apps/web and apps/mobile
+# Sync .env.shared to apps/web only
+# Mobile app does not need Firebase config (uses Pages Functions API)
 # Usage: bash scripts/sync-envs.sh
 
 echo "Syncing .env.shared to apps..."
@@ -19,12 +20,7 @@ else
   echo "⚠ apps/web directory not found"
 fi
 
-# Copy to apps/mobile
-if [ -d "apps/mobile" ]; then
-  cp .env.shared apps/mobile/.env
-  echo "✓ Synced to apps/mobile/.env"
-else
-  echo "⚠ apps/mobile directory not found"
-fi
+# Note: Mobile app has its own .env (no Firebase config needed)
+echo "ℹ apps/mobile/.env not synced (uses separate config without Firebase)"
 
 echo "✓ Environment sync complete"

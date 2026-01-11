@@ -1,0 +1,8 @@
+# Cloudflare Pages Configuration for FeedOwn
+name = "feedown"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "apps/web/dist"
+
+# Pages specific settings will be managed through Pages dashboard
+# This file is mainly for local development and CI/CD

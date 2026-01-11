@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedOwn API Test</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #FF6B35;
+            margin-top: 0;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #FF6B35;
+        }
+        button {
+            background: #FF6B35;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #e55a28;
+        }
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .success { color: #22c55e; }
+        .error { color: #ef4444; }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 FeedOwn API Test</h1>
+        <p>Test your deployed Pages Functions API endpoints</p>
+
+        <div class="test-section">
+            <h3>1. Register New User</h3>
+            <input type="email" id="registerEmail" placeholder="Email" value="test@example.com">
+            <input type="password" id="registerPassword" placeholder="Password" value="password123">
+            <button onclick="testRegister()">Register</button>
+            <pre id="registerResult"></pre>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Login (with token)</h3>
+            <input type="text" id="loginToken" placeholder="ID Token from previous step">
+            <button onclick="testLogin()">Login</button>
+            <pre id="loginResult"></pre>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Get Feeds</h3>
+            <input type="text" id="authToken" placeholder="Bearer Token">
+            <button onclick="testGetFeeds()">Get Feeds</button>
+            <pre id="feedsResult"></pre>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Add Feed</h3>
+            <input type="url" id="feedUrl" placeholder="Feed URL" value="https://example.com/feed.xml">
+            <input type="text" id="feedTitle" placeholder="Feed Title" value="Test Feed">
+            <button onclick="testAddFeed()">Add Feed</button>
+            <pre id="addFeedResult"></pre>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Get Articles</h3>
+            <button onclick="testGetArticles()">Get Articles</button>
+            <pre id="articlesResult"></pre>
+        </div>
+
+        <div class="test-section">
+            <h3>6. Refresh Feeds</h3>
+            <button onclick="testRefresh()">Refresh All</button>
+            <pre id="refreshResult"></pre>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let currentToken = '';
+
+        async function testRegister() {
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const result = document.getElementById('registerResult');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await response.json();
+
+                if (response.ok && data.token) {
+                    currentToken = data.token;
+                    document.getElementById('authToken').value = currentToken;
+                    document.getElementById('loginToken').value = currentToken;
+                    result.innerHTML = `<span class="success">✓ Success</span>\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    result.innerHTML = `<span class="error">✗ Error ${response.status}</span>\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">✗ Error</span>\n${error.message}`;
+            }
+        }
+
+        async function testLogin() {
+            const idToken = document.getElementById('loginToken').value;
+            const result = document.getElementById('loginResult');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ idToken })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentToken = data.token || idToken;
+                    document.getElementById('authToken').value = currentToken;
+                    result.innerHTML = `<span class="success">✓ Success</span>\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    result.innerHTML = `<span class="error">✗ Error ${response.status}</span>\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">✗ Error</span>\n${error.message}`;
+            }
+        }
+
+        async function testGetFeeds() {
+            const token = document.getElementById('authToken').value || currentToken;
+            const result = document.getElementById('feedsResult');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/feeds`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `<span class="success">✓ Success</span>\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    result.innerHTML = `<span class="error">✗ Error ${response.status}</span>\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">✗ Error</span>\n${error.message}`;
+            }
+        }
+
+        async function testAddFeed() {
+            const token = document.getElementById('authToken').value || currentToken;
+            const url = document.getElementById('feedUrl').value;
+            const title = document.getElementById('feedTitle').value;
+            const result = document.getElementById('addFeedResult');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/feeds`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url, title })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `<span class="success">✓ Success</span>\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    result.innerHTML = `<span class="error">✗ Error ${response.status}</span>\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">✗ Error</span>\n${error.message}`;
+            }
+        }
+
+        async function testGetArticles() {
+            const token = document.getElementById('authToken').value || currentToken;
+            const result = document.getElementById('articlesResult');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/articles?limit=10`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `<span class="success">✓ Success</span>\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    result.innerHTML = `<span class="error">✗ Error ${response.status}</span>\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">✗ Error</span>\n${error.message}`;
+            }
+        }
+
+        async function testRefresh() {
+            const token = document.getElementById('authToken').value || currentToken;
+            const result = document.getElementById('refreshResult');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/refresh`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `<span class="success">✓ Success</span>\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    result.innerHTML = `<span class="error">✗ Error ${response.status}</span>\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">✗ Error</span>\n${error.message}`;
+            }
+        }
+
+        // Show API base URL
+        document.querySelector('h1').insertAdjacentHTML('afterend',
+            `<p style="color: #666; font-size: 14px;">API Base: <code>${API_BASE}</code></p>`
+        );
+    </script>
+</body>
+</html>

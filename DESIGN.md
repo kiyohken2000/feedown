@@ -3,7 +3,7 @@
 ## 1. データ保存設計（Firestore）
 
 ### 記事データの保存方針
-**全文をFirestoreに保存し、7日間で自動削除**
+**記事のdescriptionをFirestoreに保存し、7日間で自動削除**
 
 ```
 users/
@@ -23,7 +23,7 @@ users/
       │       feedId: string,
       │       title: string,
       │       url: string,
-      │       content: string,    # 全文（最大10KB）
+      │       description: string,    # 記事のdescription
       │       publishedAt: timestamp,
       │       fetchedAt: timestamp,
       │       expiresAt: timestamp  # fetchedAt + 7日（TTL）
@@ -36,7 +36,7 @@ users/
           └─ {articleHash}: {
               title: string,
               url: string,
-              content: string,     # お気に入りは無期限保存
+              description: string,     # お気に入りは無期限保存
               feedTitle: string,
               savedAt: timestamp
           }
@@ -46,7 +46,7 @@ users/
 - Firestoreの無料枠: 5万read/日、2万write/日
 - 1日2回更新 × 100フィード × 平均10記事 = 2000 writes/日（許容範囲）
 - TTL 7日で古い記事を自動削除し、ストレージコストを抑制
-- オフライン閲覧可能（記事全文が手元にある）
+- オフライン閲覧可能（記事descriptionが手元にある）
 
 ---
 
@@ -207,7 +207,94 @@ OPMLインポート/エクスポート: Web ✅ → Mobile ❌（ファイル選
 
 ---
 
-## 7. パフォーマンス最適化
+## 7. モバイルアプリのアーキテクチャ
+
+### Web vs Mobile の根本的な違い
+
+**Webアプリ（個別デプロイ型）:**
+```
+各ユーザーが自分のCloudflare Pagesにデプロイ
+  ↓
+Firebase Client SDK直接使用（認証・Firestore）
+  ↓
+自分のFirebase/Cloudflareにアクセス
+```
+
+**モバイルアプリ（共通アプリ型）:**
+```
+App Store/Google Playから共通アプリをダウンロード（全ユーザー共通）
+  ↓
+初期設定でPages Functions URL入力（例: https://feedown-alice.pages.dev）
+  ↓
+Pages Functions API経由でのみアクセス（Firebase Client SDK不要）
+  ↓
+各ユーザーのFirebase/Cloudflareにアクセス
+```
+
+### モバイルアプリの技術構成
+
+**必要なもの:**
+- AsyncStorage（Pages Functions URLの保存のみ）
+- API Client（`packages/shared/api`）
+- Pages Functions APIへのHTTPリクエスト
+
+**不要なもの:**
+- ❌ Firebase Client SDK（firebase パッケージ）
+- ❌ Firebase設定（.env内のFirebase認証情報）
+- ❌ Firestore直接アクセス
+
+### 認証フロー
+
+**Web:**
+```typescript
+// Firebase Auth SDK直接使用
+import { signInWithEmailAndPassword } from 'firebase/auth';
+const userCredential = await signInWithEmailAndPassword(auth, email, password);
+const token = await userCredential.user.getIdToken();
+```
+
+**Mobile:**
+```typescript
+// Pages Functions API経由
+const response = await apiClient.post('/api/auth/login', { email, password });
+const { token, user } = response.data;
+// トークンをAsyncStorageに保存
+```
+
+### データアクセスフロー
+
+**Web:**
+```
+Web UI → Firebase Client SDK → Firebase Auth/Firestore
+```
+
+**Mobile:**
+```
+Mobile UI → Pages Functions API → Firebase Admin SDK → Firebase Auth/Firestore
+```
+
+### 環境変数の違い
+
+**Web (.env):**
+```env
+VITE_FIREBASE_API_KEY=...         # 必要
+VITE_FIREBASE_AUTH_DOMAIN=...     # 必要
+VITE_FIREBASE_PROJECT_ID=...      # 必要
+VITE_WORKER_URL=...               # 必要
+VITE_API_BASE_URL=...             # 不要（同一オリジン）
+```
+
+**Mobile (.env or config):**
+```env
+# Firebase設定は不要（全て削除）
+# Pages Functions URLはユーザーが初期設定で入力（AsyncStorage保存）
+APP_NAME=FeedOwn
+APP_VERSION=1.0.0
+```
+
+---
+
+## 8. パフォーマンス最適化
 
 ### 記事一覧取得の工夫
 ```typescript
@@ -232,7 +319,7 @@ fetch('/api/articles/:id/read', { method: 'POST' }).catch(() => {
 
 ---
 
-## 8. セキュリティ設計
+## 9. セキュリティ設計
 
 ### Firebase Security Rules
 ```javascript
@@ -256,7 +343,7 @@ const userId = decodedToken.uid;
 
 ---
 
-## 9. デプロイフロー
+## 10. デプロイフロー
 
 ### 初期セットアップ
 ```bash
@@ -276,7 +363,7 @@ cd workers && npx wrangler deploy
 
 ---
 
-## 10. コスト試算（無料枠での運用）
+## 11. コスト試算（無料枠での運用）
 
 ### ユーザー1人あたり/日
 - 100フィード × 2回更新 = 200 Worker requests
