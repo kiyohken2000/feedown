@@ -1,0 +1,18 @@
+{
+  "name": "workers",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Workers for RSS fetching and CORS proxy",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "wrangler deploy --dry-run"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "wrangler": "^4.0.0",
+    "typescript": "^5.3.3",
+    "@cloudflare/workers-types": "^4.20231218.0"
+  }
+}

@@ -1,14 +1,16 @@
 {
+  "name": "mobile",
+  "version": "1.0.0",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "start": "npx expo start",
+    "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
     "eject": "expo eject",
-    "lint": "node_modules/.bin/eslint src/ --fix src/ --fix",
-    "test": "node_modules/.bin/jest --passWithNoTests"
+    "lint": "eslint src/ --fix",
+    "test": "jest --passWithNoTests"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -50,7 +52,8 @@
     "react-native-worklets": "0.5.1",
     "react-redux": "^7.1.1",
     "redux": "^4.0.4",
-    "redux-logger": "^3.0.6"
+    "redux-logger": "^3.0.6",
+    "firebase": "^11.2.0"
   },
   "devDependencies": {
     "@babel/plugin-proposal-export-namespace-from": "^7.18.9",

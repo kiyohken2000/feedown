@@ -1,0 +1,28 @@
+name = "feedown-worker"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Account ID
+account_id = "ee20aa897421e01cb195b1e36acebf02"
+
+# KV Namespace for caching RSS feeds
+[[kv_namespaces]]
+binding = "CACHE"
+id = "76c3c4142838463b8a3b1656e750aa1c"
+preview_id = "737baa0c5e164e17a9c185cf7e4d4f1a"
+
+# Environment variables
+[vars]
+FIREBASE_PROJECT_ID = "feedown-dev" # Update with your actual Firebase project ID later
+
+# Observability (optional)
+[observability]
+enabled = true
+
+# Build configuration
+[build]
+command = ""
+
+# Limits (optional - uses defaults)
+# [limits]
+# cpu_ms = 50

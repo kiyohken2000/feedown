@@ -1,0 +1,30 @@
+{
+  "name": "feedown",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Own your feeds, own your data - Self-hosted RSS reader",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/feedown/feedown.git"
+  },
+  "license": "MIT",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "workers",
+    "functions"
+  ],
+  "scripts": {
+    "dev:web": "yarn workspace web dev",
+    "dev:mobile": "yarn workspace mobile start",
+    "dev:workers": "yarn workspace workers dev",
+    "build:web": "yarn workspace web build",
+    "build:mobile": "yarn workspace mobile build",
+    "build:workers": "yarn workspace workers build",
+    "sync-envs": "bash scripts/sync-envs.sh",
+    "deploy": "bash scripts/deploy.sh"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

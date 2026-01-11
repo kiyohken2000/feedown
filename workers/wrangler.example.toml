@@ -1,0 +1,28 @@
+# Example Wrangler Configuration
+# Copy this to wrangler.toml and update with your actual values
+
+name = "feedown-worker"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Account ID (get from Cloudflare Dashboard → Workers → Overview)
+# account_id = "your-account-id-here"
+
+# KV Namespace for caching RSS feeds
+# Create with: wrangler kv:namespace create CACHE
+[[kv_namespaces]]
+binding = "CACHE"
+id = "your-production-kv-namespace-id"
+preview_id = "your-preview-kv-namespace-id"
+
+# Environment variables
+[vars]
+FIREBASE_PROJECT_ID = "your-firebase-project-id"
+
+# Observability
+[observability]
+enabled = true
+
+# Build configuration
+[build]
+command = ""
