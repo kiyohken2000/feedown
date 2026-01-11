@@ -1,0 +1,93 @@
+{
+  "private": true,
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "npx expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "eject": "expo eject",
+    "lint": "node_modules/.bin/eslint src/ --fix src/ --fix",
+    "test": "node_modules/.bin/jest --passWithNoTests"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/masked-view": "0.1.10",
+    "@react-navigation/bottom-tabs": "^7.4.7",
+    "@react-navigation/drawer": "^7.5.8",
+    "@react-navigation/material-top-tabs": "^7.3.7",
+    "@react-navigation/native": "^7.1.17",
+    "@react-navigation/stack": "^7.4.8",
+    "@reduxjs/toolkit": "^1.5.1",
+    "@shopify/react-native-skia": "2.2.12",
+    "axios": "^0.21.2",
+    "expo": "54.0.8",
+    "expo-asset": "~12.0.8",
+    "expo-font": "~14.0.8",
+    "expo-linear-gradient": "~15.0.7",
+    "expo-updates": "~29.0.10",
+    "global": "^4.4.0",
+    "lottie-react-native": "~7.3.1",
+    "moment": "^2.24.0",
+    "prop-types": "^15.7.2",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.4",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-keyboard-aware-scroll-view": "^0.9.5",
+    "react-native-loading-spinner-overlay": "^3.0.1",
+    "react-native-pager-view": "6.9.1",
+    "react-native-reanimated": "~4.1.0",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-storage": "^1.0.1",
+    "react-native-svg": "15.12.1",
+    "react-native-svg-transformer": "^0.14.3",
+    "react-native-tab-view": "^3.1.1",
+    "react-native-toast-message": "^2.1.5",
+    "react-native-vector-icons": "^10.1.0",
+    "react-native-web": "^0.21.0",
+    "react-native-worklets": "0.5.1",
+    "react-redux": "^7.1.1",
+    "redux": "^4.0.4",
+    "redux-logger": "^3.0.6"
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-export-namespace-from": "^7.18.9",
+    "babel-eslint": "^10.1.0",
+    "babel-plugin-module-resolver": "^4.0.0",
+    "babel-preset-expo": "~54.0.0",
+    "braces": ">=2.3.1",
+    "eslint": "^6.8.0",
+    "eslint-config-airbnb": "^18.1.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-import": "^2.20.2",
+    "eslint-plugin-jsx-a11y": "^6.2.3",
+    "eslint-plugin-prettier": "^3.1.3",
+    "eslint-plugin-react": "^7.19.0",
+    "eslint-plugin-react-hooks": "^2.5.1",
+    "husky": "^4.2.5",
+    "jest-expo": "~54.0.11",
+    "lint-staged": "^10.2.0",
+    "prettier": "^2.0.5",
+    "pretty-quick": "^2.0.1",
+    "react-test-renderer": "^16.13.1"
+  },
+  "prettier": {
+    "trailingComma": "all",
+    "tabWidth": 2,
+    "semi": false,
+    "singleQuote": true,
+    "bracketSpacing": true
+  },
+  "resolutions": {
+    "use-latest-callback": "0.1.9"
+  },
+  "lint-staged": {
+    "*.{js,jsx}": [
+      "pretty-quick --staged",
+      "yarn lint",
+      "yarn test"
+    ]
+  }
+}

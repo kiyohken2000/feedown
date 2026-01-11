@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "react-native-boilerplate",
+    "slug": "react-native-boilerplate",
+    "privacy": "public",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/logo-sm.png",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "newArchEnabled": true,
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 10000
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "reactnative.expo.boilerplate",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Use the photo library to change your avatar.",
+        "CFBundleDevelopmentRegion": "ja_JP"
+      },
+      "userInterfaceStyle": "automatic"
+    },
+    "android": {
+      "package": "reactnative.expo.boilerplate",
+      "versionCode": 1,
+      "userInterfaceStyle": "automatic",
+      "permissions": [
+        "VIBRATE",
+        "CAMERA"
+      ]
+    },
+    "packagerOpts": {
+      "config": "metro.config.js",
+      "sourceExts": [
+        "js",
+        "jsx",
+        "svg",
+        "ts",
+        "tsx"
+      ]
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-asset"
+    ]
+  }
+}
