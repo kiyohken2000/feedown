@@ -39,12 +39,27 @@ export class ApiClient {
         },
       });
 
-      const data = await response.json();
+      // Check if response has content
+      const contentType = response.headers.get('content-type');
+      const hasJsonContent = contentType && contentType.includes('application/json');
+
+      let data: any = null;
+      if (hasJsonContent) {
+        const text = await response.text();
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            console.error('Failed to parse JSON response:', e);
+            data = null;
+          }
+        }
+      }
 
       if (!response.ok) {
         return {
           success: false,
-          error: data.error || `HTTP ${response.status}: ${response.statusText}`,
+          error: data?.error || `HTTP ${response.status}: ${response.statusText}`,
         };
       }
 
