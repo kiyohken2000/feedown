@@ -148,6 +148,37 @@ const DashboardPage = () => {
     }
   };
 
+  const handleMarkAllAsRead = async () => {
+    if (articlesLoading) return;
+
+    const unreadArticleIds = articles.filter(article => !readArticles.has(article.id)).map(a => a.id);
+    if (unreadArticleIds.length === 0) {
+      return;
+    }
+
+    // Optimistically update UI
+    setReadArticles(prev => {
+      const newSet = new Set(prev);
+      unreadArticleIds.forEach(id => newSet.add(id));
+      return newSet;
+    });
+
+    // Mark all as read in background
+    try {
+      await Promise.all(
+        unreadArticleIds.map(articleId => api.articles.markAsRead(articleId))
+      );
+    } catch (error) {
+      console.error('Failed to mark all as read:', error);
+      // Rollback on error
+      setReadArticles(prev => {
+        const newSet = new Set(prev);
+        unreadArticleIds.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+    }
+  };
+
   const handleArticleClick = (article) => {
     setSelectedArticle(article);
   };
@@ -241,9 +272,15 @@ const DashboardPage = () => {
       gap: '1rem',
       position: 'sticky',
       top: '73px',
-      backgroundColor: 'white',
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      backdropFilter: 'blur(10px)',
       zIndex: 50,
       borderBottom: '1px solid #eee',
+    },
+    buttonGroup: {
+      display: 'flex',
+      gap: '0.5rem',
+      flexWrap: 'wrap',
     },
     filterGroup: {
       display: 'flex',
@@ -267,6 +304,17 @@ const DashboardPage = () => {
     refreshButton: {
       padding: '0.5rem 1.5rem',
       backgroundColor: '#FF6B35',
+      color: 'white',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+      fontSize: '0.9rem',
+      fontWeight: '600',
+      transition: 'background-color 0.3s',
+    },
+    markAllReadButton: {
+      padding: '0.5rem 1.5rem',
+      backgroundColor: '#28a745',
       color: 'white',
       border: 'none',
       borderRadius: '5px',
@@ -410,13 +458,22 @@ const DashboardPage = () => {
             </button>
           </div>
 
-          <button
-            onClick={handleRefresh}
-            style={styles.refreshButton}
-            disabled={articlesLoading}
-          >
-            {articlesLoading ? 'Refreshing...' : '🔄 Refresh'}
-          </button>
+          <div style={styles.buttonGroup}>
+            <button
+              onClick={handleMarkAllAsRead}
+              style={styles.markAllReadButton}
+              disabled={articlesLoading || unreadCount === 0}
+            >
+              ✓ Mark All Read
+            </button>
+            <button
+              onClick={handleRefresh}
+              style={styles.refreshButton}
+              disabled={articlesLoading}
+            >
+              {articlesLoading ? 'Refreshing...' : '🔄 Refresh'}
+            </button>
+          </div>
         </div>
 
         {articlesLoading && (

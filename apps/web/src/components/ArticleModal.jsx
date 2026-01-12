@@ -26,18 +26,23 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
       position: 'relative',
     },
     closeButton: {
-      position: 'sticky',
-      top: 0,
-      right: 0,
-      background: 'white',
+      position: 'absolute',
+      top: '1rem',
+      right: '1rem',
+      background: 'transparent',
       border: 'none',
-      fontSize: '2rem',
+      fontSize: '2.5rem',
       cursor: 'pointer',
-      padding: '1rem 1.5rem',
+      padding: '0.5rem',
       color: '#666',
       zIndex: 10,
-      textAlign: 'right',
-      borderBottom: '1px solid #eee',
+      width: '3rem',
+      height: '3rem',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: '50%',
+      transition: 'background-color 0.3s',
     },
     content: {
       padding: '2rem',
@@ -115,7 +120,16 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
   return (
     <div style={styles.overlay} onClick={handleOverlayClick}>
       <div style={styles.modal}>
-        <button style={styles.closeButton} onClick={onClose}>
+        <button
+          style={styles.closeButton}
+          onClick={onClose}
+          onMouseOver={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+        >
           ×
         </button>
         <div style={styles.content}>
