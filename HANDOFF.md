@@ -68,12 +68,18 @@ Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完�
   - filter === 'unread'の場合、Intersection Observerを設定しない
   - ユーザーが未読記事を閲覧しても勝手に既読にならない
 
-#### 5. 記事一覧の全件表示 ✅ **NEW**
-- **limitパラメータを1000に設定**
-  - 従来: limit=50（デフォルト）
-  - 変更後: limit=1000
-  - 全Feedの記事を取得して日付順（publishedAt降順）で表示
-  - バックエンドでは最大1000件まで取得可能
+#### 5. 無限スクロール（ページネーション） ✅ **NEW**
+- **段階的な記事読み込み**
+  - 初回表示: limit=50
+  - スクロールで下部到達時: 次の50件を自動読み込み
+  - Intersection Observerで最下部を監視
+
+- **実装詳細**
+  - `hasMore`フラグで続きがあるかチェック
+  - `loadingMore`状態で追加読み込み中を表示
+  - リスト最後に「Loading more articles...」表示
+  - 全件読み込み完了時は「No more articles to load」表示
+  - Refresh/Mark All Read時はリセットして最初から読み込み
 
 #### 6. Feedly風UI ✅
 - **サムネイル画像表示**
@@ -331,8 +337,8 @@ feedown/
 - `apps/web/.env`の`VITE_API_BASE_URL`: `https://7a58f493.feedown.pages.dev`
 
 ### Gitの状態
-- **最新コミット**: "Disable auto-mark-as-read in Unread filter and increase article limit" (9a26b8c)
-- **前回のコミット**: "Implement favicon display and drag & drop feed reordering" (d7a48bb)
+- **最新コミット**: "Implement infinite scroll (pagination) for Dashboard" (b002dba)
+- **前回のコミット**: "Update HANDOFF.md with latest implementations" (3009732)
 - **ブランチ**: main
 - **すべての変更がプッシュ済み** ✅
 
@@ -351,8 +357,9 @@ feedown/
 | 2026-01-12 03:00 | `af73564c.feedown.pages.dev` | スティッキーヘッダー |
 | 2026-01-12 03:30 | `1bf93f7d.feedown.pages.dev` | モーダル画像調整、スティッキーコントロール |
 | 2026-01-12 04:00 | `7a58f493.feedown.pages.dev` | 一括既読、透過背景 |
-| **2026-01-12 11:00** | **自動デプロイ中** | **Favicon表示、ドラッグ&ドロップ、画像抽出改善** |
-| **2026-01-12 11:15** | **自動デプロイ中** | **Unreadフィルター時自動既読無効化、全件表示(limit:1000)** |
+| 2026-01-12 11:00 | 自動デプロイ済み | Favicon表示、ドラッグ&ドロップ、画像抽出改善 |
+| 2026-01-12 11:15 | 自動デプロイ済み | Unreadフィルター時自動既読無効化、全件表示 |
+| **2026-01-12 12:30** | **自動デプロイ中** | **無限スクロール（ページネーション）実装** |
 
 ---
 
@@ -391,11 +398,18 @@ feedown/
 3. **2秒以上表示しても自動的に既読にならない**
 4. **「All」フィルターに戻すと自動既読が再び有効になる**
 
-#### 全記事表示（最大1000件）
-1. **複数のフィードを登録（3つ以上推奨）**
-2. **各フィードから記事を取得**
-3. **Dashboardに全フィードの記事が日付順で表示される**
-4. **従来は最大50件だったが、現在は最大1000件まで表示**
+#### 無限スクロール（ページネーション） ✅ **NEW**
+1. **Dashboardで記事一覧を表示**
+   - 初回は最大50件の記事が表示される
+2. **ページを下にスクロール**
+   - リストの最後に到達すると自動的に次の50件を読み込む
+   - 読み込み中は「Loading more articles...」とスピナーが表示される
+3. **全件読み込み完了**
+   - すべての記事を読み込むと「No more articles to load」が表示される
+4. **Refreshボタンをクリック**
+   - リセットされて最初の50件から再表示される
+5. **パフォーマンス確認**
+   - 100件以上の記事がある場合でも、スムーズにスクロール・読み込みできる
 
 ### UI/UX機能
 1. **スクロール**
@@ -445,13 +459,13 @@ feedown/
    - Unreadフィルター中は無効化される ✅ **NEW**
    - モバイルでは動作が異なる可能性
 
-5. **記事一覧の表示件数** ✅ **NEW**
-   - 最大1000件まで表示可能
-   - 1000件を超える場合は古い記事から除外される
-   - パフォーマンス面での最適化は今後の課題
+5. **無限スクロール（ページネーション）** ✅ **NEW**
+   - 初回50件、スクロールで段階的に読み込み
+   - バックエンドでは最大1000件まで対応
+   - フィルター変更時はリセットされる
+   - パフォーマンスは良好だが、1000件を超える場合は古い記事から除外
 
 6. **オプション機能（未実装）**
-   - 無限スクロール（ページネーション）
    - OPMLインポート/エクスポート
    - ダークモード
    - キーボードショートカット
@@ -617,9 +631,10 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
    - filter === 'unread'の場合、Intersection Observerを無効化
    - ユーザーが未読記事を閲覧中に勝手に既読にならない
 
-5. ✅ **記事一覧の全件表示**
-   - limitパラメータを50→1000に変更
-   - 全Feedの記事を取得して日付順で表示
+5. ✅ **無限スクロール（ページネーション）**
+   - 初回50件、スクロールで段階的に自動読み込み
+   - Intersection Observerで最下部を監視
+   - hasMoreフラグとローディングインジケーター実装
 
 ### 変更したファイル
 - `functions/api/refresh.ts` - favicon抽出、画像抽出改善（3種類追加）
@@ -627,13 +642,15 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 - `functions/api/feeds/[id].ts` - PATCH endpoint追加
 - `packages/shared/src/api/client.ts` - PATCH メソッド追加
 - `packages/shared/src/api/endpoints.ts` - FeedsAPI.update()追加
-- `apps/web/src/pages/DashboardPage.jsx` - favicon表示、自動既読無効化、limit変更
+- `apps/web/src/pages/DashboardPage.jsx` - favicon表示、自動既読無効化、無限スクロール実装
 - `apps/web/src/pages/FeedsPage.jsx` - favicon表示、ドラッグ&ドロップ実装
 - `apps/web/src/pages/FavoritesPage.jsx` - favicon表示
+- `PROGRESS.md` - Phase 5の無限スクロールにチェック
 
 ### Gitコミット履歴
 1. `d7a48bb` - "Implement favicon display and drag & drop feed reordering"
 2. `9a26b8c` - "Disable auto-mark-as-read in Unread filter and increase article limit"
+3. `b002dba` - "Implement infinite scroll (pagination) for Dashboard"
 
 ---
 
@@ -673,13 +690,14 @@ Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUI�
 | 日時 | 担当者 | 主な変更内容 |
 |------|--------|------------|
 | 2026-01-12 04:30 | Claude Sonnet 4.5 | Phase 5完了、Feedly風UI実装 |
-| **2026-01-12 11:30** | **Claude Sonnet 4.5** | **Favicon表示、ドラッグ&ドロップ、画像抽出改善、Unreadフィルター改善、全件表示実装** |
+| 2026-01-12 11:30 | Claude Sonnet 4.5 | Favicon表示、ドラッグ&ドロップ、画像抽出改善、Unreadフィルター改善 |
+| **2026-01-12 12:30** | **Claude Sonnet 4.5** | **無限スクロール（ページネーション）実装完了** |
 
 ---
 
-**最終更新**: 2026-01-12 11:30
+**最終更新**: 2026-01-12 12:30
 **担当者**: Claude Sonnet 4.5
-**現在のフェーズ**: Phase 5 完了 (100%)、Phase 6 完了 (90%)
+**現在のフェーズ**: Phase 5 完了 (100%)、Phase 6 完了 (92%)
 **次のフェーズ**: Phase 7 - Mobile アプリ (0%)
 **最新デプロイURL**: https://feedown.pages.dev（自動デプロイ中）
-**最新コミット**: 9a26b8c
+**最新コミット**: b002dba
