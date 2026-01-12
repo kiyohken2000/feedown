@@ -1,6 +1,8 @@
 import React from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 
 const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead, isFavorited }) => {
+  const { isDarkMode } = useTheme();
   const styles = {
     overlay: {
       position: 'fixed',
@@ -16,13 +18,13 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
       padding: '1rem',
     },
     modal: {
-      backgroundColor: 'white',
+      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
       borderRadius: '12px',
       maxWidth: '800px',
       width: '100%',
       maxHeight: '90vh',
       overflow: 'auto',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+      boxShadow: isDarkMode ? '0 8px 32px rgba(0, 0, 0, 0.6)' : '0 8px 32px rgba(0, 0, 0, 0.3)',
       position: 'relative',
     },
     closeButton: {
@@ -34,7 +36,7 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
       fontSize: '2.5rem',
       cursor: 'pointer',
       padding: '0.5rem',
-      color: '#666',
+      color: isDarkMode ? '#b0b0b0' : '#666',
       zIndex: 10,
       width: '3rem',
       height: '3rem',
@@ -54,12 +56,12 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
       objectFit: 'contain',
       borderRadius: '8px',
       marginBottom: '1.5rem',
-      backgroundColor: '#f5f5f5',
+      backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f5f5',
     },
     title: {
       fontSize: '2rem',
       fontWeight: 'bold',
-      color: '#333',
+      color: isDarkMode ? '#e0e0e0' : '#333',
       marginBottom: '1rem',
       lineHeight: '1.3',
     },
@@ -67,14 +69,14 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
       display: 'flex',
       gap: '1rem',
       fontSize: '0.9rem',
-      color: '#999',
+      color: isDarkMode ? '#b0b0b0' : '#999',
       marginBottom: '1.5rem',
       flexWrap: 'wrap',
     },
     description: {
       fontSize: '1.1rem',
       lineHeight: '1.8',
-      color: '#444',
+      color: isDarkMode ? '#b0b0b0' : '#444',
       marginBottom: '2rem',
       whiteSpace: 'pre-wrap',
     },
@@ -83,7 +85,7 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
       gap: '1rem',
       marginTop: '2rem',
       paddingTop: '1.5rem',
-      borderTop: '1px solid #eee',
+      borderTop: isDarkMode ? '1px solid #444' : '1px solid #eee',
       flexWrap: 'wrap',
     },
     button: {

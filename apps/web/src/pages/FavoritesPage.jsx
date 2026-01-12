@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import ArticleModal from '../components/ArticleModal';
+import { useTheme } from '../contexts/ThemeContext';
 
 const FavoritesPage = () => {
   const [loading, setLoading] = useState(true);
@@ -15,6 +16,7 @@ const FavoritesPage = () => {
   const [feeds, setFeeds] = useState([]);
   const navigate = useNavigate();
   const auth = getAuth();
+  const { isDarkMode } = useTheme();
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '/api',
@@ -139,7 +141,7 @@ const FavoritesPage = () => {
       paddingBottom: '1.5rem',
     },
     heading: {
-      color: '#333',
+      color: isDarkMode ? '#e0e0e0' : '#333',
       marginBottom: '0.5rem',
       fontSize: '1.5rem',
       fontWeight: 'bold',
@@ -152,7 +154,7 @@ const FavoritesPage = () => {
       fontSize: '1.8rem',
     },
     subtitle: {
-      color: '#666',
+      color: isDarkMode ? '#b0b0b0' : '#666',
       fontSize: '1rem',
     },
     articlesList: {
@@ -160,11 +162,11 @@ const FavoritesPage = () => {
       gap: '1rem',
     },
     articleCard: {
-      backgroundColor: 'white',
+      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
       borderRadius: '8px',
       padding: '1.5rem',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      border: '1px solid #eee',
+      boxShadow: isDarkMode ? '0 2px 4px rgba(0,0,0,0.4)' : '0 2px 4px rgba(0,0,0,0.1)',
+      border: isDarkMode ? '1px solid #444' : '1px solid #eee',
       transition: 'all 0.3s',
       cursor: 'pointer',
       display: 'flex',
@@ -181,12 +183,12 @@ const FavoritesPage = () => {
     noImage: {
       width: '200px',
       height: '120px',
-      backgroundColor: '#f5f5f5',
+      backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f5f5',
       borderRadius: '6px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      color: '#999',
+      color: isDarkMode ? '#b0b0b0' : '#999',
       fontSize: '0.9rem',
       flexShrink: 0,
     },
@@ -200,7 +202,7 @@ const FavoritesPage = () => {
       display: 'flex',
       gap: '0.5rem',
       fontSize: '0.85rem',
-      color: '#999',
+      color: isDarkMode ? '#b0b0b0' : '#999',
       flexWrap: 'wrap',
     },
     feedTitle: {
@@ -217,13 +219,13 @@ const FavoritesPage = () => {
       flexShrink: 0,
     },
     articleTitle: {
-      color: '#333',
+      color: isDarkMode ? '#e0e0e0' : '#333',
       fontSize: '1.2rem',
       fontWeight: '600',
       lineHeight: '1.4',
     },
     articleDescription: {
-      color: '#666',
+      color: isDarkMode ? '#b0b0b0' : '#666',
       fontSize: '0.95rem',
       lineHeight: '1.6',
       display: '-webkit-box',
@@ -234,7 +236,7 @@ const FavoritesPage = () => {
     noFavorites: {
       textAlign: 'center',
       padding: '3rem',
-      color: '#999',
+      color: isDarkMode ? '#b0b0b0' : '#999',
     },
     loadingSpinner: {
       border: '4px solid #f3f3f3',

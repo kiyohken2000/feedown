@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import ArticleModal from '../components/ArticleModal';
+import { useTheme } from '../contexts/ThemeContext';
 
 const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
@@ -22,6 +23,7 @@ const DashboardPage = () => {
 
   const navigate = useNavigate();
   const auth = getAuth();
+  const { isDarkMode } = useTheme();
   const observerRef = useRef(null);
   const articleRefs = useRef({});
   const loadMoreRef = useRef(null);
@@ -357,10 +359,10 @@ const DashboardPage = () => {
     controlsWrapper: {
       position: 'sticky',
       top: '73px',
-      backgroundColor: 'rgba(240, 240, 240, 0.85)',
+      backgroundColor: isDarkMode ? 'rgba(26, 26, 26, 0.85)' : 'rgba(240, 240, 240, 0.85)',
       backdropFilter: 'blur(10px)',
       zIndex: 50,
-      borderBottom: '1px solid #ddd',
+      borderBottom: isDarkMode ? '1px solid #444' : '1px solid #ddd',
       width: '100%',
     },
     controls: {
@@ -388,7 +390,7 @@ const DashboardPage = () => {
     filterButton: {
       padding: '0.5rem 1rem',
       border: '2px solid #FF6B35',
-      backgroundColor: 'white',
+      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
       color: '#FF6B35',
       borderRadius: '5px',
       cursor: 'pointer',
@@ -427,13 +429,13 @@ const DashboardPage = () => {
       gap: '1rem',
     },
     articleCard: {
-      backgroundColor: 'white',
+      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
       borderRadius: '8px',
       padding: '1rem',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      boxShadow: isDarkMode ? '0 2px 4px rgba(0,0,0,0.4)' : '0 2px 4px rgba(0,0,0,0.1)',
       cursor: 'pointer',
       transition: 'all 0.3s',
-      border: '1px solid #eee',
+      border: isDarkMode ? '1px solid #444' : '1px solid #eee',
       display: 'flex',
       gap: '1rem',
     },
@@ -453,7 +455,7 @@ const DashboardPage = () => {
       height: '120px',
       borderRadius: '6px',
       flexShrink: 0,
-      backgroundColor: '#f0f0f0',
+      backgroundColor: isDarkMode ? '#1a1a1a' : '#f0f0f0',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -469,7 +471,7 @@ const DashboardPage = () => {
       gap: '0.5rem',
       alignItems: 'center',
       fontSize: '0.85rem',
-      color: '#999',
+      color: isDarkMode ? '#b0b0b0' : '#999',
       marginBottom: '0.5rem',
       flexWrap: 'wrap',
     },
@@ -487,14 +489,14 @@ const DashboardPage = () => {
       flexShrink: 0,
     },
     articleTitle: {
-      color: '#333',
+      color: isDarkMode ? '#e0e0e0' : '#333',
       marginBottom: '0.5rem',
       fontSize: '1.2rem',
       fontWeight: '600',
       lineHeight: '1.4',
     },
     articleDescription: {
-      color: '#666',
+      color: isDarkMode ? '#b0b0b0' : '#666',
       lineHeight: '1.5',
       fontSize: '0.95rem',
       marginBottom: '0.5rem',
@@ -506,7 +508,7 @@ const DashboardPage = () => {
     noArticles: {
       textAlign: 'center',
       padding: '3rem',
-      color: '#999',
+      color: isDarkMode ? '#b0b0b0' : '#999',
     },
     loadingSpinner: {
       border: '4px solid #f3f3f3',
@@ -544,7 +546,7 @@ const DashboardPage = () => {
     endOfArticles: {
       textAlign: 'center',
       padding: '2rem',
-      color: '#999',
+      color: isDarkMode ? '#b0b0b0' : '#999',
       fontSize: '0.9rem',
     },
   };

@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import Navigation from '../components/Navigation';
+import { useTheme } from '../contexts/ThemeContext';
 
 const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
   const auth = getAuth();
+  const { isDarkMode, toggleDarkMode } = useTheme();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -37,22 +39,24 @@ const SettingsPage = () => {
       padding: '2rem',
       maxWidth: '800px',
       margin: '2rem auto',
+      backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f5f5',
+      minHeight: '100vh',
     },
     card: {
-      backgroundColor: 'white',
+      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
       borderRadius: '8px',
       padding: '2rem',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.1)',
       marginBottom: '2rem',
     },
     heading: {
-      color: '#333',
+      color: isDarkMode ? '#e0e0e0' : '#333',
       marginBottom: '1.5rem',
       fontSize: '1.8rem',
       fontWeight: 'bold',
     },
     sectionHeading: {
-      color: '#555',
+      color: isDarkMode ? '#b0b0b0' : '#555',
       marginBottom: '1rem',
       fontSize: '1.3rem',
       fontWeight: '600',
@@ -61,14 +65,15 @@ const SettingsPage = () => {
       display: 'flex',
       justifyContent: 'space-between',
       padding: '0.75rem 0',
-      borderBottom: '1px solid #eee',
+      borderBottom: isDarkMode ? '1px solid #444' : '1px solid #eee',
+      alignItems: 'center',
     },
     label: {
       fontWeight: '600',
-      color: '#666',
+      color: isDarkMode ? '#999' : '#666',
     },
     value: {
-      color: '#333',
+      color: isDarkMode ? '#e0e0e0' : '#333',
     },
     button: {
       padding: '0.75rem 2rem',
@@ -93,6 +98,26 @@ const SettingsPage = () => {
       animation: 'spin 1s linear infinite',
       margin: '2rem auto',
     },
+    toggleSwitch: {
+      position: 'relative',
+      width: '60px',
+      height: '30px',
+      backgroundColor: isDarkMode ? '#FF6B35' : '#ccc',
+      borderRadius: '15px',
+      cursor: 'pointer',
+      transition: 'background-color 0.3s',
+    },
+    toggleSlider: {
+      position: 'absolute',
+      top: '3px',
+      left: isDarkMode ? '33px' : '3px',
+      width: '24px',
+      height: '24px',
+      backgroundColor: 'white',
+      borderRadius: '50%',
+      transition: 'left 0.3s',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+    },
   };
 
   if (loading) {
@@ -112,6 +137,19 @@ const SettingsPage = () => {
       <Navigation />
       <div style={styles.container}>
         <h1 style={styles.heading}>Settings</h1>
+
+        <div style={styles.card}>
+          <h2 style={styles.sectionHeading}>Appearance</h2>
+          <div style={styles.infoRow}>
+            <span style={styles.label}>Dark Mode</span>
+            <div
+              style={styles.toggleSwitch}
+              onClick={toggleDarkMode}
+            >
+              <div style={styles.toggleSlider}></div>
+            </div>
+          </div>
+        </div>
 
         <div style={styles.card}>
           <h2 style={styles.sectionHeading}>Account Information</h2>

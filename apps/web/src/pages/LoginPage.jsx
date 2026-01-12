@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -9,6 +10,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const auth = getAuth();
+  const { isDarkMode } = useTheme();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,10 +42,10 @@ const LoginPage = () => {
       padding: '2rem',
     },
     card: {
-      backgroundColor: 'white',
+      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
       padding: '3rem',
       borderRadius: '12px',
-      boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+      boxShadow: isDarkMode ? '0 10px 40px rgba(0,0,0,0.6)' : '0 10px 40px rgba(0,0,0,0.2)',
       maxWidth: '450px',
       width: '100%',
     },
@@ -59,13 +61,13 @@ const LoginPage = () => {
     },
     tagline: {
       fontSize: '1rem',
-      color: '#666',
+      color: isDarkMode ? '#b0b0b0' : '#666',
       fontStyle: 'italic',
     },
     tabs: {
       display: 'flex',
       marginBottom: '2rem',
-      borderBottom: '2px solid #e0e0e0',
+      borderBottom: isDarkMode ? '2px solid #444' : '2px solid #e0e0e0',
     },
     tab: {
       flex: 1,
@@ -73,7 +75,7 @@ const LoginPage = () => {
       textAlign: 'center',
       cursor: 'pointer',
       fontWeight: '600',
-      color: '#999',
+      color: isDarkMode ? '#b0b0b0' : '#999',
       borderBottom: '3px solid transparent',
       transition: 'all 0.3s',
     },
@@ -93,15 +95,17 @@ const LoginPage = () => {
     },
     label: {
       fontWeight: '600',
-      color: '#333',
+      color: isDarkMode ? '#e0e0e0' : '#333',
       fontSize: '0.9rem',
     },
     input: {
       padding: '0.75rem',
-      border: '2px solid #e0e0e0',
+      border: isDarkMode ? '2px solid #444' : '2px solid #e0e0e0',
       borderRadius: '6px',
       fontSize: '1rem',
       transition: 'border-color 0.3s',
+      backgroundColor: isDarkMode ? '#1a1a1a' : 'white',
+      color: isDarkMode ? '#e0e0e0' : '#333',
     },
     button: {
       padding: '1rem',

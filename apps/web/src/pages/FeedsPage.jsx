@@ -3,6 +3,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
+import { useTheme } from '../contexts/ThemeContext';
 
 const FeedsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -15,6 +16,7 @@ const FeedsPage = () => {
   const [draggedIndex, setDraggedIndex] = useState(null);
   const navigate = useNavigate();
   const auth = getAuth();
+  const { isDarkMode } = useTheme();
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '/api',
@@ -142,20 +144,20 @@ const FeedsPage = () => {
       margin: '2rem auto',
     },
     heading: {
-      color: '#333',
+      color: isDarkMode ? '#e0e0e0' : '#333',
       marginBottom: '2rem',
       fontSize: '2rem',
       fontWeight: 'bold',
     },
     card: {
-      backgroundColor: 'white',
+      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
       borderRadius: '8px',
       padding: '2rem',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.1)',
       marginBottom: '2rem',
     },
     sectionHeading: {
-      color: '#555',
+      color: isDarkMode ? '#b0b0b0' : '#555',
       marginBottom: '1rem',
       fontSize: '1.3rem',
       fontWeight: '600',
@@ -168,10 +170,12 @@ const FeedsPage = () => {
     input: {
       flex: 1,
       padding: '0.75rem',
-      border: '2px solid #e0e0e0',
+      border: isDarkMode ? '2px solid #444' : '2px solid #e0e0e0',
       borderRadius: '5px',
       fontSize: '1rem',
       transition: 'border-color 0.3s',
+      backgroundColor: isDarkMode ? '#1a1a1a' : 'white',
+      color: isDarkMode ? '#e0e0e0' : '#333',
     },
     button: {
       padding: '0.75rem 1.5rem',
@@ -193,9 +197,9 @@ const FeedsPage = () => {
       justifyContent: 'space-between',
       alignItems: 'center',
       padding: '1rem',
-      backgroundColor: '#f9f9f9',
+      backgroundColor: isDarkMode ? '#1a1a1a' : '#f9f9f9',
       borderRadius: '5px',
-      border: '1px solid #e0e0e0',
+      border: isDarkMode ? '1px solid #444' : '1px solid #e0e0e0',
       cursor: 'move',
       transition: 'all 0.2s',
     },
@@ -205,7 +209,7 @@ const FeedsPage = () => {
     },
     dragHandle: {
       fontSize: '1.2rem',
-      color: '#999',
+      color: isDarkMode ? '#b0b0b0' : '#999',
       cursor: 'grab',
       marginRight: '0.75rem',
       userSelect: 'none',
@@ -229,12 +233,12 @@ const FeedsPage = () => {
     },
     feedTitle: {
       fontWeight: '600',
-      color: '#333',
+      color: isDarkMode ? '#e0e0e0' : '#333',
       marginBottom: '0.25rem',
     },
     feedUrl: {
       fontSize: '0.85rem',
-      color: '#999',
+      color: isDarkMode ? '#b0b0b0' : '#999',
     },
     deleteButton: {
       padding: '0.5rem 1rem',
@@ -250,7 +254,7 @@ const FeedsPage = () => {
     noFeeds: {
       textAlign: 'center',
       padding: '2rem',
-      color: '#999',
+      color: isDarkMode ? '#b0b0b0' : '#999',
     },
     loadingSpinner: {
       border: '4px solid #f3f3f3',
