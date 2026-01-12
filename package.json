@@ -5,7 +5,7 @@
   "description": "Own your feeds, own your data - Self-hosted RSS reader",
   "repository": {
     "type": "git",
-    "url": "https://github.com/feedown/feedown.git"
+    "url": "https://github.com/kiyohken2000/feedown.git"
   },
   "license": "MIT",
   "workspaces": [

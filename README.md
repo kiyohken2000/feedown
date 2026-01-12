@@ -24,7 +24,7 @@ Self-hosted RSS reader powered by Firebase and Cloudflare.
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22.19.0+
 - Yarn 1.22+
 - Firebase account
 - Cloudflare account
@@ -33,7 +33,7 @@ Self-hosted RSS reader powered by Firebase and Cloudflare.
 
 ```bash
 # Clone repository
-git clone https://github.com/feedown/feedown.git
+git clone https://github.com/kiyohken2000/feedown.git
 cd feedown
 
 # Install dependencies
