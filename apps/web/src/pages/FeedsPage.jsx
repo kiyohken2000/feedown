@@ -5,6 +5,23 @@ import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import { useTheme } from '../contexts/ThemeContext';
 
+// Recommended feeds
+const RECOMMENDED_FEEDS = [
+  { name: 'AFP', url: 'http://feeds.afpbb.com/rss/afpbb/afpbbnews' },
+  { name: 'BBC', url: 'http://feeds.bbci.co.uk/japanese/rss.xml' },
+  { name: 'CNN', url: 'http://feeds.cnn.co.jp/rss/cnn/cnn.rdf' },
+  { name: 'Rocket News 24', url: 'http://feeds.rocketnews24.com/rocketnews24' },
+  { name: 'Weekly ASCII Plus', url: 'http://weekly.ascii.jp/cate/1/rss.xml' },
+  { name: 'National Geographic', url: 'http://nationalgeographic.jp/nng/rss/index.rdf' },
+  { name: 'Lifehacker', url: 'http://www.lifehacker.jp/index.xml' },
+  { name: 'Reuters', url: 'http://feeds.reuters.com/reuters/JPTopNews?format=xml' },
+  { name: 'GIGAZINE', url: 'https://gigazine.net/news/rss_2.0/' },
+  { name: 'Gizmodo', url: 'http://feeds.gizmodo.jp/rss/gizmodo/index.xml' },
+  { name: 'CNET Japan', url: 'http://feed.japan.cnet.com/rss/index.rdf' },
+  { name: 'AAPL Ch.', url: 'http://applech2.com/index.rdf' },
+  { name: 'Kitamori Kawaraban', url: 'https://northwood.blog.fc2.com/?xml' },
+];
+
 const FeedsPage = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -13,6 +30,7 @@ const FeedsPage = () => {
   const [feedsError, setFeedsError] = useState(null);
   const [newFeedUrl, setNewFeedUrl] = useState('');
   const [addingFeed, setAddingFeed] = useState(false);
+  const [addingRecommended, setAddingRecommended] = useState({});
   const [draggedIndex, setDraggedIndex] = useState(null);
   const navigate = useNavigate();
   const auth = getAuth();
@@ -77,6 +95,30 @@ const FeedsPage = () => {
     }
   };
 
+  const handleAddRecommendedFeed = async (feedUrl, feedName) => {
+    // Check if already added
+    const alreadyAdded = feeds.some(feed => feed.url === feedUrl);
+    if (alreadyAdded) {
+      alert(`${feedName} is already in your feed list.`);
+      return;
+    }
+
+    setAddingRecommended(prev => ({ ...prev, [feedUrl]: true }));
+    try {
+      const response = await api.feeds.add(feedUrl);
+      if (response.success) {
+        await fetchFeeds();
+        alert(`${feedName} has been added successfully!`);
+      } else {
+        throw new Error(response.error);
+      }
+    } catch (error) {
+      alert('Failed to add feed: ' + error.message);
+    } finally {
+      setAddingRecommended(prev => ({ ...prev, [feedUrl]: false }));
+    }
+  };
+
   const handleDeleteFeed = async (feedId) => {
     if (!window.confirm('Are you sure you want to delete this feed?')) return;
 
@@ -90,6 +132,10 @@ const FeedsPage = () => {
     } catch (error) {
       alert('Failed to delete feed: ' + error.message);
     }
+  };
+
+  const isFeedAdded = (feedUrl) => {
+    return feeds.some(feed => feed.url === feedUrl);
   };
 
   const handleDragStart = (e, index) => {
@@ -265,6 +311,43 @@ const FeedsPage = () => {
       animation: 'spin 1s linear infinite',
       margin: '2rem auto',
     },
+    recommendedGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+      gap: '1rem',
+    },
+    recommendedItem: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '1rem',
+      backgroundColor: isDarkMode ? '#1a1a1a' : '#f9f9f9',
+      borderRadius: '5px',
+      border: isDarkMode ? '1px solid #444' : '1px solid #e0e0e0',
+      gap: '0.75rem',
+    },
+    recommendedName: {
+      flex: 1,
+      fontWeight: '600',
+      color: isDarkMode ? '#e0e0e0' : '#333',
+      fontSize: '0.95rem',
+    },
+    addButton: {
+      padding: '0.5rem 1rem',
+      backgroundColor: '#28a745',
+      color: 'white',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+      fontSize: '0.9rem',
+      fontWeight: '600',
+      transition: 'background-color 0.3s',
+      flexShrink: 0,
+    },
+    addButtonAdded: {
+      backgroundColor: '#6c757d',
+      cursor: 'not-allowed',
+    },
   };
 
   if (loading) {
@@ -301,6 +384,41 @@ const FeedsPage = () => {
               {addingFeed ? 'Adding...' : 'Add Feed'}
             </button>
           </form>
+        </div>
+
+        <div style={styles.card}>
+          <h2 style={styles.sectionHeading}>Recommended Feeds</h2>
+          <div style={styles.recommendedGrid}>
+            {RECOMMENDED_FEEDS.map((feed) => {
+              const isAdded = isFeedAdded(feed.url);
+              const isAdding = addingRecommended[feed.url];
+              return (
+                <div key={feed.url} style={styles.recommendedItem}>
+                  <div style={styles.recommendedName}>{feed.name}</div>
+                  <button
+                    onClick={() => handleAddRecommendedFeed(feed.url, feed.name)}
+                    style={{
+                      ...styles.addButton,
+                      ...(isAdded ? styles.addButtonAdded : {}),
+                    }}
+                    disabled={isAdded || isAdding}
+                    onMouseOver={(e) => {
+                      if (!isAdded && !isAdding) {
+                        e.target.style.backgroundColor = '#218838';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isAdded && !isAdding) {
+                        e.target.style.backgroundColor = '#28a745';
+                      }
+                    }}
+                  >
+                    {isAdding ? 'Adding...' : isAdded ? 'Added' : 'Add'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div style={styles.card}>
