@@ -80,8 +80,8 @@ export class ArticlesAPI {
     return this.client.post<void>(`/api/articles/${articleId}/read`);
   }
 
-  async addToFavorites(articleId: string) {
-    return this.client.post<void>(`/api/articles/${articleId}/favorite`);
+  async addToFavorites(articleId: string, articleData: { title: string; url: string; description?: string; feedTitle?: string }) {
+    return this.client.post<void>(`/api/articles/${articleId}/favorite`, articleData);
   }
 
   async removeFromFavorites(articleId: string) {

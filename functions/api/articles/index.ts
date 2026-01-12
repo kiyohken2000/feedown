@@ -62,16 +62,24 @@ export async function onRequestGet(context: any): Promise<Response> {
       articles = articles.filter(article => article.feedId === feedId);
     }
 
-    // Get read articles if filtering by unread
+    // Get read articles to mark isRead flag
+    const readArticles = await listDocuments(
+      `users/${uid}/readArticles`,
+      idToken,
+      config,
+      1000
+    );
+    const readArticleIds = new Set(readArticles.map(doc => doc.id));
+
+    // Add isRead flag to all articles
+    articles = articles.map(article => ({
+      ...article,
+      isRead: readArticleIds.has(article.id),
+    }));
+
+    // Filter by unread if specified
     if (unreadOnly) {
-      const readArticles = await listDocuments(
-        `users/${uid}/readArticles`,
-        idToken,
-        config,
-        1000
-      );
-      const readArticleIds = new Set(readArticles.map(doc => doc.id));
-      articles = articles.filter(article => !readArticleIds.has(article.id));
+      articles = articles.filter(article => !article.isRead);
     }
 
     // Sort by publishedAt descending

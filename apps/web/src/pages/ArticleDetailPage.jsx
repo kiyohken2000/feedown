@@ -56,7 +56,12 @@ const ArticleDetailPage = () => {
           setIsFavorite(false);
         }
       } else {
-        const response = await api.articles.addToFavorites(id);
+        const response = await api.articles.addToFavorites(id, {
+          title: article.title,
+          url: article.url || article.link,
+          description: article.description || '',
+          feedTitle: article.feedTitle || '',
+        });
         if (response.success) {
           setIsFavorite(true);
         }
