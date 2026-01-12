@@ -157,10 +157,10 @@ const DashboardPage = () => {
     observerRef.current = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.8) {
             const articleId = entry.target.dataset.articleId;
             if (articleId && !readArticles.has(articleId)) {
-              // Mark as read after 2 seconds of viewing
+              // Mark as read after 5 seconds of viewing (80% visible)
               setTimeout(async () => {
                 if (entry.target && entry.isIntersecting) {
                   try {
@@ -170,12 +170,12 @@ const DashboardPage = () => {
                     console.error('Failed to mark as read:', error);
                   }
                 }
-              }, 2000);
+              }, 5000);
             }
           }
         });
       },
-      { threshold: 0.5 }
+      { threshold: 0.8 }
     );
 
     // Observe all article cards
