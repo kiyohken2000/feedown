@@ -3,6 +3,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
+import ArticleModal from '../components/ArticleModal';
 
 const FavoritesPage = () => {
   const [loading, setLoading] = useState(true);
@@ -10,6 +11,7 @@ const FavoritesPage = () => {
   const [favorites, setFavorites] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [favoritesError, setFavoritesError] = useState(null);
+  const [selectedArticle, setSelectedArticle] = useState(null);
   const navigate = useNavigate();
   const auth = getAuth();
 
@@ -52,20 +54,84 @@ const FavoritesPage = () => {
     return () => unsubscribe();
   }, [auth, navigate, api]);
 
+  const handleArticleClick = (favorite) => {
+    // Convert favorite format to article format for modal
+    const article = {
+      id: favorite.articleId,
+      title: favorite.articleTitle,
+      url: favorite.articleLink,
+      description: favorite.articleDescription,
+      feedTitle: favorite.feedTitle || 'Unknown Feed',
+      publishedAt: favorite.savedAt,
+      imageUrl: favorite.imageUrl || null,
+    };
+    setSelectedArticle(article);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedArticle(null);
+  };
+
+  const handleRemoveFromFavorites = async () => {
+    if (!selectedArticle) return;
+
+    try {
+      await api.articles.removeFromFavorites(selectedArticle.id);
+      setSelectedArticle(null);
+      // Refresh favorites list
+      await fetchFavorites();
+    } catch (error) {
+      console.error('Failed to remove from favorites:', error);
+    }
+  };
+
+  const getRelativeTime = (dateString) => {
+    if (!dateString) return 'Unknown date';
+
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInSeconds = Math.floor((now - date) / 1000);
+
+    if (diffInSeconds < 60) {
+      return 'just now';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes}m ago`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours}h ago`;
+    } else if (diffInSeconds < 604800) {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days}d ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
   const styles = {
     container: {
-      padding: '2rem',
-      maxWidth: '1000px',
-      margin: '2rem auto',
+      paddingLeft: '2rem',
+      paddingRight: '2rem',
+      paddingBottom: '2rem',
+      maxWidth: '1200px',
+      margin: '0 auto',
     },
     header: {
-      marginBottom: '2rem',
+      paddingTop: '2rem',
+      paddingBottom: '1.5rem',
     },
     heading: {
       color: '#333',
       marginBottom: '0.5rem',
-      fontSize: '2rem',
+      fontSize: '1.5rem',
       fontWeight: 'bold',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+    },
+    favoriteIcon: {
+      color: '#FFD700',
+      fontSize: '1.8rem',
     },
     subtitle: {
       color: '#666',
@@ -83,27 +149,60 @@ const FavoritesPage = () => {
       border: '1px solid #eee',
       transition: 'all 0.3s',
       cursor: 'pointer',
+      display: 'flex',
+      gap: '1.5rem',
+    },
+    articleImage: {
+      width: '200px',
+      height: '120px',
+      objectFit: 'cover',
+      borderRadius: '6px',
+      backgroundColor: '#f5f5f5',
+      flexShrink: 0,
+    },
+    noImage: {
+      width: '200px',
+      height: '120px',
+      backgroundColor: '#f5f5f5',
+      borderRadius: '6px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#999',
+      fontSize: '0.9rem',
+      flexShrink: 0,
+    },
+    articleContent: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.5rem',
+    },
+    articleMeta: {
+      display: 'flex',
+      gap: '0.5rem',
+      fontSize: '0.85rem',
+      color: '#999',
+      flexWrap: 'wrap',
+    },
+    feedTitle: {
+      color: '#FF6B35',
+      fontWeight: '600',
     },
     articleTitle: {
       color: '#333',
-      marginBottom: '0.5rem',
-      fontSize: '1.3rem',
+      fontSize: '1.2rem',
       fontWeight: '600',
+      lineHeight: '1.4',
     },
     articleDescription: {
       color: '#666',
-      lineHeight: '1.5',
-      marginBottom: '0.75rem',
-    },
-    articleLink: {
-      color: '#FF6B35',
-      textDecoration: 'none',
-      fontWeight: '600',
-      transition: 'color 0.3s',
-    },
-    favoriteIcon: {
-      color: '#FFD700',
-      marginRight: '0.5rem',
+      fontSize: '0.95rem',
+      lineHeight: '1.6',
+      display: '-webkit-box',
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: 'vertical',
+      overflow: 'hidden',
     },
     noFavorites: {
       textAlign: 'center',
@@ -127,7 +226,7 @@ const FavoritesPage = () => {
         <Navigation />
         <div style={styles.container}>
           <div style={styles.loadingSpinner}></div>
-          <p>Loading favorites...</p>
+          <p style={{ textAlign: 'center' }}>Loading favorites...</p>
         </div>
       </div>
     );
@@ -163,6 +262,7 @@ const FavoritesPage = () => {
                 <div
                   key={favorite.articleId}
                   style={styles.articleCard}
+                  onClick={() => handleArticleClick(favorite)}
                   onMouseOver={(e) => {
                     e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
                     e.currentTarget.style.transform = 'translateY(-2px)';
@@ -172,21 +272,26 @@ const FavoritesPage = () => {
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
-                  <h3 style={styles.articleTitle}>{favorite.articleTitle}</h3>
-                  <p style={styles.articleDescription}>
-                    {favorite.articleDescription?.substring(0, 200) || 'No description available'}
-                    {favorite.articleDescription?.length > 200 ? '...' : ''}
-                  </p>
-                  <a
-                    href={favorite.articleLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={styles.articleLink}
-                    onMouseOver={(e) => (e.target.style.color = '#e55a2b')}
-                    onMouseOut={(e) => (e.target.style.color = '#FF6B35')}
-                  >
-                    Read Full Article →
-                  </a>
+                  {favorite.imageUrl ? (
+                    <img
+                      src={favorite.imageUrl}
+                      alt={favorite.articleTitle}
+                      style={styles.articleImage}
+                    />
+                  ) : (
+                    <div style={styles.noImage}>No image</div>
+                  )}
+                  <div style={styles.articleContent}>
+                    <div style={styles.articleMeta}>
+                      <span style={styles.feedTitle}>{favorite.feedTitle || 'Unknown Feed'}</span>
+                      <span>•</span>
+                      <span>{getRelativeTime(favorite.savedAt)}</span>
+                    </div>
+                    <h3 style={styles.articleTitle}>{favorite.articleTitle}</h3>
+                    <p style={styles.articleDescription}>
+                      {favorite.articleDescription || 'No description available'}
+                    </p>
+                  </div>
                 </div>
               ))
             ) : (
@@ -198,6 +303,17 @@ const FavoritesPage = () => {
           </div>
         )}
       </div>
+
+      {selectedArticle && (
+        <ArticleModal
+          article={selectedArticle}
+          onClose={handleCloseModal}
+          onMarkAsRead={() => {}} // Favorites don't need mark as read
+          onToggleFavorite={handleRemoveFromFavorites}
+          isRead={false}
+          isFavorited={true}
+        />
+      )}
     </div>
   );
 };
