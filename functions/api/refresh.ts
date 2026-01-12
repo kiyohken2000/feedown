@@ -64,6 +64,8 @@ export async function onRequestPost(context: any): Promise<Response> {
       newArticles: 0,
     };
 
+    console.log(`[Refresh] Starting refresh for ${feeds.length} feeds`);
+
     // Get Worker URL from environment
     const workerUrl = env.WORKER_URL || env.VITE_WORKER_URL;
     if (!workerUrl) {
@@ -77,6 +79,8 @@ export async function onRequestPost(context: any): Promise<Response> {
     for (const feed of feeds) {
       const feedId = feed.id;
       const feedUrl = feed.url;
+
+      console.log(`[Refresh] Processing feed ${feedId}: ${feed.title || feedUrl}`);
 
       try {
         // Fetch RSS XML via Worker
@@ -109,6 +113,8 @@ export async function onRequestPost(context: any): Promise<Response> {
           config
         );
 
+        console.log(`[Refresh] Feed ${feedId}: ${newArticleCount} new articles`);
+
         stats.newArticles += newArticleCount;
         stats.successfulFeeds++;
 
@@ -127,11 +133,13 @@ export async function onRequestPost(context: any): Promise<Response> {
         );
 
       } catch (error) {
-        console.error(`Error refreshing feed ${feedId}:`, error);
+        console.error(`[Refresh] Error refreshing feed ${feedId}:`, error);
         stats.failedFeeds++;
         await updateFeedError(uid, feedId, idToken, config);
       }
     }
+
+    console.log(`[Refresh] Complete: ${stats.successfulFeeds}/${stats.totalFeeds} feeds successful, ${stats.newArticles} new articles`);
 
     return new Response(
       JSON.stringify({
