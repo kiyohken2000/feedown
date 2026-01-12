@@ -275,10 +275,10 @@ const DashboardPage = () => {
     controlsWrapper: {
       position: 'sticky',
       top: '73px',
-      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      backgroundColor: 'rgba(240, 240, 240, 0.85)',
       backdropFilter: 'blur(10px)',
       zIndex: 50,
-      borderBottom: '1px solid #eee',
+      borderBottom: '1px solid #ddd',
       width: '100%',
     },
     controls: {
@@ -426,19 +426,15 @@ const DashboardPage = () => {
       animation: 'spin 1s linear infinite',
       margin: '2rem auto',
     },
-    loadingOverlay: {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(255, 255, 255, 0.8)',
-      backdropFilter: 'blur(4px)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
+    inlineSpinner: {
+      border: '3px solid #f3f3f3',
+      borderTop: '3px solid #FF6B35',
+      borderRadius: '50%',
+      width: '20px',
+      height: '20px',
+      animation: 'spin 1s linear infinite',
+      display: 'inline-block',
+      marginLeft: '0.5rem',
     },
   };
 
@@ -502,8 +498,11 @@ const DashboardPage = () => {
               style={styles.refreshButton}
               disabled={articlesLoading}
             >
-              {articlesLoading ? 'Refreshing...' : '🔄 Refresh'}
+              🔄 Refresh
             </button>
+            {articlesLoading && (
+              <div style={styles.inlineSpinner}></div>
+            )}
           </div>
         </div>
       </div>
@@ -576,13 +575,6 @@ const DashboardPage = () => {
           isRead={readArticles.has(selectedArticle.id)}
           isFavorited={favoritedArticles.has(selectedArticle.id)}
         />
-      )}
-
-      {articlesLoading && (
-        <div style={styles.loadingOverlay}>
-          <div style={styles.loadingSpinner}></div>
-          <p style={{ marginTop: '1rem', color: '#666' }}>Refreshing articles...</p>
-        </div>
       )}
     </div>
   );
