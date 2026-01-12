@@ -190,6 +190,9 @@ async function parseRssXml(xmlText: string): Promise<any> {
                              entryXml.match(/<updated[^>]*>(.*?)<\/updated>/)?.[1] || new Date().toISOString();
       const entryAuthor = entryXml.match(/<author[^>]*>[\s\S]*?<name[^>]*>(.*?)<\/name>/)?.[1] || '';
 
+      // Extract image URL from Atom entry
+      const imageUrl = extractImageUrl(entryXml, entryContent);
+
       result.items.push({
         title: stripHtml(entryTitle),
         link: entryLink,
@@ -197,6 +200,7 @@ async function parseRssXml(xmlText: string): Promise<any> {
         content: stripHtml(entryContent),
         publishedAt: new Date(entryPublished),
         author: entryAuthor ? stripHtml(entryAuthor) : null,
+        imageUrl,
       });
     }
   } else {
@@ -229,6 +233,9 @@ async function parseRssXml(xmlText: string): Promise<any> {
       const itemAuthor = itemXml.match(/<(?:dc:)?creator[^>]*>(.*?)<\/(?:dc:)?creator>/)?.[1] ||
                          itemXml.match(/<author[^>]*>(.*?)<\/author>/)?.[1] || '';
 
+      // Extract image URL from RSS item
+      const imageUrl = extractImageUrl(itemXml, itemContent);
+
       result.items.push({
         title: stripHtml(itemTitle),
         link: itemLink.trim(),
@@ -236,11 +243,52 @@ async function parseRssXml(xmlText: string): Promise<any> {
         content: stripHtml(itemContent),
         publishedAt: new Date(itemPubDate),
         author: itemAuthor ? stripHtml(itemAuthor) : null,
+        imageUrl,
       });
     }
   }
 
   return result;
+}
+
+/**
+ * Extract image URL from RSS/Atom entry
+ * Tries multiple common image sources in order of preference
+ */
+function extractImageUrl(entryXml: string, content: string): string | null {
+  // 1. Try media:thumbnail (most common in RSS feeds)
+  let match = entryXml.match(/<media:thumbnail[^>]+url="([^"]+)"/);
+  if (match) return match[1];
+
+  // 2. Try media:content with image type
+  match = entryXml.match(/<media:content[^>]+type="image\/[^"]+"[^>]+url="([^"]+)"/);
+  if (match) return match[1];
+  match = entryXml.match(/<media:content[^>]+url="([^"]+)"[^>]+type="image\/[^"]+"/);
+  if (match) return match[1];
+
+  // 3. Try enclosure with image type
+  match = entryXml.match(/<enclosure[^>]+type="image\/[^"]+"[^>]+url="([^"]+)"/);
+  if (match) return match[1];
+  match = entryXml.match(/<enclosure[^>]+url="([^"]+)"[^>]+type="image\/[^"]+"/);
+  if (match) return match[1];
+
+  // 4. Try Atom link with rel="enclosure" and image type
+  match = entryXml.match(/<link[^>]+rel="enclosure"[^>]+type="image\/[^"]+"[^>]+href="([^"]+)"/);
+  if (match) return match[1];
+  match = entryXml.match(/<link[^>]+href="([^"]+)"[^>]+rel="enclosure"[^>]+type="image\/[^"]+"/);
+  if (match) return match[1];
+
+  // 5. Try to find first <img> tag in content (before stripping HTML)
+  match = content.match(/<img[^>]+src="([^"]+)"/);
+  if (match) return match[1];
+  match = content.match(/<img[^>]+src='([^']+)'/);
+  if (match) return match[1];
+
+  // 6. Try og:image meta tag in content
+  match = content.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/);
+  if (match) return match[1];
+
+  return null;
 }
 
 /**
@@ -304,6 +352,7 @@ async function storeArticles(
         fetchedAt: now,
         expiresAt,
         author: article.author || null,
+        imageUrl: article.imageUrl || null,
       },
       idToken,
       config

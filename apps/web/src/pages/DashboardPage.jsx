@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
+import ArticleModal from '../components/ArticleModal';
 
 const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
@@ -12,8 +13,14 @@ const DashboardPage = () => {
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [articlesError, setArticlesError] = useState(null);
   const [filter, setFilter] = useState('all'); // 'all', 'unread', 'read'
+  const [selectedArticle, setSelectedArticle] = useState(null);
+  const [readArticles, setReadArticles] = useState(new Set());
+  const [favoritedArticles, setFavoritedArticles] = useState(new Set());
+
   const navigate = useNavigate();
   const auth = getAuth();
+  const observerRef = useRef(null);
+  const articleRefs = useRef({});
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '/api',
@@ -28,7 +35,17 @@ const DashboardPage = () => {
     try {
       const response = await api.articles.list();
       if (response.success) {
-        setArticles(response.data.articles || []);
+        const articlesList = response.data.articles || [];
+        setArticles(articlesList);
+
+        // Build read articles set
+        const readSet = new Set();
+        articlesList.forEach(article => {
+          if (article.isRead) {
+            readSet.add(article.id);
+          }
+        });
+        setReadArticles(readSet);
       } else {
         throw new Error(response.error);
       }
@@ -59,11 +76,55 @@ const DashboardPage = () => {
     if (filter === 'all') {
       setFilteredArticles(articles);
     } else if (filter === 'unread') {
-      setFilteredArticles(articles.filter(article => !article.isRead));
+      setFilteredArticles(articles.filter(article => !readArticles.has(article.id)));
     } else if (filter === 'read') {
-      setFilteredArticles(articles.filter(article => article.isRead));
+      setFilteredArticles(articles.filter(article => readArticles.has(article.id)));
     }
-  }, [articles, filter]);
+  }, [articles, filter, readArticles]);
+
+  // Setup Intersection Observer for auto-mark-as-read
+  useEffect(() => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            const articleId = entry.target.dataset.articleId;
+            if (articleId && !readArticles.has(articleId)) {
+              // Mark as read after 2 seconds of viewing
+              setTimeout(async () => {
+                if (entry.target && entry.isIntersecting) {
+                  try {
+                    await api.articles.markAsRead(articleId);
+                    setReadArticles(prev => new Set([...prev, articleId]));
+                  } catch (error) {
+                    console.error('Failed to mark as read:', error);
+                  }
+                }
+              }, 2000);
+            }
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    // Observe all article cards
+    Object.values(articleRefs.current).forEach((ref) => {
+      if (ref && observerRef.current) {
+        observerRef.current.observe(ref);
+      }
+    });
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [filteredArticles, readArticles, api]);
 
   const handleRefresh = async () => {
     setArticlesLoading(true);
@@ -83,13 +144,79 @@ const DashboardPage = () => {
   };
 
   const handleArticleClick = (article) => {
-    navigate(`/article/${article.id}`, { state: { article } });
+    setSelectedArticle(article);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedArticle(null);
+  };
+
+  const handleMarkAsRead = async () => {
+    if (!selectedArticle) return;
+
+    try {
+      await api.articles.markAsRead(selectedArticle.id);
+      setReadArticles(prev => new Set([...prev, selectedArticle.id]));
+    } catch (error) {
+      console.error('Failed to mark as read:', error);
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!selectedArticle) return;
+
+    try {
+      if (favoritedArticles.has(selectedArticle.id)) {
+        await api.articles.removeFromFavorites(selectedArticle.id);
+        setFavoritedArticles(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(selectedArticle.id);
+          return newSet;
+        });
+      } else {
+        await api.articles.addToFavorites(
+          selectedArticle.id,
+          {
+            title: selectedArticle.title,
+            url: selectedArticle.url,
+            description: selectedArticle.description,
+            feedTitle: selectedArticle.feedTitle,
+          }
+        );
+        setFavoritedArticles(prev => new Set([...prev, selectedArticle.id]));
+      }
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+    }
+  };
+
+  const getRelativeTime = (dateString) => {
+    if (!dateString) return 'Unknown date';
+
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInSeconds = Math.floor((now - date) / 1000);
+
+    if (diffInSeconds < 60) {
+      return 'just now';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes}m ago`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours}h ago`;
+    } else if (diffInSeconds < 604800) {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days}d ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
   };
 
   const styles = {
     container: {
       padding: '2rem',
-      maxWidth: '1000px',
+      maxWidth: '1200px',
       margin: '2rem auto',
     },
     header: {
@@ -150,29 +277,70 @@ const DashboardPage = () => {
     articleCard: {
       backgroundColor: 'white',
       borderRadius: '8px',
-      padding: '1.5rem',
+      padding: '1rem',
       boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
       cursor: 'pointer',
       transition: 'all 0.3s',
       border: '1px solid #eee',
+      display: 'flex',
+      gap: '1rem',
+    },
+    articleCardRead: {
+      opacity: 0.6,
+    },
+    thumbnail: {
+      width: '200px',
+      height: '120px',
+      objectFit: 'cover',
+      borderRadius: '6px',
+      flexShrink: 0,
+      backgroundColor: '#f0f0f0',
+    },
+    noThumbnail: {
+      width: '200px',
+      height: '120px',
+      borderRadius: '6px',
+      flexShrink: 0,
+      backgroundColor: '#f0f0f0',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#999',
+      fontSize: '0.8rem',
+    },
+    articleContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    articleMeta: {
+      display: 'flex',
+      gap: '0.5rem',
+      alignItems: 'center',
+      fontSize: '0.85rem',
+      color: '#999',
+      marginBottom: '0.5rem',
+      flexWrap: 'wrap',
+    },
+    feedTitle: {
+      color: '#FF6B35',
+      fontWeight: '600',
     },
     articleTitle: {
       color: '#333',
       marginBottom: '0.5rem',
-      fontSize: '1.3rem',
+      fontSize: '1.2rem',
       fontWeight: '600',
+      lineHeight: '1.4',
     },
     articleDescription: {
       color: '#666',
       lineHeight: '1.5',
-      marginBottom: '0.75rem',
-    },
-    articleMeta: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      fontSize: '0.85rem',
-      color: '#999',
+      fontSize: '0.95rem',
+      marginBottom: '0.5rem',
+      display: '-webkit-box',
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: 'vertical',
+      overflow: 'hidden',
     },
     noArticles: {
       textAlign: 'center',
@@ -196,7 +364,7 @@ const DashboardPage = () => {
         <Navigation />
         <div style={styles.container}>
           <div style={styles.loadingSpinner}></div>
-          <p>Loading dashboard...</p>
+          <p style={{ textAlign: 'center' }}>Loading dashboard...</p>
         </div>
       </div>
     );
@@ -265,35 +433,47 @@ const DashboardPage = () => {
         {!articlesLoading && !articlesError && (
           <div style={styles.articlesList}>
             {filteredArticles.length > 0 ? (
-              filteredArticles.map((article) => (
-                <div
-                  key={article.id}
-                  style={styles.articleCard}
-                  onClick={() => handleArticleClick(article)}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  <h3 style={styles.articleTitle}>{article.title}</h3>
-                  <p style={styles.articleDescription}>
-                    {article.description?.substring(0, 200) || 'No description available'}
-                    {article.description?.length > 200 ? '...' : ''}
-                  </p>
-                  <div style={styles.articleMeta}>
-                    <span>
-                      {article.publishedAt
-                        ? new Date(article.publishedAt).toLocaleDateString()
-                        : 'Unknown date'}
-                    </span>
-                    {article.isRead && <span style={{ color: '#28a745' }}>✓ Read</span>}
+              filteredArticles.map((article) => {
+                const isRead = readArticles.has(article.id);
+                return (
+                  <div
+                    key={article.id}
+                    ref={(el) => (articleRefs.current[article.id] = el)}
+                    data-article-id={article.id}
+                    style={{
+                      ...styles.articleCard,
+                      ...(isRead ? styles.articleCardRead : {}),
+                    }}
+                    onClick={() => handleArticleClick(article)}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    {article.imageUrl ? (
+                      <img src={article.imageUrl} alt={article.title} style={styles.thumbnail} />
+                    ) : (
+                      <div style={styles.noThumbnail}>No image</div>
+                    )}
+                    <div style={styles.articleContent}>
+                      <div style={styles.articleMeta}>
+                        <span style={styles.feedTitle}>{article.feedTitle || 'Unknown Feed'}</span>
+                        <span>•</span>
+                        <span>{getRelativeTime(article.publishedAt)}</span>
+                        {isRead && <span style={{ color: '#28a745' }}>✓ Read</span>}
+                      </div>
+                      <h3 style={styles.articleTitle}>{article.title}</h3>
+                      <p style={styles.articleDescription}>
+                        {article.description || 'No description available'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div style={styles.noArticles}>
                 <p>No articles found.</p>
@@ -303,6 +483,17 @@ const DashboardPage = () => {
           </div>
         )}
       </div>
+
+      {selectedArticle && (
+        <ArticleModal
+          article={selectedArticle}
+          onClose={handleCloseModal}
+          onMarkAsRead={handleMarkAsRead}
+          onToggleFavorite={handleToggleFavorite}
+          isRead={readArticles.has(selectedArticle.id)}
+          isFavorited={favoritedArticles.has(selectedArticle.id)}
+        />
+      )}
     </div>
   );
 };
