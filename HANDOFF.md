@@ -1,20 +1,81 @@
-# 引継ぎメモ - Phase 5 完全完了、Phase 6 完了
+# 引継ぎメモ - Phase 5 完全完了、Phase 6 完了（追加機能実装済み）
 
 ## 概要
 
-Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完了しました。Feedly風の洗練されたUIを実装し、すべてのコア機能が正常に動作しています。Webアプリケーションは本番環境で稼働中です。
+Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完了しました。Feedly風の洗練されたUIに加え、Favicon表示、ドラッグ&ドロップによるフィード並べ替え、サムネイル画像抽出の大幅改善などの追加機能が実装されました。すべてのコア機能が正常に動作しています。
 
-**最新デプロイURL**: `https://7a58f493.feedown.pages.dev`
-**ローカル開発サーバー**: `http://localhost:5178/`（起動中、タスクID: bc2b361）
-**プロジェクト進捗**: 71% (91/129 タスク完了)
+**最新デプロイURL**: `https://feedown.pages.dev`（自動デプロイ中）
+**最新コミット**: `9a26b8c` - "Disable auto-mark-as-read in Unread filter and increase article limit"
+**プロジェクト進捗**: 75% (97/129 タスク完了)
 
 ---
 
-## 最新の実装内容（Phase 5 完全版）
+## 最新の実装内容（Phase 5 完全版 + 追加機能）
 
 ### 実装済みの全機能
 
-#### 1. Feedly風UI ✅
+#### 1. Favicon表示機能 ✅ **NEW**
+- **Google Favicon Service使用**
+  - `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
+  - フィード追加時とRefresh時に自動取得
+  - 各フィードのfaviconUrlフィールドに保存
+
+- **表示箇所**
+  - **Dashboard**: 記事カード内のフィードタイトル横に16x16pxで表示
+  - **Feeds Page**: フィードリスト内に24x24pxで表示
+  - **Favorites Page**: お気に入り記事のフィードタイトル横に16x16pxで表示
+  - 画像読み込みエラー時は非表示（onErrorハンドリング）
+
+#### 2. フィード並べ替え機能 ✅ **NEW**
+- **ドラッグ&ドロップUI**
+  - HTML5 Drag and Drop API使用
+  - ドラッグハンドル（☰）表示
+  - ドラッグ中は半透明+縮小エフェクト
+  - カーソル: move / grab
+
+- **orderフィールドによる管理**
+  - 各フィードにorder数値フィールド
+  - 新規フィード追加時は`Date.now()`をデフォルト値に設定
+  - フィードリストはorder昇順でソート
+  - PATCH `/api/feeds/:id`でorder更新
+
+- **楽観的UI更新**
+  - ドロップ時に即座にUI更新
+  - バックグラウンドでバッチ更新（Promise.all）
+  - エラー時は自動ロールバック
+
+#### 3. サムネイル画像抽出の大幅改善 ✅ **NEW**
+- **10種類の抽出方法**
+  1. media:thumbnail タグ
+  2. media:content タグ（画像タイプ）
+  3. enclosure タグ（画像タイプ）
+  4. Atom link enclosure
+  5. description内のimgタグ
+  6. entryXml内のimgタグ
+  7. og:image メタタグ
+  8. **URL内の画像拡張子パターンマッチング** ← NEW
+  9. **descriptionタグ内の画像URL** ← NEW
+  10. **content:encoded内の画像URL** ← NEW
+
+- **抽出精度の向上**
+  - AFPBB等の画像が取得できなかったフィードにも対応
+  - 大文字小文字を区別しない正規表現（/i フラグ）
+  - シングル・ダブルクォート両対応
+
+#### 4. Unreadフィルター改善 ✅ **NEW**
+- **自動既読の無効化**
+  - Unreadフィルター表示中は自動既読マークを無効化
+  - filter === 'unread'の場合、Intersection Observerを設定しない
+  - ユーザーが未読記事を閲覧しても勝手に既読にならない
+
+#### 5. 記事一覧の全件表示 ✅ **NEW**
+- **limitパラメータを1000に設定**
+  - 従来: limit=50（デフォルト）
+  - 変更後: limit=1000
+  - 全Feedの記事を取得して日付順（publishedAt降順）で表示
+  - バックエンドでは最大1000件まで取得可能
+
+#### 6. Feedly風UI ✅
 - **サムネイル画像表示**
   - RSS/Atomフィードから自動抽出（media:thumbnail, enclosure, img タグ等）
   - 最大300px高さで表示（モーダル内）
@@ -70,9 +131,46 @@ Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完�
 
 ## 技術的な実装詳細
 
-### バックエンド改善（`functions/api/refresh.ts`）
+### バックエンド改善
 
-#### 画像抽出機能
+#### Favicon抽出機能（`functions/api/refresh.ts`, `functions/api/feeds/index.ts`）
+```typescript
+function extractFaviconUrl(feedUrl: string): string {
+  try {
+    const url = new URL(feedUrl);
+    const domain = url.hostname;
+    // Google's favicon service を使用
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  } catch (error) {
+    console.error('Error extracting favicon URL:', error);
+    return '';
+  }
+}
+```
+
+- フィード追加時（`feeds/index.ts`）とRefresh時（`refresh.ts`）に呼び出し
+- フィードドキュメントのfaviconUrlフィールドに保存
+- エラー時は空文字列を返す
+
+#### フィード並べ替えAPI（`functions/api/feeds/[id].ts`）
+```typescript
+// PATCH /api/feeds/:id
+export async function onRequestPatch(context: any): Promise<Response> {
+  const { order } = await request.json();
+
+  if (order === undefined) {
+    return new Response(
+      JSON.stringify({ error: 'Order field is required' }),
+      { status: 400 }
+    );
+  }
+
+  await updateDocument(feedPath, { order }, idToken, config);
+  return new Response(JSON.stringify({ success: true }), { status: 200 });
+}
+```
+
+#### 画像抽出機能（`functions/api/refresh.ts`）
 ```typescript
 function extractImageUrl(entryXml: string, content: string): string | null {
   // 1. media:thumbnail (最も一般的)
@@ -82,6 +180,9 @@ function extractImageUrl(entryXml: string, content: string): string | null {
   // 5. <img> タグ（コンテンツ内）
   // 6. <img> タグ（entryXml内）
   // 7. og:image メタタグ
+  // 8. URL内の画像拡張子パターンマッチング ← NEW
+  // 9. descriptionタグ内の画像URL ← NEW
+  // 10. content:encoded内の画像URL ← NEW
 
   // 大文字小文字を区別しない（/i フラグ）
   // シングル・ダブルクォート両対応
@@ -94,9 +195,11 @@ function extractImageUrl(entryXml: string, content: string): string | null {
 #### コンポーネント
 - `Navigation.jsx` - スティッキーナビゲーション、未読数バッジ表示
 - `ArticleModal.jsx` - モーダル表示、画像サイズ制限、透過閉じるボタン
-- `DashboardPage.jsx` - メインUI、フィルター、自動既読、一括既読
+- `DashboardPage.jsx` - メインUI、フィルター、自動既読、一括既読、**Favicon表示**
+- `FeedsPage.jsx` - フィード管理、**ドラッグ&ドロップ並べ替え**、**Favicon表示**
+- `FavoritesPage.jsx` - お気に入り記事一覧、**Favicon表示**
 
-#### 主要なstate管理
+#### 主要なstate管理（DashboardPage.jsx）
 ```jsx
 const [articles, setArticles] = useState([]);
 const [filteredArticles, setFilteredArticles] = useState([]);
@@ -104,12 +207,49 @@ const [readArticles, setReadArticles] = useState(new Set());
 const [favoritedArticles, setFavoritedArticles] = useState(new Set());
 const [selectedArticle, setSelectedArticle] = useState(null);
 const [filter, setFilter] = useState('all');
+const [feeds, setFeeds] = useState([]); // ← NEW (Favicon表示用)
 const unreadCount = useMemo(() => {...}, [articles, readArticles]);
 ```
 
-#### Intersection Observer（自動既読）
+#### ドラッグ&ドロップ実装（FeedsPage.jsx）
+```jsx
+const [draggedIndex, setDraggedIndex] = useState(null);
+
+const handleDragStart = (e, index) => {
+  setDraggedIndex(index);
+  e.dataTransfer.effectAllowed = 'move';
+};
+
+const handleDrop = async (e, dropIndex) => {
+  // 配列を並び替え
+  const newFeeds = [...feeds];
+  const [draggedFeed] = newFeeds.splice(draggedIndex, 1);
+  newFeeds.splice(dropIndex, 0, draggedFeed);
+
+  // 楽観的UI更新
+  setFeeds(newFeeds);
+
+  // バックグラウンドでorder更新
+  await Promise.all(
+    newFeeds.map((feed, index) =>
+      api.feeds.update(feed.id, { order: index })
+    )
+  );
+};
+```
+
+#### Intersection Observer（自動既読）- Unread時は無効化
 ```jsx
 useEffect(() => {
+  if (observerRef.current) {
+    observerRef.current.disconnect();
+  }
+
+  // Unreadフィルター時は自動既読を無効化 ← NEW
+  if (filter === 'unread') {
+    return;
+  }
+
   observerRef.current = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
@@ -121,7 +261,25 @@ useEffect(() => {
       }
     });
   }, { threshold: 0.5 });
-}, [filteredArticles, readArticles, api]);
+
+  // ... observe処理
+}, [filteredArticles, readArticles, api, filter]); // ← filterを依存配列に追加
+```
+
+#### APIクライアント拡張（`packages/shared/src/api/`）
+```typescript
+// client.ts - PATCH メソッド追加
+async patch<T>(endpoint: string, body?: any): Promise<ApiResponse<T>> {
+  return this.request<T>(endpoint, {
+    method: 'PATCH',
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+// endpoints.ts - FeedsAPI に update メソッド追加
+async update(feedId: string, data: { order?: number }) {
+  return this.client.patch<void>(`/api/feeds/${feedId}`, data);
+}
 ```
 
 ---
@@ -173,7 +331,8 @@ feedown/
 - `apps/web/.env`の`VITE_API_BASE_URL`: `https://7a58f493.feedown.pages.dev`
 
 ### Gitの状態
-- **最新コミット**: "Add mark all as read button and improve transparency" (f36ad9d)
+- **最新コミット**: "Disable auto-mark-as-read in Unread filter and increase article limit" (9a26b8c)
+- **前回のコミット**: "Implement favicon display and drag & drop feed reordering" (d7a48bb)
 - **ブランチ**: main
 - **すべての変更がプッシュ済み** ✅
 
@@ -191,17 +350,52 @@ feedown/
 | 2026-01-12 02:30 | `10c5e8ec.feedown.pages.dev` | 画像抽出改善、未読数バッジ |
 | 2026-01-12 03:00 | `af73564c.feedown.pages.dev` | スティッキーヘッダー |
 | 2026-01-12 03:30 | `1bf93f7d.feedown.pages.dev` | モーダル画像調整、スティッキーコントロール |
-| 2026-01-12 04:00 | `7a58f493.feedown.pages.dev` | 一括既読、透過背景（現在の最新） |
+| 2026-01-12 04:00 | `7a58f493.feedown.pages.dev` | 一括既読、透過背景 |
+| **2026-01-12 11:00** | **自動デプロイ中** | **Favicon表示、ドラッグ&ドロップ、画像抽出改善** |
+| **2026-01-12 11:15** | **自動デプロイ中** | **Unreadフィルター時自動既読無効化、全件表示(limit:1000)** |
 
 ---
 
 ## 動作確認手順
 
 ### 基本機能
-1. **ログイン**: https://7a58f493.feedown.pages.dev でログイン
+1. **ログイン**: https://feedown.pages.dev でログイン
 2. **フィード追加**: Feedsページで任意のRSSフィードURLを追加
 3. **記事取得**: Dashboardで「🔄 Refresh」をクリック
 4. **画像表示**: 記事カードに画像が表示される（新規取得分）
+
+### 新機能の確認 ✅ **NEW**
+
+#### Favicon表示
+1. **Dashboardで確認**
+   - 記事カードのフィードタイトル横に小さいファビコン（16x16px）が表示される
+   - フィードごとに異なるアイコンが表示される
+
+2. **Feedsページで確認**
+   - フィードリストの各項目の左側にファビコン（24x24px）が表示される
+   - ドラッグハンドル（☰）の右側に表示される
+
+3. **Favoritesページで確認**
+   - お気に入り記事のフィードタイトル横にファビコンが表示される
+
+#### ドラッグ&ドロップでフィード並べ替え
+1. **Feedsページへ移動**
+2. **ドラッグハンドル（☰）をクリック&ホールド**
+3. **別のフィードの位置までドラッグ**
+4. **ドロップすると順序が変更される**
+5. **ページをリロードしても順序が保持される**
+
+#### Unreadフィルター時の自動既読無効化
+1. **Dashboardで「Unread」フィルターを選択**
+2. **未読記事をスクロールして表示**
+3. **2秒以上表示しても自動的に既読にならない**
+4. **「All」フィルターに戻すと自動既読が再び有効になる**
+
+#### 全記事表示（最大1000件）
+1. **複数のフィードを登録（3つ以上推奨）**
+2. **各フィードから記事を取得**
+3. **Dashboardに全フィードの記事が日付順で表示される**
+4. **従来は最大50件だったが、現在は最大1000件まで表示**
 
 ### UI/UX機能
 1. **スクロール**
@@ -227,23 +421,42 @@ feedown/
 
 ---
 
-## 既知の制限事項
+## 既知の制限事項と注意点
 
 1. **画像表示**
    - 既存の記事にはimageUrlフィールドがない
    - Refreshボタンで新しい記事を取得すると画像が表示される
    - RSSフィードに画像情報がない場合は「No image」プレースホルダー
+   - 10種類の抽出方法で大幅改善済み ✅
 
-2. **自動既読**
+2. **Favicon表示** ✅ **NEW**
+   - Google Favicon Serviceに依存（外部サービス）
+   - ドメインにfaviconがない場合は空白表示
+   - 既存フィードはRefresh時にfaviconUrlが追加される
+   - 新規追加フィードは即座にfaviconUrlが設定される
+
+3. **フィード並べ替え** ✅ **NEW**
+   - ドラッグ中にページをリロードすると順序が失われる可能性
+   - API更新エラー時は自動的に元の順序に戻る
+   - 楽観的UI更新により、一時的に不整合が生じる可能性
+
+4. **自動既読**
    - 2秒間表示が必要（スクロールが速いと既読にならない）
+   - Unreadフィルター中は無効化される ✅ **NEW**
    - モバイルでは動作が異なる可能性
 
-3. **オプション機能（未実装）**
+5. **記事一覧の表示件数** ✅ **NEW**
+   - 最大1000件まで表示可能
+   - 1000件を超える場合は古い記事から除外される
+   - パフォーマンス面での最適化は今後の課題
+
+6. **オプション機能（未実装）**
    - 無限スクロール（ページネーション）
    - OPMLインポート/エクスポート
    - ダークモード
    - キーボードショートカット
    - 記事の検索機能
+   - フィードのフォルダ分け・グルーピング
 
 ---
 
@@ -382,18 +595,61 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ---
 
+## 今回のセッションで実装した機能（2026-01-12）
+
+### 実装した機能一覧
+1. ✅ **Favicon表示機能**
+   - Google Favicon Serviceを使用してフィードアイコンを取得
+   - Dashboard、Feeds、Favoritesページすべてで表示
+   - refresh.tsとfeeds/index.tsで自動抽出・保存
+
+2. ✅ **フィード並べ替え機能**
+   - HTML5 Drag and Drop APIによる直感的なUI
+   - orderフィールドで永続化
+   - PATCH /api/feeds/:id エンドポイント追加
+
+3. ✅ **サムネイル画像抽出の大幅改善**
+   - 7種類→10種類の抽出方法に拡張
+   - URL内の画像拡張子パターンマッチング追加
+   - descriptionタグ・content:encodedタグからの抽出追加
+
+4. ✅ **Unreadフィルター時の自動既読無効化**
+   - filter === 'unread'の場合、Intersection Observerを無効化
+   - ユーザーが未読記事を閲覧中に勝手に既読にならない
+
+5. ✅ **記事一覧の全件表示**
+   - limitパラメータを50→1000に変更
+   - 全Feedの記事を取得して日付順で表示
+
+### 変更したファイル
+- `functions/api/refresh.ts` - favicon抽出、画像抽出改善（3種類追加）
+- `functions/api/feeds/index.ts` - favicon抽出、orderフィールド追加、ソート変更
+- `functions/api/feeds/[id].ts` - PATCH endpoint追加
+- `packages/shared/src/api/client.ts` - PATCH メソッド追加
+- `packages/shared/src/api/endpoints.ts` - FeedsAPI.update()追加
+- `apps/web/src/pages/DashboardPage.jsx` - favicon表示、自動既読無効化、limit変更
+- `apps/web/src/pages/FeedsPage.jsx` - favicon表示、ドラッグ&ドロップ実装
+- `apps/web/src/pages/FavoritesPage.jsx` - favicon表示
+
+### Gitコミット履歴
+1. `d7a48bb` - "Implement favicon display and drag & drop feed reordering"
+2. `9a26b8c` - "Disable auto-mark-as-read in Unread filter and increase article limit"
+
+---
+
 ## 次の担当者へのメッセージ
 
-Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUIになりました。以下の点に注意して続けてください：
+Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUIになりました。今回のセッションでFavicon表示、フィード並べ替え、画像抽出改善など、ユーザビリティを大幅に向上させる機能を追加しました。
 
 ### Webアプリについて
-- 現在のUIは非常に洗練されているので、大きな変更は不要です
+- 現在のUIは非常に洗練されており、コア機能はすべて実装済みです
 - さらに改善したい場合は、以下のオプション機能を検討してください：
-  - 記事の検索機能
+  - 記事の検索機能（タイトル・本文の全文検索）
   - キーボードショートカット（j/k で記事移動など）
-  - フィードごとのグループ表示
+  - フィードごとのグループ・フォルダ機能
   - ダークモード
-  - 記事の並び替えオプション
+  - 記事の並び替えオプション（日付以外の基準）
+  - OPMLインポート/エクスポート
 
 ### Mobileアプリについて
 - Webで実装した機能を参考にしてください
@@ -412,9 +668,18 @@ Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUI�
 
 ---
 
-**最終更新**: 2026-01-12 04:30
+## 更新履歴
+
+| 日時 | 担当者 | 主な変更内容 |
+|------|--------|------------|
+| 2026-01-12 04:30 | Claude Sonnet 4.5 | Phase 5完了、Feedly風UI実装 |
+| **2026-01-12 11:30** | **Claude Sonnet 4.5** | **Favicon表示、ドラッグ&ドロップ、画像抽出改善、Unreadフィルター改善、全件表示実装** |
+
+---
+
+**最終更新**: 2026-01-12 11:30
 **担当者**: Claude Sonnet 4.5
-**現在のフェーズ**: Phase 5 完了 (100%)、Phase 6 完了 (83%)
+**現在のフェーズ**: Phase 5 完了 (100%)、Phase 6 完了 (90%)
 **次のフェーズ**: Phase 7 - Mobile アプリ (0%)
-**デプロイURL**: https://7a58f493.feedown.pages.dev
-**ローカル開発**: http://localhost:5178/
+**最新デプロイURL**: https://feedown.pages.dev（自動デプロイ中）
+**最新コミット**: 9a26b8c
