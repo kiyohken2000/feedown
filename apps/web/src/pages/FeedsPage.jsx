@@ -387,41 +387,6 @@ const FeedsPage = () => {
         </div>
 
         <div style={styles.card}>
-          <h2 style={styles.sectionHeading}>Recommended Feeds</h2>
-          <div style={styles.recommendedGrid}>
-            {RECOMMENDED_FEEDS.map((feed) => {
-              const isAdded = isFeedAdded(feed.url);
-              const isAdding = addingRecommended[feed.url];
-              return (
-                <div key={feed.url} style={styles.recommendedItem}>
-                  <div style={styles.recommendedName}>{feed.name}</div>
-                  <button
-                    onClick={() => handleAddRecommendedFeed(feed.url, feed.name)}
-                    style={{
-                      ...styles.addButton,
-                      ...(isAdded ? styles.addButtonAdded : {}),
-                    }}
-                    disabled={isAdded || isAdding}
-                    onMouseOver={(e) => {
-                      if (!isAdded && !isAdding) {
-                        e.target.style.backgroundColor = '#218838';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (!isAdded && !isAdding) {
-                        e.target.style.backgroundColor = '#28a745';
-                      }
-                    }}
-                  >
-                    {isAdding ? 'Adding...' : isAdded ? 'Added' : 'Add'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div style={styles.card}>
           <h2 style={styles.sectionHeading}>Your Feeds ({feeds.length})</h2>
 
           {feedsLoading && (
@@ -484,6 +449,41 @@ const FeedsPage = () => {
               )}
             </div>
           )}
+        </div>
+
+        <div style={styles.card}>
+          <h2 style={styles.sectionHeading}>Recommended Feeds</h2>
+          <div style={styles.recommendedGrid}>
+            {RECOMMENDED_FEEDS.map((feed) => {
+              const isAdded = isFeedAdded(feed.url);
+              const isAdding = addingRecommended[feed.url];
+              return (
+                <div key={feed.url} style={styles.recommendedItem}>
+                  <div style={styles.recommendedName}>{feed.name}</div>
+                  <button
+                    onClick={() => handleAddRecommendedFeed(feed.url, feed.name)}
+                    style={{
+                      ...styles.addButton,
+                      ...(isAdded ? styles.addButtonAdded : {}),
+                    }}
+                    disabled={isAdded || isAdding}
+                    onMouseOver={(e) => {
+                      if (!isAdded && !isAdding) {
+                        e.target.style.backgroundColor = '#218838';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isAdded && !isAdding) {
+                        e.target.style.backgroundColor = '#28a745';
+                      }
+                    }}
+                  >
+                    {isAdding ? 'Adding...' : isAdded ? 'Added' : 'Add'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
