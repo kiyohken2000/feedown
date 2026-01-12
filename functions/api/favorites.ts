@@ -38,6 +38,7 @@ export async function onRequestGet(context: any): Promise<Response> {
       articleDescription: fav.description || '',
       articleLink: fav.url,
       feedTitle: fav.feedTitle || '',
+      imageUrl: fav.imageUrl || null,
       savedAt: fav.savedAt,
     }));
 

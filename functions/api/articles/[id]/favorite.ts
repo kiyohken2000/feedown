@@ -32,7 +32,7 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     // Get article data from request body
     const body = await request.json();
-    const { title, url, description, feedTitle } = body;
+    const { title, url, description, feedTitle, imageUrl } = body;
 
     if (!title || !url) {
       return new Response(
@@ -51,6 +51,7 @@ export async function onRequestPost(context: any): Promise<Response> {
         url,
         description: description || '',
         feedTitle: feedTitle || '',
+        imageUrl: imageUrl || null,
         savedAt: new Date(),
       },
       idToken,
