@@ -16,6 +16,7 @@ const DashboardPage = () => {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [readArticles, setReadArticles] = useState(new Set());
   const [favoritedArticles, setFavoritedArticles] = useState(new Set());
+  const [feeds, setFeeds] = useState([]);
 
   const navigate = useNavigate();
   const auth = getAuth();
@@ -28,6 +29,17 @@ const DashboardPage = () => {
   ), [auth]);
 
   const api = useMemo(() => new FeedOwnAPI(apiClient), [apiClient]);
+
+  const fetchFeeds = async () => {
+    try {
+      const response = await api.feeds.list();
+      if (response.success) {
+        setFeeds(response.data.feeds || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch feeds:', error);
+    }
+  };
 
   const fetchArticles = async () => {
     setArticlesLoading(true);
@@ -64,6 +76,7 @@ const DashboardPage = () => {
       } else {
         setUser(currentUser);
         setLoading(false);
+        fetchFeeds();
         fetchArticles();
       }
     });
@@ -151,7 +164,8 @@ const DashboardPage = () => {
       if (refreshResponse.success) {
         console.log('Refresh successful:', refreshResponse.data);
       }
-      // その後、記事一覧を再取得
+      // その後、フィードと記事一覧を再取得
+      await fetchFeeds();
       await fetchArticles();
     } catch (error) {
       console.error('Failed to refresh:', error);
@@ -262,6 +276,11 @@ const DashboardPage = () => {
     } else {
       return date.toLocaleDateString();
     }
+  };
+
+  const getFeedFavicon = (feedId) => {
+    const feed = feeds.find(f => f.id === feedId);
+    return feed?.faviconUrl || null;
   };
 
   const styles = {
@@ -394,6 +413,15 @@ const DashboardPage = () => {
     feedTitle: {
       color: '#FF6B35',
       fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+    },
+    favicon: {
+      width: '16px',
+      height: '16px',
+      borderRadius: '2px',
+      flexShrink: 0,
     },
     articleTitle: {
       color: '#333',
@@ -543,7 +571,17 @@ const DashboardPage = () => {
                     )}
                     <div style={styles.articleContent}>
                       <div style={styles.articleMeta}>
-                        <span style={styles.feedTitle}>{article.feedTitle || 'Unknown Feed'}</span>
+                        <span style={styles.feedTitle}>
+                          {getFeedFavicon(article.feedId) && (
+                            <img
+                              src={getFeedFavicon(article.feedId)}
+                              alt=""
+                              style={styles.favicon}
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          )}
+                          {article.feedTitle || 'Unknown Feed'}
+                        </span>
                         <span>•</span>
                         <span>{getRelativeTime(article.publishedAt)}</span>
                         {isRead && <span style={{ color: '#28a745' }}>✓ Read</span>}

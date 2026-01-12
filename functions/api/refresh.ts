@@ -118,6 +118,12 @@ export async function onRequestPost(context: any): Promise<Response> {
         stats.newArticles += newArticleCount;
         stats.successfulFeeds++;
 
+        // Extract favicon if not already set
+        let faviconUrl = feed.faviconUrl || null;
+        if (!faviconUrl) {
+          faviconUrl = extractFaviconUrl(feedUrl);
+        }
+
         // Update feed metadata
         await updateDocument(
           `users/${uid}/feeds/${feedId}`,
@@ -127,6 +133,7 @@ export async function onRequestPost(context: any): Promise<Response> {
             errorCount: 0,
             title: feed.title || parsedFeed.title,
             description: feed.description || parsedFeed.description || '',
+            faviconUrl,
           },
           idToken,
           config
@@ -329,6 +336,27 @@ function extractImageUrl(entryXml: string, content: string): string | null {
       return match[1];
     }
 
+    // 8. Try to find any URL ending with image extensions in description/content
+    const imageUrlMatch = content.match(/https?:\/\/[^\s<>"]+\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s<>"]*)?/i);
+    if (imageUrlMatch) {
+      console.log('Found image via URL pattern:', imageUrlMatch[0]);
+      return imageUrlMatch[0];
+    }
+
+    // 9. Try description tag with image URL
+    match = entryXml.match(/<description[^>]*>[\s\S]*?(https?:\/\/[^\s<>"]+\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s<>"]*)?)/i);
+    if (match) {
+      console.log('Found image in description:', match[1]);
+      return match[1];
+    }
+
+    // 10. Try content:encoded with image URL
+    match = entryXml.match(/<content:encoded[^>]*>[\s\S]*?(https?:\/\/[^\s<>"]+\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s<>"]*)?)/i);
+    if (match) {
+      console.log('Found image in content:encoded:', match[1]);
+      return match[1];
+    }
+
     console.log('No image found for entry');
     return null;
   } catch (error) {
@@ -351,6 +379,21 @@ function stripHtml(html: string): string {
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
     .trim();
+}
+
+/**
+ * Extract favicon URL from feed URL
+ */
+function extractFaviconUrl(feedUrl: string): string {
+  try {
+    const url = new URL(feedUrl);
+    const domain = url.hostname;
+    // Use Google's favicon service
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  } catch (error) {
+    console.error('Error extracting favicon URL:', error);
+    return '';
+  }
 }
 
 /**

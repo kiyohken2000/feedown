@@ -32,11 +32,11 @@ export async function onRequestGet(context: any): Promise<Response> {
       100
     );
 
-    // Sort by addedAt descending
+    // Sort by order field (ascending), fallback to addedAt
     feeds.sort((a, b) => {
-      const aTime = a.addedAt ? new Date(a.addedAt).getTime() : 0;
-      const bTime = b.addedAt ? new Date(b.addedAt).getTime() : 0;
-      return bTime - aTime;
+      const aOrder = a.order !== undefined ? a.order : (a.addedAt ? new Date(a.addedAt).getTime() : 0);
+      const bOrder = b.order !== undefined ? b.order : (b.addedAt ? new Date(b.addedAt).getTime() : 0);
+      return aOrder - bOrder;
     });
 
     return new Response(
@@ -137,15 +137,20 @@ export async function onRequestPost(context: any): Promise<Response> {
       }
     }
 
+    // Extract favicon URL
+    const faviconUrl = extractFaviconUrl(url);
+
     // Add feed to Firestore
     const feedData = {
       url,
       title: feedTitle,
       description: feedDescription,
+      faviconUrl,
       addedAt: new Date(),
       lastFetchedAt: null,
       lastSuccessAt: null,
       errorCount: 0,
+      order: Date.now(), // Use timestamp as default order
     };
 
     const result = await createDocument(
@@ -233,4 +238,19 @@ function stripHtmlTags(html: string): string {
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
     .trim();
+}
+
+/**
+ * Extract favicon URL from feed URL
+ */
+function extractFaviconUrl(feedUrl: string): string {
+  try {
+    const url = new URL(feedUrl);
+    const domain = url.hostname;
+    // Use Google's favicon service
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  } catch (error) {
+    console.error('Error extracting favicon URL:', error);
+    return '';
+  }
 }

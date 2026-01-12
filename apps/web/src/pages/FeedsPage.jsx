@@ -12,6 +12,7 @@ const FeedsPage = () => {
   const [feedsError, setFeedsError] = useState(null);
   const [newFeedUrl, setNewFeedUrl] = useState('');
   const [addingFeed, setAddingFeed] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState(null);
   const navigate = useNavigate();
   const auth = getAuth();
 
@@ -89,6 +90,51 @@ const FeedsPage = () => {
     }
   };
 
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e, dropIndex) => {
+    e.preventDefault();
+
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    // Reorder feeds array
+    const newFeeds = [...feeds];
+    const [draggedFeed] = newFeeds.splice(draggedIndex, 1);
+    newFeeds.splice(dropIndex, 0, draggedFeed);
+
+    // Update UI optimistically
+    setFeeds(newFeeds);
+    setDraggedIndex(null);
+
+    // Update order field for all feeds
+    try {
+      await Promise.all(
+        newFeeds.map((feed, index) =>
+          api.feeds.update(feed.id, { order: index })
+        )
+      );
+    } catch (error) {
+      console.error('Failed to update feed order:', error);
+      // Revert on error
+      fetchFeeds();
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
   const styles = {
     container: {
       padding: '2rem',
@@ -150,9 +196,36 @@ const FeedsPage = () => {
       backgroundColor: '#f9f9f9',
       borderRadius: '5px',
       border: '1px solid #e0e0e0',
+      cursor: 'move',
+      transition: 'all 0.2s',
+    },
+    feedItemDragging: {
+      opacity: 0.5,
+      transform: 'scale(0.98)',
+    },
+    dragHandle: {
+      fontSize: '1.2rem',
+      color: '#999',
+      cursor: 'grab',
+      marginRight: '0.75rem',
+      userSelect: 'none',
+      flexShrink: 0,
     },
     feedInfo: {
       flex: 1,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.75rem',
+    },
+    favicon: {
+      width: '24px',
+      height: '24px',
+      borderRadius: '3px',
+      flexShrink: 0,
+    },
+    feedContent: {
+      flex: 1,
+      minWidth: 0,
     },
     feedTitle: {
       fontWeight: '600',
@@ -243,11 +316,33 @@ const FeedsPage = () => {
           {!feedsLoading && !feedsError && (
             <div style={styles.feedsList}>
               {feeds.length > 0 ? (
-                feeds.map((feed) => (
-                  <div key={feed.id} style={styles.feedItem}>
+                feeds.map((feed, index) => (
+                  <div
+                    key={feed.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDrop={(e) => handleDrop(e, index)}
+                    onDragEnd={handleDragEnd}
+                    style={{
+                      ...styles.feedItem,
+                      ...(draggedIndex === index ? styles.feedItemDragging : {}),
+                    }}
+                  >
+                    <div style={styles.dragHandle}>☰</div>
                     <div style={styles.feedInfo}>
-                      <div style={styles.feedTitle}>{feed.title || 'Untitled Feed'}</div>
-                      <div style={styles.feedUrl}>{feed.url}</div>
+                      {feed.faviconUrl && (
+                        <img
+                          src={feed.faviconUrl}
+                          alt=""
+                          style={styles.favicon}
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      )}
+                      <div style={styles.feedContent}>
+                        <div style={styles.feedTitle}>{feed.title || 'Untitled Feed'}</div>
+                        <div style={styles.feedUrl}>{feed.url}</div>
+                      </div>
                     </div>
                     <button
                       onClick={() => handleDeleteFeed(feed.id)}

@@ -49,6 +49,10 @@ export class FeedsAPI {
     return this.client.delete<void>(`/api/feeds/${feedId}`);
   }
 
+  async update(feedId: string, data: { order?: number }) {
+    return this.client.patch<void>(`/api/feeds/${feedId}`, data);
+  }
+
   async testFeed(url: string) {
     return this.client.post<{ valid: boolean; title?: string; error?: string }>(
       '/api/test-feed',

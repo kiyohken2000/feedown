@@ -12,6 +12,7 @@ const FavoritesPage = () => {
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [favoritesError, setFavoritesError] = useState(null);
   const [selectedArticle, setSelectedArticle] = useState(null);
+  const [feeds, setFeeds] = useState([]);
   const navigate = useNavigate();
   const auth = getAuth();
 
@@ -21,6 +22,17 @@ const FavoritesPage = () => {
   ), [auth]);
 
   const api = useMemo(() => new FeedOwnAPI(apiClient), [apiClient]);
+
+  const fetchFeeds = async () => {
+    try {
+      const response = await api.feeds.list();
+      if (response.success) {
+        setFeeds(response.data.feeds || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch feeds:', error);
+    }
+  };
 
   const fetchFavorites = async () => {
     setFavoritesLoading(true);
@@ -47,6 +59,7 @@ const FavoritesPage = () => {
       } else {
         setUser(currentUser);
         setLoading(false);
+        fetchFeeds();
         fetchFavorites();
       }
     });
@@ -106,6 +119,11 @@ const FavoritesPage = () => {
     } else {
       return date.toLocaleDateString();
     }
+  };
+
+  const getFeedFavicon = (feedTitle) => {
+    const feed = feeds.find(f => f.title === feedTitle);
+    return feed?.faviconUrl || null;
   };
 
   const styles = {
@@ -188,6 +206,15 @@ const FavoritesPage = () => {
     feedTitle: {
       color: '#FF6B35',
       fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+    },
+    favicon: {
+      width: '16px',
+      height: '16px',
+      borderRadius: '2px',
+      flexShrink: 0,
     },
     articleTitle: {
       color: '#333',
@@ -283,7 +310,17 @@ const FavoritesPage = () => {
                   )}
                   <div style={styles.articleContent}>
                     <div style={styles.articleMeta}>
-                      <span style={styles.feedTitle}>{favorite.feedTitle || 'Unknown Feed'}</span>
+                      <span style={styles.feedTitle}>
+                        {getFeedFavicon(favorite.feedTitle) && (
+                          <img
+                            src={getFeedFavicon(favorite.feedTitle)}
+                            alt=""
+                            style={styles.favicon}
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                        )}
+                        {favorite.feedTitle || 'Unknown Feed'}
+                      </span>
                       <span>•</span>
                       <span>{getRelativeTime(favorite.savedAt)}</span>
                     </div>
