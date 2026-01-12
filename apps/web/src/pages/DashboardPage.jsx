@@ -222,7 +222,7 @@ const DashboardPage = () => {
   }, [hasMore, loadingMore, articlesLoading]);
 
   const handleRefresh = async () => {
-    setArticlesLoading(true);
+    // Don't set articlesLoading here - let fetchArticles handle it
     try {
       // まずフィードからRSSを取得して記事を保存
       const refreshResponse = await api.refresh.refreshAll();
@@ -235,7 +235,6 @@ const DashboardPage = () => {
     } catch (error) {
       console.error('Failed to refresh:', error);
       setArticlesError('Failed to refresh feeds.');
-      setArticlesLoading(false);
     }
   };
 
