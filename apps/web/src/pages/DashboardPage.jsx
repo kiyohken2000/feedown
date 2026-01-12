@@ -71,6 +71,11 @@ const DashboardPage = () => {
     return () => unsubscribe();
   }, [auth, navigate, api]);
 
+  // Calculate unread count
+  const unreadCount = useMemo(() => {
+    return articles.filter(article => !readArticles.has(article.id)).length;
+  }, [articles, readArticles]);
+
   // Filter articles based on selected filter
   useEffect(() => {
     if (filter === 'all') {
@@ -227,6 +232,17 @@ const DashboardPage = () => {
       marginBottom: '0.5rem',
       fontSize: '2rem',
       fontWeight: 'bold',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '1rem',
+    },
+    unreadBadge: {
+      backgroundColor: '#FF6B35',
+      color: 'white',
+      padding: '0.25rem 0.75rem',
+      borderRadius: '20px',
+      fontSize: '1rem',
+      fontWeight: '600',
     },
     welcome: {
       color: '#666',
@@ -375,7 +391,12 @@ const DashboardPage = () => {
       <Navigation />
       <div style={styles.container}>
         <div style={styles.header}>
-          <h1 style={styles.heading}>Dashboard</h1>
+          <h1 style={styles.heading}>
+            Dashboard
+            {unreadCount > 0 && (
+              <span style={styles.unreadBadge}>{unreadCount} unread</span>
+            )}
+          </h1>
           <p style={styles.welcome}>Welcome back, {user?.email}!</p>
         </div>
 

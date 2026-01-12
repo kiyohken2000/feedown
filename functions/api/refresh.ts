@@ -256,39 +256,77 @@ async function parseRssXml(xmlText: string): Promise<any> {
  * Tries multiple common image sources in order of preference
  */
 function extractImageUrl(entryXml: string, content: string): string | null {
-  // 1. Try media:thumbnail (most common in RSS feeds)
-  let match = entryXml.match(/<media:thumbnail[^>]+url="([^"]+)"/);
-  if (match) return match[1];
+  try {
+    // 1. Try media:thumbnail (most common in RSS feeds)
+    let match = entryXml.match(/<media:thumbnail[^>]+url=["']([^"']+)["']/i);
+    if (match) {
+      console.log('Found image via media:thumbnail:', match[1]);
+      return match[1];
+    }
 
-  // 2. Try media:content with image type
-  match = entryXml.match(/<media:content[^>]+type="image\/[^"]+"[^>]+url="([^"]+)"/);
-  if (match) return match[1];
-  match = entryXml.match(/<media:content[^>]+url="([^"]+)"[^>]+type="image\/[^"]+"/);
-  if (match) return match[1];
+    // 2. Try media:content with image type
+    match = entryXml.match(/<media:content[^>]+type=["']image\/[^"']+"[^>]+url=["']([^"']+)["']/i);
+    if (match) {
+      console.log('Found image via media:content (1):', match[1]);
+      return match[1];
+    }
+    match = entryXml.match(/<media:content[^>]+url=["']([^"']+)["'][^>]+type=["']image\/[^"']+["']/i);
+    if (match) {
+      console.log('Found image via media:content (2):', match[1]);
+      return match[1];
+    }
 
-  // 3. Try enclosure with image type
-  match = entryXml.match(/<enclosure[^>]+type="image\/[^"]+"[^>]+url="([^"]+)"/);
-  if (match) return match[1];
-  match = entryXml.match(/<enclosure[^>]+url="([^"]+)"[^>]+type="image\/[^"]+"/);
-  if (match) return match[1];
+    // 3. Try enclosure with image type
+    match = entryXml.match(/<enclosure[^>]+type=["']image\/[^"']+"[^>]+url=["']([^"']+)["']/i);
+    if (match) {
+      console.log('Found image via enclosure (1):', match[1]);
+      return match[1];
+    }
+    match = entryXml.match(/<enclosure[^>]+url=["']([^"']+)["'][^>]+type=["']image\/[^"']+["']/i);
+    if (match) {
+      console.log('Found image via enclosure (2):', match[1]);
+      return match[1];
+    }
 
-  // 4. Try Atom link with rel="enclosure" and image type
-  match = entryXml.match(/<link[^>]+rel="enclosure"[^>]+type="image\/[^"]+"[^>]+href="([^"]+)"/);
-  if (match) return match[1];
-  match = entryXml.match(/<link[^>]+href="([^"]+)"[^>]+rel="enclosure"[^>]+type="image\/[^"]+"/);
-  if (match) return match[1];
+    // 4. Try Atom link with rel="enclosure" and image type
+    match = entryXml.match(/<link[^>]+rel=["']enclosure["'][^>]+type=["']image\/[^"']+"[^>]+href=["']([^"']+)["']/i);
+    if (match) {
+      console.log('Found image via atom link (1):', match[1]);
+      return match[1];
+    }
+    match = entryXml.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']enclosure["'][^>]+type=["']image\/[^"']+["']/i);
+    if (match) {
+      console.log('Found image via atom link (2):', match[1]);
+      return match[1];
+    }
 
-  // 5. Try to find first <img> tag in content (before stripping HTML)
-  match = content.match(/<img[^>]+src="([^"]+)"/);
-  if (match) return match[1];
-  match = content.match(/<img[^>]+src='([^']+)'/);
-  if (match) return match[1];
+    // 5. Try to find first <img> tag in content (before stripping HTML)
+    match = content.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (match) {
+      console.log('Found image via img tag (1):', match[1]);
+      return match[1];
+    }
 
-  // 6. Try og:image meta tag in content
-  match = content.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/);
-  if (match) return match[1];
+    // 6. Try img tag in entryXml as well
+    match = entryXml.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (match) {
+      console.log('Found image via img tag (2):', match[1]);
+      return match[1];
+    }
 
-  return null;
+    // 7. Try og:image meta tag in content
+    match = content.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+    if (match) {
+      console.log('Found image via og:image:', match[1]);
+      return match[1];
+    }
+
+    console.log('No image found for entry');
+    return null;
+  } catch (error) {
+    console.error('Error extracting image URL:', error);
+    return null;
+  }
 }
 
 /**
