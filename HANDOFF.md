@@ -2,11 +2,149 @@
 
 ## 概要
 
-Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完了しました。Feedly風の洗練されたUIに加え、Favicon表示、ドラッグ&ドロップによるフィード並べ替え、サムネイル画像抽出の大幅改善などの追加機能が実装されました。すべてのコア機能が正常に動作しています。
+Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完了しました。Feedly風の洗練されたUIに加え、Favicon表示、ドラッグ&ドロップによるフィード並べ替え、サムネイル画像抽出の大幅改善、ダークモード、アカウント削除機能、おすすめフィード機能などの追加機能が実装されました。すべてのコア機能が正常に動作しています。
 
-**最新デプロイURL**: `https://feedown.pages.dev`（自動デプロイ中）
-**最新コミット**: `9a26b8c` - "Disable auto-mark-as-read in Unread filter and increase article limit"
+**最新デプロイURL**: `https://feedown.pages.dev`（自動デプロイ済み）
+**最新コミット**: `9c0cde7` - "Fix JSON parsing error in API client for empty responses"
 **プロジェクト進捗**: 75% (97/129 タスク完了)
+
+---
+
+## 今回のセッションで実装した機能（2026-01-13）
+
+### 実装した機能一覧
+
+#### 1. ✅ **ダークモード実装** (commit: ea491d6)
+- **ThemeContext作成**
+  - React Context APIを使用したグローバルなテーマ管理
+  - `apps/web/src/contexts/ThemeContext.jsx` - isDarkMode状態とtoggleDarkMode関数を提供
+  - localStorageでダークモード設定を永続化
+
+- **CSS変数によるテーマ管理**
+  - `apps/web/src/App.css` - :root と .dark-mode セレクタでカラー定義
+  - プライマリカラー、背景色、テキスト色などを変数化
+  - スムーズな色変更トランジション
+
+- **全ページ対応**
+  - Dashboard、Feeds、Favorites、Settings、Login、Navigation、ArticleModal
+  - 各コンポーネントで isDarkMode に応じた条件付きスタイリング
+  - 統一感のあるダークモードデザイン
+
+- **Settings画面にトグルスイッチ追加**
+  - スライド式トグルボタン（iOS風デザイン）
+  - リアルタイムで全画面に反映
+
+#### 2. ✅ **記事リスト表示の改善** (commits: c714598, b2db50d)
+- **問題**: Refresh中に記事リストが一時的に消えて「No Articles」が表示される
+- **原因**: `fetchArticles`で`setArticles([])`を呼び出していた + `handleRefresh`で重複して`setArticlesLoading(true)`を設定
+- **解決策**:
+  1. 第一段階: `setArticles([])`を削除して古い記事を保持
+  2. 第二段階: `handleRefresh`内の`setArticlesLoading(true)`を削除してローディング状態の管理を一元化
+- **結果**: Refresh中も記事リストが表示されたままでスムーズなUX
+
+#### 3. ✅ **アカウント削除機能** (commits: afb587f, 4c164b8)
+- **2つの削除オプション**
+  - **Clear All Data**: すべてのデータ（フィード、記事、お気に入り）を削除、アカウントは残す
+  - **Delete Account**: アカウントとすべてのデータを完全削除
+
+- **バックエンド実装**
+  - `functions/api/user/data.js` - DELETE endpoint for data clearing
+    - `users/{uid}/feeds`、`users/{uid}/articles`、`users/{uid}/favorites` の全削除
+    - アカウントは残る
+  - `functions/api/user/account.js` - DELETE endpoint for account deletion
+    - Firestoreデータ完全削除（feeds, articles, favorites, userドキュメント）
+    - Firebase Auth REST APIでアカウント削除
+    - `https://identitytoolkit.googleapis.com/v1/accounts:delete`
+
+- **ヘルパー関数追加**
+  - `functions/lib/firebase-rest.ts` に `deleteCollection()` 関数追加
+    - コレクション内の全ドキュメントをバッチ削除
+    - `listDocuments()` + `Promise.all()` でパフォーマンス最適化
+
+- **フロントエンド実装**
+  - `packages/shared/src/api/endpoints.ts` に `UserAPI` クラス追加
+    - `deleteAccount()`, `clearAllData()` メソッド
+  - `apps/web/src/pages/SettingsPage.jsx` に「Danger Zone」セクション追加
+    - 2段階確認ダイアログで誤操作防止
+    - Clear Data（オレンジ）とDelete Account（赤）のボタン
+    - 英語での警告メッセージと説明
+
+#### 4. ✅ **おすすめフィード機能** (commits: 305b473, cc39992)
+- **13個の日本語ニュースフィードを事前設定**
+  - AFP、BBC、CNN、Rocket News 24、Weekly ASCII Plus、National Geographic、
+  - Lifehacker、Reuters、GIGAZINE、Gizmodo、CNET Japan、AAPL Ch.、Kitamori Kawaraban
+
+- **ワンクリック登録機能**
+  - `apps/web/src/pages/FeedsPage.jsx` に「Recommended Feeds」セクション追加
+  - グリッドレイアウト（280px minimum、auto-fill）
+  - 各フィードに「Add」ボタン
+  - 追加済みフィードは「Added」と表示され、グレーアウト
+  - 追加中は「Adding...」と表示
+
+- **重複チェック**
+  - `isFeedAdded()` 関数で既存フィードと照合
+  - 重複時はアラート表示
+
+- **セクション配置**
+  - 初期配置: Recommended Feeds → Your Feeds
+  - ユーザーフィードバックで位置変更: Your Feeds → Recommended Feeds（最終版）
+
+#### 5. ✅ **API Client エラーハンドリング改善** (commit: 9c0cde7)
+- **問題**: Clear Data実行時に「Failed to execute 'json' on 'Response': Unexpected end of JSON input」エラー
+- **原因**: `response.json()` を常に呼び出していたが、DELETE レスポンスがemptyの場合にエラー
+- **解決策**: `packages/shared/src/api/client.ts` の `request()` メソッドを修正
+  - Content-Typeヘッダーをチェック
+  - `response.text()` を先に取得してから安全にJSON.parse
+  - try-catchでパースエラーをキャッチ
+  - 空レスポンスの場合は data: null を返す
+- **結果**: 空レスポンスやinvalid JSONでもエラーが発生しない
+
+### 変更したファイル
+
+#### バックエンド
+- `functions/api/user/data.js` - 新規作成（データクリアエンドポイント）
+- `functions/api/user/account.js` - 新規作成（アカウント削除エンドポイント）
+- `functions/lib/firebase-rest.ts` - deleteCollection() 関数追加
+
+#### 共有パッケージ
+- `packages/shared/src/api/client.ts` - 安全なJSON parsing、エラーハンドリング改善
+- `packages/shared/src/api/endpoints.ts` - UserAPI クラス追加、FeedOwnAPI に user プロパティ追加
+
+#### フロントエンド
+- `apps/web/src/contexts/ThemeContext.jsx` - 新規作成（ダークモードContext）
+- `apps/web/src/App.css` - CSS変数でダークモード対応
+- `apps/web/src/App.jsx` - ThemeProvider追加
+- `apps/web/src/pages/DashboardPage.jsx` - 記事リスト表示修正、ダークモード対応
+- `apps/web/src/pages/FeedsPage.jsx` - おすすめフィード機能追加、ダークモード対応
+- `apps/web/src/pages/FavoritesPage.jsx` - ダークモード対応
+- `apps/web/src/pages/SettingsPage.jsx` - アカウント削除機能、ダークモードトグル、全体的にダークモード対応
+- `apps/web/src/pages/LoginPage.jsx` - ダークモード対応
+- `apps/web/src/components/Navigation.jsx` - ダークモード対応
+- `apps/web/src/components/ArticleModal.jsx` - ダークモード対応
+
+### 修正したバグ
+
+#### Bug 1: 記事リストが一時的に消える
+**症状**: Refreshボタンをクリックすると記事リストが消えて「No Articles」が表示される
+**修正内容**:
+1. `DashboardPage.jsx` の `fetchArticles()` から `setArticles([])` を削除
+2. `handleRefresh()` から `setArticlesLoading(true)` を削除（fetchArticlesに一任）
+**結果**: Refresh中も既存の記事リストが表示され続ける
+
+#### Bug 2: Clear Data実行時のJSON parsing error
+**症状**: 「Failed to execute 'json' on 'Response': Unexpected end of JSON input」エラー
+**修正内容**: `packages/shared/src/api/client.ts` でContent-Typeチェックと安全なJSON parsingを実装
+**結果**: 空レスポンスでもエラーが発生しない
+
+### Gitコミット履歴（このセッション）
+1. `ea491d6` - "Implement dark mode across the entire application"
+2. `c714598` - "Keep article list visible during refresh"
+3. `b2db50d` - "Fix: Remove duplicate articlesLoading state setting in handleRefresh"
+4. `afb587f` - "Add account deletion and data clearing features"
+5. `4c164b8` - "Change Danger Zone UI text to English"
+6. `305b473` - "Add recommended feeds section to Feeds page"
+7. `cc39992` - "Reorder sections: move Recommended Feeds after Your Feeds"
+8. `9c0cde7` - "Fix JSON parsing error in API client for empty responses"
 
 ---
 
@@ -14,7 +152,27 @@ Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完�
 
 ### 実装済みの全機能
 
-#### 1. Favicon表示機能 ✅ **NEW**
+#### 0. ダークモード ✅ **NEW (2026-01-13)**
+- **グローバルテーマ管理**
+  - React Context APIによる状態管理
+  - localStorageで設定を永続化
+  - アプリ全体で即座に反映
+
+- **CSS変数によるテーマ切り替え**
+  - :root と .dark-mode セレクタ
+  - プライマリカラー、背景色、テキスト色、ボーダー色など完全対応
+  - スムーズなトランジション
+
+- **全コンポーネント対応**
+  - Dashboard、Feeds、Favorites、Settings、Login
+  - Navigation、ArticleModal
+  - 条件付きスタイリングで統一感のあるデザイン
+
+- **Settings画面でON/OFF**
+  - iOS風トグルスイッチ
+  - リアルタイム切り替え
+
+#### 1. Favicon表示機能 ✅
 - **Google Favicon Service使用**
   - `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
   - フィード追加時とRefresh時に自動取得
@@ -81,7 +239,35 @@ Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完�
   - 全件読み込み完了時は「No more articles to load」表示
   - Refresh/Mark All Read時はリセットして最初から読み込み
 
-#### 6. Feedly風UI ✅
+#### 6. アカウント削除機能 ✅ **NEW (2026-01-13)**
+- **2つの削除オプション**
+  - **Clear All Data**: すべてのデータ（フィード、記事、お気に入り）削除、アカウントは保持
+  - **Delete Account**: アカウントとすべてのデータを完全削除
+
+- **Danger Zone UI**
+  - Settings画面に専用セクション
+  - 2段階確認ダイアログ（誤操作防止）
+  - Clear Data（オレンジボタン）、Delete Account（赤ボタン）
+  - 英語での警告メッセージ
+
+- **バックエンド実装**
+  - Firebase REST APIでアカウント削除
+  - Firestoreコレクションのバッチ削除
+  - deleteCollection() ヘルパー関数
+
+#### 7. おすすめフィード機能 ✅ **NEW (2026-01-13)**
+- **13個の日本語ニュースフィードを事前設定**
+  - AFP、BBC、CNN、Rocket News 24、Weekly ASCII Plus、National Geographic
+  - Lifehacker、Reuters、GIGAZINE、Gizmodo、CNET Japan、AAPL Ch.、Kitamori Kawaraban
+
+- **ワンクリック登録**
+  - Feeds画面に「Recommended Feeds」セクション
+  - グリッドレイアウトで見やすく表示
+  - 各フィードに「Add」ボタン
+  - 追加済みは「Added」（グレーアウト）
+  - 重複チェック機能
+
+#### 8. Feedly風UI ✅
 - **サムネイル画像表示**
   - RSS/Atomフィードから自動抽出（media:thumbnail, enclosure, img タグ等）
   - 最大300px高さで表示（モーダル内）
@@ -95,7 +281,7 @@ Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完�
   - 記事description（2行まで表示）
   - 既読記事は透明度60%
 
-#### 2. インタラクション機能 ✅
+#### 9. インタラクション機能 ✅
 - **モーダル表示**
   - 記事クリックでモーダル表示（ページ遷移なし）
   - 閉じるボタン（右上、透過背景、円形、ホバーエフェクト）
@@ -113,7 +299,7 @@ Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完�
   - 並列API呼び出しで高速処理
   - 未読がない場合はボタン無効化
 
-#### 3. ナビゲーション・コントロール ✅
+#### 10. ナビゲーション・コントロール ✅
 - **スティッキーナビゲーション**
   - スクロールしても常に表示（position: sticky）
   - 未読数バッジ（Dashboardリンクの横）
@@ -128,7 +314,7 @@ Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完�
   - スクロールしても常に表示（top: 73px、ナビゲーションの下）
   - Z-index: 50
 
-#### 4. クリーンなレイアウト ✅
+#### 11. クリーンなレイアウト ✅
 - 無駄な「Dashboard」見出しを削除
 - 「Welcome back, email」テキストを削除
 - 最大限の作業スペースを確保
@@ -411,6 +597,70 @@ feedown/
 5. **パフォーマンス確認**
    - 100件以上の記事がある場合でも、スムーズにスクロール・読み込みできる
 
+#### ダークモード ✅ **NEW (2026-01-13)**
+1. **Settingsページへ移動**
+2. **Appearanceセクションを確認**
+   - 「Dark Mode」トグルスイッチが表示される
+3. **トグルをクリック**
+   - 即座に全画面がダークモードに切り替わる
+   - 背景色、テキスト色、ボーダー色が変更される
+4. **他のページに移動**
+   - Dashboard、Feeds、Favoritesなど全ページでダークモードが適用される
+5. **ページをリロード**
+   - localStorageに保存されているため、設定が維持される
+6. **ライトモードに戻す**
+   - トグルをもう一度クリックして元に戻る
+
+#### アカウント削除機能 ✅ **NEW (2026-01-13)**
+1. **Settingsページへ移動**
+2. **Danger Zoneセクションを確認**
+   - 警告メッセージ: "These actions are irreversible. Please proceed with caution."
+   - 「Clear Data」ボタン（オレンジ）と「Delete Account」ボタン（赤）が表示される
+
+3. **Clear Data機能のテスト**
+   - 「Clear Data」ボタンをクリック
+   - 1回目の確認ダイアログが表示される
+   - 「OK」をクリック
+   - 2回目の確認ダイアログが表示される
+   - 「OK」をクリック
+   - すべてのデータ（フィード、記事、お気に入り）が削除される
+   - Dashboardにリダイレクトされ、空の状態になる
+   - アカウントは残っているため、再度フィードを追加できる
+
+4. **Delete Account機能のテスト（注意: 実際にアカウントが削除されます）**
+   - テスト用アカウントで実施してください
+   - 「Delete Account」ボタンをクリック
+   - 1回目の確認ダイアログが表示される
+   - 「OK」をクリック
+   - 2回目の確認ダイアログが表示される
+   - 「OK」をクリック
+   - アカウントとすべてのデータが完全削除される
+   - ログイン画面にリダイレクトされる
+   - 削除されたアカウントではログインできない
+
+#### おすすめフィード機能 ✅ **NEW (2026-01-13)**
+1. **Feedsページへ移動**
+2. **「Recommended Feeds」セクションを確認**
+   - 13個の日本語ニュースフィードがグリッド表示される
+   - 各フィードに「Add」ボタンが表示される
+
+3. **フィードの追加**
+   - 任意のフィードの「Add」ボタンをクリック
+   - ボタンが「Adding...」に変わる
+   - 追加が完了すると「Added」に変わり、グレーアウトされる
+   - 成功メッセージ「{フィード名} has been added successfully!」が表示される
+   - 「Your Feeds」セクションに追加されたフィードが表示される
+
+4. **重複チェック**
+   - 既に追加済みのフィードの「Add」ボタンをクリック
+   - アラート「{フィード名} is already in your feed list.」が表示される
+   - フィードは追加されない
+
+5. **Refreshで記事取得**
+   - Dashboardに移動
+   - 「🔄 Refresh」ボタンをクリック
+   - 追加したフィードの記事が表示される
+
 ### UI/UX機能
 1. **スクロール**
    - ナビゲーションバーが常に表示される
@@ -465,9 +715,24 @@ feedown/
    - フィルター変更時はリセットされる
    - パフォーマンスは良好だが、1000件を超える場合は古い記事から除外
 
-6. **オプション機能（未実装）**
+6. **ダークモード** ✅ **NEW (2026-01-13)**
+   - 全ページで正常に動作
+   - localStorageで設定を永続化
+   - Settings画面でON/OFF切り替え可能
+
+7. **アカウント削除機能** ✅ **NEW (2026-01-13)**
+   - Clear All Data: データのみ削除、アカウント保持
+   - Delete Account: アカウントとデータを完全削除
+   - 2段階確認で誤操作を防止
+   - Firebase Auth REST APIで実装
+
+8. **おすすめフィード機能** ✅ **NEW (2026-01-13)**
+   - 13個の日本語ニュースフィードを事前設定
+   - ワンクリックで登録可能
+   - 重複チェック機能あり
+
+9. **オプション機能（未実装）**
    - OPMLインポート/エクスポート
-   - ダークモード
    - キーボードショートカット
    - 記事の検索機能
    - フィードのフォルダ分け・グルーピング
@@ -609,7 +874,7 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ---
 
-## 今回のセッションで実装した機能（2026-01-12）
+## 前回のセッションで実装した機能（2026-01-12）
 
 ### 実装した機能一覧
 1. ✅ **Favicon表示機能**
@@ -636,17 +901,6 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
    - Intersection Observerで最下部を監視
    - hasMoreフラグとローディングインジケーター実装
 
-### 変更したファイル
-- `functions/api/refresh.ts` - favicon抽出、画像抽出改善（3種類追加）
-- `functions/api/feeds/index.ts` - favicon抽出、orderフィールド追加、ソート変更
-- `functions/api/feeds/[id].ts` - PATCH endpoint追加
-- `packages/shared/src/api/client.ts` - PATCH メソッド追加
-- `packages/shared/src/api/endpoints.ts` - FeedsAPI.update()追加
-- `apps/web/src/pages/DashboardPage.jsx` - favicon表示、自動既読無効化、無限スクロール実装
-- `apps/web/src/pages/FeedsPage.jsx` - favicon表示、ドラッグ&ドロップ実装
-- `apps/web/src/pages/FavoritesPage.jsx` - favicon表示
-- `PROGRESS.md` - Phase 5の無限スクロールにチェック
-
 ### Gitコミット履歴
 1. `d7a48bb` - "Implement favicon display and drag & drop feed reordering"
 2. `9a26b8c` - "Disable auto-mark-as-read in Unread filter and increase article limit"
@@ -656,15 +910,15 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ## 次の担当者へのメッセージ
 
-Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUIになりました。今回のセッションでFavicon表示、フィード並べ替え、画像抽出改善など、ユーザビリティを大幅に向上させる機能を追加しました。
+Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUIになりました。最新のセッションでダークモード、アカウント削除機能、おすすめフィード機能など、ユーザビリティをさらに向上させる機能を追加しました。
 
 ### Webアプリについて
 - 現在のUIは非常に洗練されており、コア機能はすべて実装済みです
+- ダークモード、アカウント削除機能、おすすめフィード機能も実装完了 ✅
 - さらに改善したい場合は、以下のオプション機能を検討してください：
   - 記事の検索機能（タイトル・本文の全文検索）
   - キーボードショートカット（j/k で記事移動など）
   - フィードごとのグループ・フォルダ機能
-  - ダークモード
   - 記事の並び替えオプション（日付以外の基準）
   - OPMLインポート/エクスポート
 
@@ -691,13 +945,14 @@ Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUI�
 |------|--------|------------|
 | 2026-01-12 04:30 | Claude Sonnet 4.5 | Phase 5完了、Feedly風UI実装 |
 | 2026-01-12 11:30 | Claude Sonnet 4.5 | Favicon表示、ドラッグ&ドロップ、画像抽出改善、Unreadフィルター改善 |
-| **2026-01-12 12:30** | **Claude Sonnet 4.5** | **無限スクロール（ページネーション）実装完了** |
+| 2026-01-12 12:30 | Claude Sonnet 4.5 | 無限スクロール（ページネーション）実装完了 |
+| **2026-01-13 現在** | **Claude Sonnet 4.5** | **ダークモード、アカウント削除機能、おすすめフィード機能、記事リスト表示改善、API Client エラーハンドリング改善** |
 
 ---
 
-**最終更新**: 2026-01-12 12:30
+**最終更新**: 2026-01-13
 **担当者**: Claude Sonnet 4.5
 **現在のフェーズ**: Phase 5 完了 (100%)、Phase 6 完了 (92%)
 **次のフェーズ**: Phase 7 - Mobile アプリ (0%)
-**最新デプロイURL**: https://feedown.pages.dev（自動デプロイ中）
-**最新コミット**: b002dba
+**最新デプロイURL**: https://feedown.pages.dev（自動デプロイ済み）
+**最新コミット**: 9c0cde7 - "Fix JSON parsing error in API client for empty responses"
