@@ -17,11 +17,15 @@ const DashboardPage = () => {
   const [readArticles, setReadArticles] = useState(new Set());
   const [favoritedArticles, setFavoritedArticles] = useState(new Set());
   const [feeds, setFeeds] = useState([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const navigate = useNavigate();
   const auth = getAuth();
   const observerRef = useRef(null);
   const articleRefs = useRef({});
+  const loadMoreRef = useRef(null);
+  const loadMoreObserverRef = useRef(null);
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '/api',
@@ -41,19 +45,41 @@ const DashboardPage = () => {
     }
   };
 
-  const fetchArticles = async () => {
-    setArticlesLoading(true);
-    setArticlesError(null);
-    try {
-      // Fetch all articles (limit: 1000)
-      const response = await api.articles.list({ limit: 1000 });
-      if (response.success) {
-        const articlesList = response.data.articles || [];
-        setArticles(articlesList);
+  const fetchArticles = async (reset = true) => {
+    if (reset) {
+      setArticlesLoading(true);
+      setArticles([]);
+      setHasMore(true);
+    } else {
+      setLoadingMore(true);
+    }
 
-        // Build read articles set
-        const readSet = new Set();
-        articlesList.forEach(article => {
+    setArticlesError(null);
+
+    try {
+      const currentOffset = reset ? 0 : articles.length;
+      const limit = 50;
+
+      const response = await api.articles.list({
+        limit,
+        offset: currentOffset
+      });
+
+      if (response.success) {
+        const newArticles = response.data.articles || [];
+        const hasMoreData = response.data.hasMore ?? (newArticles.length === limit);
+
+        if (reset) {
+          setArticles(newArticles);
+        } else {
+          setArticles(prev => [...prev, ...newArticles]);
+        }
+
+        setHasMore(hasMoreData);
+
+        // Build read articles set (merge with existing for incremental load)
+        const readSet = reset ? new Set() : new Set(readArticles);
+        newArticles.forEach(article => {
           if (article.isRead) {
             readSet.add(article.id);
           }
@@ -66,7 +92,11 @@ const DashboardPage = () => {
       console.error('Failed to fetch articles:', error);
       setArticlesError('Failed to load articles.');
     } finally {
-      setArticlesLoading(false);
+      if (reset) {
+        setArticlesLoading(false);
+      } else {
+        setLoadingMore(false);
+      }
     }
   };
 
@@ -89,7 +119,7 @@ const DashboardPage = () => {
   useEffect(() => {
     const handleFocus = async () => {
       if (user) {
-        await fetchArticles();
+        await fetchArticles(true);
       }
     };
 
@@ -162,6 +192,33 @@ const DashboardPage = () => {
     };
   }, [filteredArticles, readArticles, api, filter]);
 
+  // Setup Intersection Observer for infinite scroll
+  useEffect(() => {
+    if (loadMoreObserverRef.current) {
+      loadMoreObserverRef.current.disconnect();
+    }
+
+    loadMoreObserverRef.current = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && hasMore && !loadingMore && !articlesLoading) {
+          fetchArticles(false);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      loadMoreObserverRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (loadMoreObserverRef.current) {
+        loadMoreObserverRef.current.disconnect();
+      }
+    };
+  }, [hasMore, loadingMore, articlesLoading]);
+
   const handleRefresh = async () => {
     setArticlesLoading(true);
     try {
@@ -172,7 +229,7 @@ const DashboardPage = () => {
       }
       // その後、フィードと記事一覧を再取得
       await fetchFeeds();
-      await fetchArticles();
+      await fetchArticles(true); // reset=true for full reload
     } catch (error) {
       console.error('Failed to refresh:', error);
       setArticlesError('Failed to refresh feeds.');
@@ -201,7 +258,7 @@ const DashboardPage = () => {
         unreadArticleIds.map(articleId => api.articles.markAsRead(articleId))
       );
       // Refresh articles after marking all as read
-      await fetchArticles();
+      await fetchArticles(true);
     } catch (error) {
       console.error('Failed to mark all as read:', error);
       // Rollback on error
@@ -470,6 +527,26 @@ const DashboardPage = () => {
       display: 'inline-block',
       marginLeft: '0.5rem',
     },
+    loadMoreTrigger: {
+      height: '100px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    loadingMore: {
+      textAlign: 'center',
+      padding: '2rem',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: '1rem',
+    },
+    endOfArticles: {
+      textAlign: 'center',
+      padding: '2rem',
+      color: '#999',
+      fontSize: '0.9rem',
+    },
   };
 
   if (loading) {
@@ -604,6 +681,25 @@ const DashboardPage = () => {
               <div style={styles.noArticles}>
                 <p>No articles found.</p>
                 <p>Try adding some feeds or changing the filter.</p>
+              </div>
+            )}
+
+            {/* Load more trigger for infinite scroll */}
+            {filteredArticles.length > 0 && hasMore && (
+              <div ref={loadMoreRef} style={styles.loadMoreTrigger}>
+                {loadingMore && (
+                  <div style={styles.loadingMore}>
+                    <div style={styles.loadingSpinner}></div>
+                    <p>Loading more articles...</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* End of articles indicator */}
+            {filteredArticles.length > 0 && !hasMore && (
+              <div style={styles.endOfArticles}>
+                <p>No more articles to load</p>
               </div>
             )}
           </div>
