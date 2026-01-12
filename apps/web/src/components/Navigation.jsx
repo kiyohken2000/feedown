@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-const Navigation = () => {
+const Navigation = ({ unreadCount = 0 }) => {
   const location = useLocation();
 
   const navItems = [
@@ -16,6 +16,9 @@ const Navigation = () => {
       backgroundColor: '#FF6B35',
       padding: '1rem 2rem',
       boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      position: 'sticky',
+      top: 0,
+      zIndex: 100,
     },
     navContainer: {
       maxWidth: '1200px',
@@ -50,6 +53,16 @@ const Navigation = () => {
     activeNavLink: {
       backgroundColor: 'rgba(255, 255, 255, 0.2)',
     },
+    unreadBadge: {
+      backgroundColor: 'white',
+      color: '#FF6B35',
+      padding: '0.15rem 0.5rem',
+      borderRadius: '12px',
+      fontSize: '0.85rem',
+      fontWeight: '700',
+      marginLeft: '0.5rem',
+      display: 'inline-block',
+    },
   };
 
   return (
@@ -69,6 +82,9 @@ const Navigation = () => {
                 }}
               >
                 {item.label}
+                {item.path === '/dashboard' && unreadCount > 0 && (
+                  <span style={styles.unreadBadge}>{unreadCount}</span>
+                )}
               </Link>
             </li>
           ))}

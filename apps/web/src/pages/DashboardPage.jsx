@@ -222,37 +222,14 @@ const DashboardPage = () => {
     container: {
       padding: '2rem',
       maxWidth: '1200px',
-      margin: '2rem auto',
-    },
-    header: {
-      marginBottom: '2rem',
-    },
-    heading: {
-      color: '#333',
-      marginBottom: '0.5rem',
-      fontSize: '2rem',
-      fontWeight: 'bold',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '1rem',
-    },
-    unreadBadge: {
-      backgroundColor: '#FF6B35',
-      color: 'white',
-      padding: '0.25rem 0.75rem',
-      borderRadius: '20px',
-      fontSize: '1rem',
-      fontWeight: '600',
-    },
-    welcome: {
-      color: '#666',
-      fontSize: '1rem',
+      margin: '0 auto',
     },
     controls: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: '1.5rem',
+      marginTop: '2rem',
       flexWrap: 'wrap',
       gap: '1rem',
     },
@@ -377,7 +354,7 @@ const DashboardPage = () => {
   if (loading) {
     return (
       <div>
-        <Navigation />
+        <Navigation unreadCount={0} />
         <div style={styles.container}>
           <div style={styles.loadingSpinner}></div>
           <p style={{ textAlign: 'center' }}>Loading dashboard...</p>
@@ -388,18 +365,8 @@ const DashboardPage = () => {
 
   return (
     <div>
-      <Navigation />
+      <Navigation unreadCount={unreadCount} />
       <div style={styles.container}>
-        <div style={styles.header}>
-          <h1 style={styles.heading}>
-            Dashboard
-            {unreadCount > 0 && (
-              <span style={styles.unreadBadge}>{unreadCount} unread</span>
-            )}
-          </h1>
-          <p style={styles.welcome}>Welcome back, {user?.email}!</p>
-        </div>
-
         <div style={styles.controls}>
           <div style={styles.filterGroup}>
             <button
