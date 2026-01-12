@@ -45,7 +45,8 @@ const DashboardPage = () => {
     setArticlesLoading(true);
     setArticlesError(null);
     try {
-      const response = await api.articles.list();
+      // Fetch all articles (limit: 1000)
+      const response = await api.articles.list({ limit: 1000 });
       if (response.success) {
         const articlesList = response.data.articles || [];
         setArticles(articlesList);
@@ -118,6 +119,11 @@ const DashboardPage = () => {
       observerRef.current.disconnect();
     }
 
+    // Disable auto-mark-as-read when viewing Unread filter
+    if (filter === 'unread') {
+      return;
+    }
+
     observerRef.current = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -154,7 +160,7 @@ const DashboardPage = () => {
         observerRef.current.disconnect();
       }
     };
-  }, [filteredArticles, readArticles, api]);
+  }, [filteredArticles, readArticles, api, filter]);
 
   const handleRefresh = async () => {
     setArticlesLoading(true);
