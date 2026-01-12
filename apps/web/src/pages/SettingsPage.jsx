@@ -44,13 +44,13 @@ const SettingsPage = () => {
 
   const handleClearAllData = async () => {
     const confirmed = window.confirm(
-      'すべてのデータ（フィード、記事、お気に入り）を削除します。この操作は取り消せません。アカウントは残ります。\n\n本当に削除しますか？'
+      'This will delete all your data (feeds, articles, favorites). This action cannot be undone. Your account will remain active.\n\nAre you sure you want to continue?'
     );
 
     if (!confirmed) return;
 
     const doubleConfirmed = window.confirm(
-      '本当によろしいですか？すべてのデータが完全に削除されます。'
+      'Are you absolutely sure? All your data will be permanently deleted.'
     );
 
     if (!doubleConfirmed) return;
@@ -58,27 +58,27 @@ const SettingsPage = () => {
     try {
       const response = await api.user.clearAllData();
       if (response.success) {
-        alert('すべてのデータを削除しました。');
+        alert('All data has been deleted successfully.');
         // Redirect to dashboard to see empty state
         navigate('/dashboard');
       } else {
-        alert('データの削除に失敗しました: ' + (response.error || 'Unknown error'));
+        alert('Failed to delete data: ' + (response.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Clear data failed:', error);
-      alert('データの削除に失敗しました: ' + error.message);
+      alert('Failed to delete data: ' + error.message);
     }
   };
 
   const handleDeleteAccount = async () => {
     const confirmed = window.confirm(
-      'アカウントとすべてのデータを完全に削除します。この操作は取り消せません。\n\n本当に削除しますか？'
+      'This will permanently delete your account and all associated data. This action cannot be undone.\n\nAre you sure you want to continue?'
     );
 
     if (!confirmed) return;
 
     const doubleConfirmed = window.confirm(
-      '本当によろしいですか？アカウントとすべてのデータが完全に削除され、ログインできなくなります。'
+      'Are you absolutely sure? Your account and all data will be permanently deleted and you will not be able to log in again.'
     );
 
     if (!doubleConfirmed) return;
@@ -86,16 +86,16 @@ const SettingsPage = () => {
     try {
       const response = await api.user.deleteAccount();
       if (response.success) {
-        alert('アカウントを削除しました。');
+        alert('Your account has been deleted successfully.');
         // Sign out and redirect to login
         await signOut(auth);
         navigate('/');
       } else {
-        alert('アカウントの削除に失敗しました: ' + (response.error || 'Unknown error'));
+        alert('Failed to delete account: ' + (response.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Delete account failed:', error);
-      alert('アカウントの削除に失敗しました: ' + error.message);
+      alert('Failed to delete account: ' + error.message);
     }
   };
 
@@ -283,14 +283,14 @@ const SettingsPage = () => {
 
         <div style={styles.card}>
           <h2 style={styles.sectionHeading}>Danger Zone</h2>
-          <p style={styles.warningText}>これらの操作は取り消せません。注意して実行してください。</p>
+          <p style={styles.warningText}>These actions are irreversible. Please proceed with caution.</p>
 
           <div style={styles.dangerSection}>
             <div style={styles.dangerItem}>
               <div>
-                <h3 style={styles.dangerTitle}>すべてのデータを削除</h3>
+                <h3 style={styles.dangerTitle}>Clear All Data</h3>
                 <p style={styles.dangerDescription}>
-                  フィード、記事、お気に入りをすべて削除します。アカウントは残ります。
+                  Delete all feeds, articles, and favorites. Your account will remain active.
                 </p>
               </div>
               <button
@@ -299,15 +299,15 @@ const SettingsPage = () => {
                 onMouseOver={(e) => (e.target.style.backgroundColor = '#e68900')}
                 onMouseOut={(e) => (e.target.style.backgroundColor = '#ff9800')}
               >
-                データを削除
+                Clear Data
               </button>
             </div>
 
             <div style={styles.dangerItem}>
               <div>
-                <h3 style={styles.dangerTitle}>アカウントを削除</h3>
+                <h3 style={styles.dangerTitle}>Delete Account</h3>
                 <p style={styles.dangerDescription}>
-                  アカウントとすべてのデータを完全に削除します。二度とログインできなくなります。
+                  Permanently delete your account and all data. You will not be able to log in again.
                 </p>
               </div>
               <button
@@ -316,7 +316,7 @@ const SettingsPage = () => {
                 onMouseOver={(e) => (e.target.style.backgroundColor = '#a00000')}
                 onMouseOut={(e) => (e.target.style.backgroundColor = '#c82333')}
               >
-                アカウント削除
+                Delete Account
               </button>
             </div>
           </div>
