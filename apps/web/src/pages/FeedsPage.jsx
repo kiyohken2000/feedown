@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
+import Navigation from '../components/Navigation';
 
 const FeedsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -10,6 +11,7 @@ const FeedsPage = () => {
   const [feedsLoading, setFeedsLoading] = useState(false);
   const [feedsError, setFeedsError] = useState(null);
   const [newFeedUrl, setNewFeedUrl] = useState('');
+  const [addingFeed, setAddingFeed] = useState(false);
   const navigate = useNavigate();
   const auth = getAuth();
 
@@ -56,16 +58,19 @@ const FeedsPage = () => {
     e.preventDefault();
     if (!newFeedUrl) return;
 
+    setAddingFeed(true);
     try {
       const response = await api.feeds.add(newFeedUrl);
       if (response.success) {
         setNewFeedUrl('');
-        fetchFeeds(); // リストを再取得
+        fetchFeeds();
       } else {
         throw new Error(response.error);
       }
     } catch (error) {
       alert('Failed to add feed: ' + error.message);
+    } finally {
+      setAddingFeed(false);
     }
   };
 
@@ -75,7 +80,7 @@ const FeedsPage = () => {
     try {
       const response = await api.feeds.delete(feedId);
       if (response.success) {
-        fetchFeeds(); // リストを再取得
+        fetchFeeds();
       } else {
         throw new Error(response.error);
       }
@@ -84,44 +89,186 @@ const FeedsPage = () => {
     }
   };
 
+  const styles = {
+    container: {
+      padding: '2rem',
+      maxWidth: '900px',
+      margin: '2rem auto',
+    },
+    heading: {
+      color: '#333',
+      marginBottom: '2rem',
+      fontSize: '2rem',
+      fontWeight: 'bold',
+    },
+    card: {
+      backgroundColor: 'white',
+      borderRadius: '8px',
+      padding: '2rem',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      marginBottom: '2rem',
+    },
+    sectionHeading: {
+      color: '#555',
+      marginBottom: '1rem',
+      fontSize: '1.3rem',
+      fontWeight: '600',
+    },
+    form: {
+      display: 'flex',
+      gap: '1rem',
+      marginBottom: '1rem',
+    },
+    input: {
+      flex: 1,
+      padding: '0.75rem',
+      border: '2px solid #e0e0e0',
+      borderRadius: '5px',
+      fontSize: '1rem',
+      transition: 'border-color 0.3s',
+    },
+    button: {
+      padding: '0.75rem 1.5rem',
+      backgroundColor: '#FF6B35',
+      color: 'white',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+      fontSize: '1rem',
+      fontWeight: '600',
+      transition: 'background-color 0.3s',
+    },
+    feedsList: {
+      display: 'grid',
+      gap: '0.75rem',
+    },
+    feedItem: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '1rem',
+      backgroundColor: '#f9f9f9',
+      borderRadius: '5px',
+      border: '1px solid #e0e0e0',
+    },
+    feedInfo: {
+      flex: 1,
+    },
+    feedTitle: {
+      fontWeight: '600',
+      color: '#333',
+      marginBottom: '0.25rem',
+    },
+    feedUrl: {
+      fontSize: '0.85rem',
+      color: '#999',
+    },
+    deleteButton: {
+      padding: '0.5rem 1rem',
+      backgroundColor: '#dc3545',
+      color: 'white',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+      fontSize: '0.9rem',
+      fontWeight: '600',
+      transition: 'background-color 0.3s',
+    },
+    noFeeds: {
+      textAlign: 'center',
+      padding: '2rem',
+      color: '#999',
+    },
+    loadingSpinner: {
+      border: '4px solid #f3f3f3',
+      borderTop: '4px solid #FF6B35',
+      borderRadius: '50%',
+      width: '40px',
+      height: '40px',
+      animation: 'spin 1s linear infinite',
+      margin: '2rem auto',
+    },
+  };
+
   if (loading) {
-    return <div>Loading feeds page...</div>;
+    return (
+      <div>
+        <Navigation />
+        <div style={styles.container}>
+          <div style={styles.loadingSpinner}></div>
+          <p>Loading feeds...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px' }}>
-      <h1>Feeds Page</h1>
-      <p>Welcome, {user?.email}!</p>
+    <div>
+      <Navigation />
+      <div style={styles.container}>
+        <h1 style={styles.heading}>Manage Feeds</h1>
 
-      <h2>Add New Feed</h2>
-      <form onSubmit={handleAddFeed}>
-        <input
-          type="url"
-          value={newFeedUrl}
-          onChange={(e) => setNewFeedUrl(e.target.value)}
-          placeholder="Enter RSS feed URL"
-          style={{ width: '80%', padding: '8px', boxSizing: 'border-box' }}
-        />
-        <button type="submit" style={{ padding: '8px 16px', marginLeft: '10px' }}>Add</button>
-      </form>
+        <div style={styles.card}>
+          <h2 style={styles.sectionHeading}>Add New Feed</h2>
+          <form onSubmit={handleAddFeed} style={styles.form}>
+            <input
+              type="url"
+              value={newFeedUrl}
+              onChange={(e) => setNewFeedUrl(e.target.value)}
+              placeholder="Enter RSS feed URL (e.g., https://example.com/feed.xml)"
+              style={styles.input}
+              required
+              disabled={addingFeed}
+            />
+            <button type="submit" style={styles.button} disabled={addingFeed}>
+              {addingFeed ? 'Adding...' : 'Add Feed'}
+            </button>
+          </form>
+        </div>
 
-      <h2>Your Feeds</h2>
-      {feedsLoading && <p>Loading feeds...</p>}
-      {feedsError && <p style={{ color: 'red' }}>{feedsError}</p>}
-      {feeds.length > 0 ? (
-        <ul>
-          {feeds.map((feed) => (
-            <li key={feed.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', border: '1px solid #eee', padding: '10px' }}>
-              <span>{feed.title || feed.url}</span>
-              <button onClick={() => handleDeleteFeed(feed.id)} style={{ padding: '5px 10px', backgroundColor: 'red', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-                Delete
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        !feedsLoading && !feedsError && <p>No feeds found.</p>
-      )}
+        <div style={styles.card}>
+          <h2 style={styles.sectionHeading}>Your Feeds ({feeds.length})</h2>
+
+          {feedsLoading && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={styles.loadingSpinner}></div>
+              <p>Loading feeds...</p>
+            </div>
+          )}
+
+          {feedsError && (
+            <p style={{ color: 'red', textAlign: 'center' }}>{feedsError}</p>
+          )}
+
+          {!feedsLoading && !feedsError && (
+            <div style={styles.feedsList}>
+              {feeds.length > 0 ? (
+                feeds.map((feed) => (
+                  <div key={feed.id} style={styles.feedItem}>
+                    <div style={styles.feedInfo}>
+                      <div style={styles.feedTitle}>{feed.title || 'Untitled Feed'}</div>
+                      <div style={styles.feedUrl}>{feed.url}</div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteFeed(feed.id)}
+                      style={styles.deleteButton}
+                      onMouseOver={(e) => (e.target.style.backgroundColor = '#c82333')}
+                      onMouseOut={(e) => (e.target.style.backgroundColor = '#dc3545')}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div style={styles.noFeeds}>
+                  <p>No feeds added yet.</p>
+                  <p>Add your first RSS feed using the form above!</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

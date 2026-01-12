@@ -1,66 +1,199 @@
 import React, { useState } from 'react';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth'; // Firebase Auth関数を追加
-import { useNavigate } from 'react-router-dom'; // useNavigateを追加
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const navigate = useNavigate(); // useNavigateフックを初期化
-
-  // Firebase Authのインスタンスを取得
+  const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
   const auth = getAuth();
 
-  const handleLogin = async () => { // async関数に変更
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      console.log('Login successful');
-      navigate('/dashboard'); // ログイン成功後、ダッシュボードへリダイレクト
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, email, password);
+        navigate('/dashboard');
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+        navigate('/dashboard');
+      }
     } catch (error) {
-      console.error('Login failed:', error.message);
-      alert('Login failed: ' + error.message); // エラーメッセージを表示
+      console.error('Authentication failed:', error.message);
+      alert((isLogin ? 'Login' : 'Registration') + ' failed: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRegister = async () => { // async関数に変更
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      console.log('Registration successful');
-      alert('Registration successful! Please log in.'); // 登録成功メッセージを表示
-      // 登録後、自動でログインさせるか、ログイン画面のままにするかは要件次第。今回はアラート表示のみ。
-    } catch (error) {
-      console.error('Registration failed:', error.message);
-      alert('Registration failed: ' + error.message); // エラーメッセージを表示
-    }
+  const styles = {
+    container: {
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #FF6B35 0%, #f7931e 100%)',
+      padding: '2rem',
+    },
+    card: {
+      backgroundColor: 'white',
+      padding: '3rem',
+      borderRadius: '12px',
+      boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+      maxWidth: '450px',
+      width: '100%',
+    },
+    logo: {
+      textAlign: 'center',
+      marginBottom: '2rem',
+    },
+    logoText: {
+      fontSize: '2.5rem',
+      fontWeight: 'bold',
+      color: '#FF6B35',
+      marginBottom: '0.5rem',
+    },
+    tagline: {
+      fontSize: '1rem',
+      color: '#666',
+      fontStyle: 'italic',
+    },
+    tabs: {
+      display: 'flex',
+      marginBottom: '2rem',
+      borderBottom: '2px solid #e0e0e0',
+    },
+    tab: {
+      flex: 1,
+      padding: '1rem',
+      textAlign: 'center',
+      cursor: 'pointer',
+      fontWeight: '600',
+      color: '#999',
+      borderBottom: '3px solid transparent',
+      transition: 'all 0.3s',
+    },
+    activeTab: {
+      color: '#FF6B35',
+      borderBottomColor: '#FF6B35',
+    },
+    form: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1.5rem',
+    },
+    formGroup: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.5rem',
+    },
+    label: {
+      fontWeight: '600',
+      color: '#333',
+      fontSize: '0.9rem',
+    },
+    input: {
+      padding: '0.75rem',
+      border: '2px solid #e0e0e0',
+      borderRadius: '6px',
+      fontSize: '1rem',
+      transition: 'border-color 0.3s',
+    },
+    button: {
+      padding: '1rem',
+      backgroundColor: '#FF6B35',
+      color: 'white',
+      border: 'none',
+      borderRadius: '6px',
+      fontSize: '1rem',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'background-color 0.3s',
+      marginTop: '1rem',
+    },
+    buttonDisabled: {
+      backgroundColor: '#ccc',
+      cursor: 'not-allowed',
+    },
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '400px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px' }}>
-      <h1>Login / Register</h1>
-      <div>
-        <label>Email:</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ width: '100%', padding: '8px', margin: '5px 0', boxSizing: 'border-box' }}
-        />
-      </div>
-      <div>
-        <label>Password:</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ width: '100%', padding: '8px', margin: '5px 0', boxSizing: 'border-box' }}
-        />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px' }}>
-        <button onClick={handleLogin} style={{ padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-          Login
-        </button>
-        <button onClick={handleRegister} style={{ padding: '10px 20px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-          Register
-        </button>
+    <div style={styles.container}>
+      <div style={styles.card}>
+        <div style={styles.logo}>
+          <div style={styles.logoText}>FeedOwn</div>
+          <div style={styles.tagline}>Own your feeds, own your data</div>
+        </div>
+
+        <div style={styles.tabs}>
+          <div
+            style={{
+              ...styles.tab,
+              ...(isLogin ? styles.activeTab : {}),
+            }}
+            onClick={() => setIsLogin(true)}
+          >
+            Login
+          </div>
+          <div
+            style={{
+              ...styles.tab,
+              ...(!isLogin ? styles.activeTab : {}),
+            }}
+            onClick={() => setIsLogin(false)}
+          >
+            Register
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
+              style={styles.input}
+              required
+              disabled={loading}
+              onFocus={(e) => (e.target.style.borderColor = '#FF6B35')}
+              onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
+            />
+          </div>
+
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              style={styles.input}
+              required
+              disabled={loading}
+              onFocus={(e) => (e.target.style.borderColor = '#FF6B35')}
+              onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
+            />
+          </div>
+
+          <button
+            type="submit"
+            style={{
+              ...styles.button,
+              ...(loading ? styles.buttonDisabled : {}),
+            }}
+            disabled={loading}
+            onMouseOver={(e) => !loading && (e.target.style.backgroundColor = '#e55a2b')}
+            onMouseOut={(e) => !loading && (e.target.style.backgroundColor = '#FF6B35')}
+          >
+            {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Create Account')}
+          </button>
+        </form>
       </div>
     </div>
   );

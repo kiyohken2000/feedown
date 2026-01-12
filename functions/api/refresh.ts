@@ -154,17 +154,109 @@ export async function onRequestPost(context: any): Promise<Response> {
 
 /**
  * Parse RSS XML string
- * TODO: Implement proper XML parsing for Workers environment
+ * Simple regex-based parser for RSS 2.0 and Atom feeds
  */
 async function parseRssXml(xmlText: string): Promise<any> {
-  // Simplified parsing for now
-  // In production, use a proper XML parser compatible with Workers
-  // For now, return a mock structure
-  return {
-    title: 'Feed Title',
-    description: 'Feed Description',
+  const result: any = {
+    title: '',
+    description: '',
     items: [],
   };
+
+  // Check if it's an Atom feed
+  const isAtom = xmlText.includes('<feed') && xmlText.includes('xmlns="http://www.w3.org/2005/Atom"');
+
+  if (isAtom) {
+    // Parse Atom feed
+    const titleMatch = xmlText.match(/<title[^>]*>(.*?)<\/title>/);
+    const subtitleMatch = xmlText.match(/<subtitle[^>]*>(.*?)<\/subtitle>/);
+
+    result.title = titleMatch ? stripHtml(titleMatch[1]) : 'Untitled Feed';
+    result.description = subtitleMatch ? stripHtml(subtitleMatch[1]) : '';
+
+    // Extract entries
+    const entryRegex = /<entry[^>]*>([\s\S]*?)<\/entry>/g;
+    let entryMatch;
+
+    while ((entryMatch = entryRegex.exec(xmlText)) !== null) {
+      const entryXml = entryMatch[1];
+
+      const entryTitle = entryXml.match(/<title[^>]*>(.*?)<\/title>/)?.[1] || 'Untitled';
+      const entryLink = entryXml.match(/<link[^>]*href="([^"]+)"/)?.[1] || '';
+      const entryId = entryXml.match(/<id[^>]*>(.*?)<\/id>/)?.[1] || entryLink;
+      const entryContent = entryXml.match(/<content[^>]*>(.*?)<\/content>/s)?.[1] ||
+                           entryXml.match(/<summary[^>]*>(.*?)<\/summary>/s)?.[1] || '';
+      const entryPublished = entryXml.match(/<published[^>]*>(.*?)<\/published>/)?.[1] ||
+                             entryXml.match(/<updated[^>]*>(.*?)<\/updated>/)?.[1] || new Date().toISOString();
+      const entryAuthor = entryXml.match(/<author[^>]*>[\s\S]*?<name[^>]*>(.*?)<\/name>/)?.[1] || '';
+
+      result.items.push({
+        title: stripHtml(entryTitle),
+        link: entryLink,
+        guid: entryId,
+        content: stripHtml(entryContent),
+        publishedAt: new Date(entryPublished),
+        author: entryAuthor ? stripHtml(entryAuthor) : null,
+      });
+    }
+  } else {
+    // Parse RSS 2.0 feed
+    const channelMatch = xmlText.match(/<channel[^>]*>([\s\S]*)<\/channel>/);
+    if (!channelMatch) {
+      throw new Error('Invalid RSS feed: no channel element found');
+    }
+
+    const channelXml = channelMatch[1];
+    const titleMatch = channelXml.match(/<title[^>]*>(.*?)<\/title>/);
+    const descMatch = channelXml.match(/<description[^>]*>(.*?)<\/description>/);
+
+    result.title = titleMatch ? stripHtml(titleMatch[1]) : 'Untitled Feed';
+    result.description = descMatch ? stripHtml(descMatch[1]) : '';
+
+    // Extract items
+    const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/g;
+    let itemMatch;
+
+    while ((itemMatch = itemRegex.exec(channelXml)) !== null) {
+      const itemXml = itemMatch[1];
+
+      const itemTitle = itemXml.match(/<title[^>]*>(.*?)<\/title>/)?.[1] || 'Untitled';
+      const itemLink = itemXml.match(/<link[^>]*>(.*?)<\/link>/)?.[1] || '';
+      const itemGuid = itemXml.match(/<guid[^>]*>(.*?)<\/guid>/)?.[1] || itemLink;
+      const itemDesc = itemXml.match(/<description[^>]*>(.*?)<\/description>/s)?.[1] || '';
+      const itemContent = itemXml.match(/<content:encoded[^>]*>(.*?)<\/content:encoded>/s)?.[1] || itemDesc;
+      const itemPubDate = itemXml.match(/<pubDate[^>]*>(.*?)<\/pubDate>/)?.[1] || new Date().toISOString();
+      const itemAuthor = itemXml.match(/<(?:dc:)?creator[^>]*>(.*?)<\/(?:dc:)?creator>/)?.[1] ||
+                         itemXml.match(/<author[^>]*>(.*?)<\/author>/)?.[1] || '';
+
+      result.items.push({
+        title: stripHtml(itemTitle),
+        link: itemLink.trim(),
+        guid: itemGuid.trim(),
+        content: stripHtml(itemContent),
+        publishedAt: new Date(itemPubDate),
+        author: itemAuthor ? stripHtml(itemAuthor) : null,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Strip HTML tags and decode HTML entities
+ */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .trim();
 }
 
 /**
