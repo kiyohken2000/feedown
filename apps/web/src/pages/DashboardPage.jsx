@@ -220,7 +220,9 @@ const DashboardPage = () => {
 
   const styles = {
     container: {
-      padding: '2rem',
+      paddingLeft: '2rem',
+      paddingRight: '2rem',
+      paddingBottom: '2rem',
       maxWidth: '1200px',
       margin: '0 auto',
     },
@@ -229,9 +231,19 @@ const DashboardPage = () => {
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: '1.5rem',
-      marginTop: '2rem',
+      marginLeft: '-2rem',
+      marginRight: '-2rem',
+      paddingTop: '1rem',
+      paddingBottom: '1rem',
+      paddingLeft: '2rem',
+      paddingRight: '2rem',
       flexWrap: 'wrap',
       gap: '1rem',
+      position: 'sticky',
+      top: '73px',
+      backgroundColor: 'white',
+      zIndex: 50,
+      borderBottom: '1px solid #eee',
     },
     filterGroup: {
       display: 'flex',

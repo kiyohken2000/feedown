@@ -45,8 +45,11 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
     image: {
       width: '100%',
       height: 'auto',
+      maxHeight: '300px',
+      objectFit: 'contain',
       borderRadius: '8px',
       marginBottom: '1.5rem',
+      backgroundColor: '#f5f5f5',
     },
     title: {
       fontSize: '2rem',
