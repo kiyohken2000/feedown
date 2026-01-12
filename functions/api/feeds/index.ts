@@ -109,11 +109,39 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
+    // Try to fetch feed title from RSS
+    let feedTitle = title || '';
+    let feedDescription = description || '';
+
+    if (!feedTitle) {
+      try {
+        const workerUrl = env.WORKER_URL || env.VITE_WORKER_URL;
+        if (workerUrl) {
+          const rssResponse = await fetch(`${workerUrl}/fetch?url=${encodeURIComponent(url)}`, {
+            method: 'GET',
+            headers: {
+              'User-Agent': 'FeedOwn/1.0',
+            },
+          });
+
+          if (rssResponse.ok) {
+            const xmlText = await rssResponse.text();
+            const parsedFeed = await parseFeedBasicInfo(xmlText);
+            feedTitle = parsedFeed.title || '';
+            feedDescription = parsedFeed.description || '';
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch feed title:', error);
+        // Continue without title
+      }
+    }
+
     // Add feed to Firestore
     const feedData = {
       url,
-      title: title || '',
-      description: description || '',
+      title: feedTitle,
+      description: feedDescription,
       addedAt: new Date(),
       lastFetchedAt: null,
       lastSuccessAt: null,
@@ -153,4 +181,56 @@ export async function onRequestPost(context: any): Promise<Response> {
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
+}
+
+/**
+ * Parse RSS XML to get basic feed info (title, description)
+ */
+async function parseFeedBasicInfo(xmlText: string): Promise<{ title: string; description: string }> {
+  const result = {
+    title: '',
+    description: '',
+  };
+
+  try {
+    // Check if it's an Atom feed
+    const isAtom = xmlText.includes('<feed') && xmlText.includes('xmlns="http://www.w3.org/2005/Atom"');
+
+    if (isAtom) {
+      const titleMatch = xmlText.match(/<title[^>]*>(.*?)<\/title>/);
+      const subtitleMatch = xmlText.match(/<subtitle[^>]*>(.*?)<\/subtitle>/);
+      result.title = titleMatch ? stripHtmlTags(titleMatch[1]) : '';
+      result.description = subtitleMatch ? stripHtmlTags(subtitleMatch[1]) : '';
+    } else {
+      // RSS 2.0
+      const channelMatch = xmlText.match(/<channel[^>]*>([\s\S]*?)<\/channel>/);
+      if (channelMatch) {
+        const channelXml = channelMatch[1];
+        const titleMatch = channelXml.match(/<title[^>]*>(.*?)<\/title>/);
+        const descMatch = channelXml.match(/<description[^>]*>(.*?)<\/description>/);
+        result.title = titleMatch ? stripHtmlTags(titleMatch[1]) : '';
+        result.description = descMatch ? stripHtmlTags(descMatch[1]) : '';
+      }
+    }
+  } catch (error) {
+    console.error('Error parsing feed basic info:', error);
+  }
+
+  return result;
+}
+
+/**
+ * Strip HTML tags and decode entities
+ */
+function stripHtmlTags(html: string): string {
+  return html
+    .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .trim();
 }

@@ -41,6 +41,15 @@ export async function onRequestGet(context: any): Promise<Response> {
     // Smart refresh logic: check if we need to refresh
     const shouldRefresh = await checkShouldRefresh(uid, idToken, config);
 
+    // Get all feeds to filter out deleted feeds
+    const allFeeds = await listDocuments(
+      `users/${uid}/feeds`,
+      idToken,
+      config,
+      100
+    );
+    const validFeedIds = new Set(allFeeds.map(feed => feed.id));
+
     // Get all articles (REST API limitation: complex queries are difficult)
     const allArticles = await listDocuments(
       `users/${uid}/articles`,
@@ -49,12 +58,14 @@ export async function onRequestGet(context: any): Promise<Response> {
       1000 // Get up to 1000 articles
     );
 
-    // Filter non-expired articles
+    // Filter non-expired articles and articles from deleted feeds
     const now = new Date();
     let articles = allArticles.filter(article => {
       if (!article.expiresAt) return false;
       const expiresAt = new Date(article.expiresAt);
-      return expiresAt > now;
+      if (expiresAt <= now) return false;
+      // Exclude articles from deleted feeds
+      return validFeedIds.has(article.feedId);
     });
 
     // Filter by feed if specified

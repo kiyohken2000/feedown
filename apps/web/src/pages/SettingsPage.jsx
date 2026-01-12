@@ -120,14 +120,6 @@ const SettingsPage = () => {
             <span style={styles.value}>{user?.email}</span>
           </div>
           <div style={styles.infoRow}>
-            <span style={styles.label}>User ID:</span>
-            <span style={styles.value}>{user?.uid}</span>
-          </div>
-          <div style={styles.infoRow}>
-            <span style={styles.label}>Email Verified:</span>
-            <span style={styles.value}>{user?.emailVerified ? 'Yes' : 'No'}</span>
-          </div>
-          <div style={styles.infoRow}>
             <span style={styles.label}>Account Created:</span>
             <span style={styles.value}>
               {user?.metadata?.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'N/A'}

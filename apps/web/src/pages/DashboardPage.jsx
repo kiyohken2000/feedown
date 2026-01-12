@@ -71,6 +71,18 @@ const DashboardPage = () => {
     return () => unsubscribe();
   }, [auth, navigate, api]);
 
+  // Auto-refresh on window focus
+  useEffect(() => {
+    const handleFocus = async () => {
+      if (user) {
+        await fetchArticles();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [user]);
+
   // Calculate unread count
   const unreadCount = useMemo(() => {
     return articles.filter(article => !readArticles.has(article.id)).length;
@@ -168,6 +180,8 @@ const DashboardPage = () => {
       await Promise.all(
         unreadArticleIds.map(articleId => api.articles.markAsRead(articleId))
       );
+      // Refresh articles after marking all as read
+      await fetchArticles();
     } catch (error) {
       console.error('Failed to mark all as read:', error);
       // Rollback on error
@@ -262,8 +276,6 @@ const DashboardPage = () => {
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: '1.5rem',
-      marginLeft: '-2rem',
-      marginRight: '-2rem',
       paddingTop: '1rem',
       paddingBottom: '1rem',
       paddingLeft: '2rem',
@@ -276,6 +288,10 @@ const DashboardPage = () => {
       backdropFilter: 'blur(10px)',
       zIndex: 50,
       borderBottom: '1px solid #eee',
+      maxWidth: '1200px',
+      margin: '0 auto 1.5rem',
+      left: 0,
+      right: 0,
     },
     buttonGroup: {
       display: 'flex',
