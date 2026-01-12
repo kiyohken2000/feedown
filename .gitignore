@@ -28,6 +28,9 @@ build/
 .DS_Store
 Thumbs.db
 
+# Temp files
+tmpclaude-*
+
 # Cloudflare
 .dev.vars
 .wrangler/
