@@ -24,7 +24,7 @@ export async function onRequestPost(context) {
         }
         // Get article data from request body
         const body = await request.json();
-        const { title, url, description, feedTitle } = body;
+        const { title, url, description, feedTitle, imageUrl } = body;
         if (!title || !url) {
             return new Response(JSON.stringify({ error: 'Article title and URL are required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
@@ -35,6 +35,7 @@ export async function onRequestPost(context) {
             url,
             description: description || '',
             feedTitle: feedTitle || '',
+            imageUrl: imageUrl || null,
             savedAt: new Date(),
         }, idToken, config);
         if (!success) {

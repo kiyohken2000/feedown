@@ -137,6 +137,21 @@ export class OpmlAPI {
 }
 
 /**
+ * User Account API
+ */
+export class UserAPI {
+  constructor(private client: ApiClient) {}
+
+  async deleteAccount() {
+    return this.client.delete<void>('/api/user/account');
+  }
+
+  async clearAllData() {
+    return this.client.delete<void>('/api/user/data');
+  }
+}
+
+/**
  * Main API class combining all endpoints
  */
 export class FeedOwnAPI {
@@ -146,6 +161,7 @@ export class FeedOwnAPI {
   public refresh: RefreshAPI;
   public favorites: FavoritesAPI;
   public opml: OpmlAPI;
+  public user: UserAPI;
 
   constructor(client: ApiClient) {
     this.auth = new AuthAPI(client);
@@ -154,5 +170,6 @@ export class FeedOwnAPI {
     this.refresh = new RefreshAPI(client);
     this.favorites = new FavoritesAPI(client);
     this.opml = new OpmlAPI(client);
+    this.user = new UserAPI(client);
   }
 }

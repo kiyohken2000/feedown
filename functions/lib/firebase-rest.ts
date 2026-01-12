@@ -383,6 +383,32 @@ function fromFirestoreDocument(doc: FirestoreDocument): any {
 }
 
 /**
+ * Delete all documents in a collection
+ */
+export async function deleteCollection(
+  collectionPath: string,
+  idToken: string,
+  config: FirebaseConfig
+): Promise<boolean> {
+  try {
+    // List all documents in the collection
+    const documents = await listDocuments(collectionPath, idToken, config, 500);
+
+    // Delete each document
+    const deletePromises = documents.map((doc) => {
+      const docPath = `${collectionPath}/${doc.id}`;
+      return deleteDocument(docPath, idToken, config);
+    });
+
+    await Promise.all(deletePromises);
+    return true;
+  } catch (error) {
+    console.error('Error deleting collection:', error);
+    return false;
+  }
+}
+
+/**
  * Run a structured query
  */
 export async function runQuery(

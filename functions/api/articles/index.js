@@ -27,26 +27,38 @@ export async function onRequestGet(context) {
         const config = getFirebaseConfig(env);
         // Smart refresh logic: check if we need to refresh
         const shouldRefresh = await checkShouldRefresh(uid, idToken, config);
+        // Get all feeds to filter out deleted feeds
+        const allFeeds = await listDocuments(`users/${uid}/feeds`, idToken, config, 100);
+        const validFeedIds = new Set(allFeeds.map(feed => feed.id));
         // Get all articles (REST API limitation: complex queries are difficult)
         const allArticles = await listDocuments(`users/${uid}/articles`, idToken, config, 1000 // Get up to 1000 articles
         );
-        // Filter non-expired articles
+        // Filter non-expired articles and articles from deleted feeds
         const now = new Date();
         let articles = allArticles.filter(article => {
             if (!article.expiresAt)
                 return false;
             const expiresAt = new Date(article.expiresAt);
-            return expiresAt > now;
+            if (expiresAt <= now)
+                return false;
+            // Exclude articles from deleted feeds
+            return validFeedIds.has(article.feedId);
         });
         // Filter by feed if specified
         if (feedId) {
             articles = articles.filter(article => article.feedId === feedId);
         }
-        // Get read articles if filtering by unread
+        // Get read articles to mark isRead flag
+        const readArticles = await listDocuments(`users/${uid}/readArticles`, idToken, config, 1000);
+        const readArticleIds = new Set(readArticles.map(doc => doc.id));
+        // Add isRead flag to all articles
+        articles = articles.map(article => ({
+            ...article,
+            isRead: readArticleIds.has(article.id),
+        }));
+        // Filter by unread if specified
         if (unreadOnly) {
-            const readArticles = await listDocuments(`users/${uid}/readArticles`, idToken, config, 1000);
-            const readArticleIds = new Set(readArticles.map(doc => doc.id));
-            articles = articles.filter(article => !readArticleIds.has(article.id));
+            articles = articles.filter(article => !article.isRead);
         }
         // Sort by publishedAt descending
         articles.sort((a, b) => {

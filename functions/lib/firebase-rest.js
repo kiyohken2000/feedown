@@ -296,6 +296,26 @@ function fromFirestoreDocument(doc) {
     return result;
 }
 /**
+ * Delete all documents in a collection
+ */
+export async function deleteCollection(collectionPath, idToken, config) {
+    try {
+        // List all documents in the collection
+        const documents = await listDocuments(collectionPath, idToken, config, 500);
+        // Delete each document
+        const deletePromises = documents.map((doc) => {
+            const docPath = `${collectionPath}/${doc.id}`;
+            return deleteDocument(docPath, idToken, config);
+        });
+        await Promise.all(deletePromises);
+        return true;
+    }
+    catch (error) {
+        console.error('Error deleting collection:', error);
+        return false;
+    }
+}
+/**
  * Run a structured query
  */
 export async function runQuery(collectionPath, query, idToken, config) {
