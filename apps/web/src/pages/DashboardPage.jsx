@@ -50,7 +50,7 @@ const DashboardPage = () => {
   const fetchArticles = async (reset = true) => {
     if (reset) {
       setArticlesLoading(true);
-      setArticles([]);
+      // Don't clear articles to keep them visible during refresh
       setHasMore(true);
     } else {
       setLoadingMore(true);
