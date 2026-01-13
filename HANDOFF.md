@@ -1071,11 +1071,192 @@ Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUI�
 - OPMLインポート/エクスポート
 
 ### Mobileアプリについて
-- Webで実装した機能を参考にしてください
-- React NativeではIntersection Observer APIが使えないため、`onViewableItemsChanged`を使用
-- 画像表示は`<Image>`コンポーネントを使用
-- AsyncStorageでPages Functions URLを保存
-- すべてのAPIエンドポイントはWebと共通なので、`packages/shared`のAPIクライアントをそのまま使用可能
+
+#### ボイラープレートの構成
+
+`apps/mobile/` ディレクトリに **React Native Expo ボイラープレート** が準備されています。このボイラープレートは、認証、ナビゲーション、状態管理などの基本機能がすでに実装されており、FeedOwnアプリの開発をスムーズに開始できます。
+
+**主な技術スタック:**
+- **Expo SDK**: 54.0.8
+- **React Native**: 0.81.4
+- **React Navigation**: 7.x (Stack, Drawer, Tab Navigation)
+- **Redux Toolkit**: グローバル状態管理
+- **TypeScript**: 型安全性サポート
+- **AsyncStorage**: ローカルストレージ
+- **Toast Notifications**: `react-native-toast-message`
+- **Lottie**: アニメーション
+
+#### ディレクトリ構造
+
+```
+apps/mobile/
+├── App.js                    # アプリエントリーポイント
+├── app.json                  # Expo設定ファイル
+├── babel.config.js           # Babel設定（module resolver付き）
+├── metro.config.js           # Metro bundler設定
+├── package.json              # 依存関係
+└── src/
+    ├── index.js              # App.jsをエクスポート
+    ├── App.js                # メインアプリコンポーネント
+    ├── config.js             # アプリ設定（isAutoLogin, dummyUser）
+    ├── assets/               # 画像、フォント
+    │   ├── fonts/
+    │   └── images/
+    ├── components/           # 再利用可能なUIコンポーネント
+    │   ├── Button/
+    │   ├── Logo/
+    │   ├── LoadingScreen/
+    │   ├── EmptyScreen/
+    │   └── ...
+    ├── contexts/             # React Context API
+    │   ├── UserContext.jsx   # ユーザー認証状態管理
+    │   └── HomeTitleContext.jsx
+    ├── routes/               # ナビゲーション設定
+    │   ├── index.js          # Routes.jsをエクスポート
+    │   ├── Routes.js         # ルートレベルのルーティング
+    │   └── navigation/
+    │       ├── Navigation.js # NavigationContainer + Toast
+    │       ├── stacks/       # Stack Navigators（LoginStacks等）
+    │       ├── rootStack/    # 認証後のStack Navigation
+    │       └── drawer/       # Drawer Navigation（コメントアウト）
+    ├── scenes/               # 各画面コンポーネント
+    │   ├── home/Home.js
+    │   ├── signin/SignIn.js
+    │   ├── signup/SingUp.js
+    │   ├── loading/Loading.js
+    │   ├── profile/Profile.js
+    │   ├── details/Details.js
+    │   ├── menu/Menu.js
+    │   ├── post/Post.js
+    │   ├── read/Read.js
+    │   ├── write/Write.js
+    │   ├── print/Print.js
+    │   └── modal/Modal.js
+    ├── slices/               # Redux Toolkit slices
+    │   └── app.slice.js      # アプリ全体の状態（checked）
+    ├── theme/                # テーマ設定
+    │   ├── colors.js
+    │   ├── fonts.js
+    │   └── images.js
+    └── utils/                # ユーティリティ
+        ├── store.js          # Redux store設定
+        └── ignore.js         # 警告の無視設定
+```
+
+#### 既存コンポーネントの説明
+
+**1. アプリエントリーポイント (`src/App.js`)**
+```javascript
+// Redux Provider、SafeAreaProvider、UserContextProviderでラップ
+<SafeAreaProvider>
+  <Provider store={store}>
+    <UserContextProvider>
+      <Router />
+    </UserContextProvider>
+  </Provider>
+</SafeAreaProvider>
+```
+- **アセットプリロード**: 画像とフォントを初期ロード時に読み込み
+- **ローディング画面**: アセット読み込み中は空のViewを表示
+
+**2. ナビゲーション (`src/routes/navigation/Navigation.js`)**
+```javascript
+// ユーザー認証状態に応じてナビゲーションを切り替え
+{user ? <RootStack /> : <LoginStacks />}
+```
+- **UserContext**: ユーザーがログイン済みかどうかで表示するスタックを切り替え
+- **Toast**: グローバルなToast通知コンポーネントを配置
+
+**3. Redux状態管理 (`src/slices/app.slice.js` + `src/utils/store.js`)**
+- **app.slice.js**: `checked`フラグ（初期化完了）を管理
+- **store.js**: Redux Toolkitの`configureStore`で設定
+  - 開発環境では`redux-logger`ミドルウェアを有効化
+  - `serializableCheck`, `immutableCheck`を無効化
+
+**4. UserContext (`src/contexts/UserContext.jsx`)**
+- ユーザーの認証状態を管理
+- ログイン/ログアウト機能を提供
+
+**5. 既存の画面 (Scenes)**
+- **SignIn.js / SingUp.js**: ログイン・登録画面（既存のボイラープレート）
+- **Home.js**: ホーム画面（サンプル）
+- **Profile.js**: プロフィール画面（サンプル）
+- **Details.js**: 詳細画面（サンプル）
+- その他のサンプル画面（Post, Read, Write, Print, Modal, Menu, Loading）
+
+#### Babel設定（モジュールエイリアス）
+
+`babel.config.js` でパスエイリアスが設定されているため、絶対パスでimportできます:
+```javascript
+// 相対パスの代わりに
+import Button from '../../components/Button'
+
+// エイリアスを使用
+import Button from 'components/Button'
+```
+
+**利用可能なエイリアス:**
+- `components` → `./src/components`
+- `scenes` → `./src/scenes`
+- `theme` → `./src/theme`
+- `utils` → `./src/utils`
+- `slices` → `./src/slices`
+
+#### Phase 7 実装時の推奨手順
+
+**1. 既存のボイラープレートを理解する**
+   - `src/App.js` でアプリ初期化フローを確認
+   - `src/routes/navigation/Navigation.js` でナビゲーション構造を確認
+   - `src/contexts/UserContext.jsx` で認証状態管理を確認
+
+**2. FeedOwn用の画面を作成する**
+   - 既存のサンプル画面（Post, Read, Write等）を削除または書き換え
+   - 新しい画面を `src/scenes/` に追加:
+     - `InitScreen.js`: 初期設定（Pages Functions URL入力）
+     - `DashboardScreen.js`: 記事一覧（Webの DashboardPage.jsx を参考）
+     - `FeedsScreen.js`: フィード管理（Webの FeedsPage.jsx を参考）
+     - `ArticleScreen.js`: 記事詳細（Webの ArticleModal.jsx を参考）
+     - `FavoritesScreen.js`: お気に入り（Webの FavoritesPage.jsx を参考）
+     - `SettingsScreen.js`: 設定（Webの SettingsPage.jsx を参考）
+
+**3. API統合**
+   - `packages/shared/src/api` のAPIクライアントをインポート
+   - AsyncStorageにPages Functions URLとFirebase Auth Tokenを保存
+   - WebのuseEffectパターンをそのまま使用可能
+
+**4. ナビゲーション構造の変更**
+   - `src/routes/navigation/stacks/LoginStacks.js`: SignIn → InitScreen（URL入力）
+   - `src/routes/navigation/rootStack/RootStack.js`: Dashboard, Feeds, Favorites, Settings, Articleを追加
+   - Tab NavigationまたはDrawer Navigationで主要画面を構成
+
+**5. Redux Sliceの追加**
+   - `src/slices/feeds.slice.js`: フィード一覧の状態管理
+   - `src/slices/articles.slice.js`: 記事一覧の状態管理
+   - `src/utils/store.js` で新しいsliceを追加
+
+**6. React Native固有の実装**
+   - **Intersection Observer → onViewableItemsChanged**: FlatListで無限スクロールと既読自動マーク
+   - **Modal → React Navigation Modal**: 記事詳細をモーダルで表示
+   - **CSS → StyleSheet**: インラインスタイルまたはStyleSheetを使用
+   - **WebView**: 記事詳細を外部リンクで表示する場合に使用
+
+#### 重要な技術ポイント（Mobile）
+
+1. **AsyncStorageでPages Functions URLを保存**
+   - 初回起動時にInitScreenでURLを入力
+   - AsyncStorageに保存して以降のAPI呼び出しで使用
+
+2. **Firebase Client SDK不要**
+   - すべてPages Functions経由でFirebaseにアクセス
+   - モバイルアプリはシンプルなHTTPクライアントとして機能
+
+3. **FlatListでのパフォーマンス最適化**
+   - `windowSize`, `maxToRenderPerBatch`, `removeClippedSubviews` を調整
+   - 大量の記事リストでもスムーズなスクロール
+
+4. **Toast通知**
+   - `react-native-toast-message` がすでに統合済み
+   - WebのToast通知と同様のUXを提供可能
 
 ### 重要な技術ポイント
 1. **画像抽出**: RSS/Atomから複数の方法で画像URLを抽出（`functions/api/refresh.ts`参照）
@@ -1095,7 +1276,8 @@ Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUI�
 | 2026-01-12 11:30 | Claude Sonnet 4.5 | Favicon表示、ドラッグ&ドロップ、画像抽出改善、Unreadフィルター改善 |
 | 2026-01-12 12:30 | Claude Sonnet 4.5 | 無限スクロール（ページネーション）実装完了 |
 | 2026-01-13 前半 | Claude Sonnet 4.5 | ダークモード、アカウント削除機能、おすすめフィード機能、記事リスト表示改善、API Client エラーハンドリング改善 |
-| **2026-01-13 後半** | **Claude Sonnet 4.5** | **トースト通知システム、ワンクリックテストアカウント作成、Dashboard更新タイミング最適化、自動Refresh、Clear Data/Delete Account修正** |
+| 2026-01-13 後半 | Claude Sonnet 4.5 | トースト通知システム、ワンクリックテストアカウント作成、Dashboard更新タイミング最適化、自動Refresh、Clear Data/Delete Account修正 |
+| **2026-01-13 最終** | **Claude Sonnet 4.5** | **React Native Expoボイラープレート解析、モバイルアプリの構造・技術スタック・実装手順をドキュメント化** |
 
 ---
 
