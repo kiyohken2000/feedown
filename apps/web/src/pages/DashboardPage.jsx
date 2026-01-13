@@ -5,26 +5,35 @@ import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import ArticleModal from '../components/ArticleModal';
 import { useTheme } from '../contexts/ThemeContext';
+import { useArticles } from '../contexts/ArticlesContext';
 
 const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [articles, setArticles] = useState([]);
   const [filteredArticles, setFilteredArticles] = useState([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [articlesError, setArticlesError] = useState(null);
   const [filter, setFilter] = useState('all'); // 'all', 'unread', 'read'
   const [selectedArticle, setSelectedArticle] = useState(null);
-  const [readArticles, setReadArticles] = useState(new Set());
-  const [favoritedArticles, setFavoritedArticles] = useState(new Set());
-  const [feeds, setFeeds] = useState([]);
-  const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [lastArticleFetchTime, setLastArticleFetchTime] = useState(null);
 
   const navigate = useNavigate();
   const auth = getAuth();
   const { isDarkMode } = useTheme();
+  const {
+    articles,
+    setArticles,
+    readArticles,
+    setReadArticles,
+    favoritedArticles,
+    setFavoritedArticles,
+    feeds,
+    setFeeds,
+    lastArticleFetchTime,
+    setLastArticleFetchTime,
+    hasMore,
+    setHasMore,
+  } = useArticles();
   const observerRef = useRef(null);
   const articleRefs = useRef({});
   const loadMoreRef = useRef(null);

@@ -4,8 +4,8 @@
  * DELETE: Remove from favorites
  */
 
-import { requireAuth, getFirebaseConfig } from '../../../lib/auth';
-import { setDocument, deleteDocument } from '../../../lib/firebase-rest';
+import { requireAuth, getFirebaseConfig, isTestAccount } from '../../../lib/auth';
+import { setDocument, deleteDocument, listDocuments } from '../../../lib/firebase-rest';
 
 /**
  * POST /api/articles/:id/favorite
@@ -20,7 +20,7 @@ export async function onRequestPost(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, idToken, email } = authResult;
 
     const articleId = params.id;
     if (!articleId) {
@@ -42,6 +42,28 @@ export async function onRequestPost(context: any): Promise<Response> {
     }
 
     const config = getFirebaseConfig(env);
+
+    // Check favorites limit for test accounts
+    // Test accounts (test-*@test.com): max 10 favorites
+    // Regular accounts: unlimited
+    const isTest = isTestAccount(email);
+    if (isTest) {
+      const existingFavorites = await listDocuments(
+        `users/${uid}/favorites`,
+        idToken,
+        config,
+        100
+      );
+
+      if (existingFavorites.length >= 10) {
+        return new Response(
+          JSON.stringify({
+            error: 'Test accounts can only have up to 10 favorites. Please use a regular account for more favorites.'
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     // Add to favorites
     const success = await setDocument(

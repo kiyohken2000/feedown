@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import { useTheme } from '../contexts/ThemeContext';
+import { useArticles } from '../contexts/ArticlesContext';
 
 const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -11,6 +12,7 @@ const SettingsPage = () => {
   const navigate = useNavigate();
   const auth = getAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const { clearAllData: clearArticlesContext } = useArticles();
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '/api',
@@ -34,6 +36,8 @@ const SettingsPage = () => {
 
   const handleLogout = async () => {
     try {
+      // Clear global articles context before logout
+      clearArticlesContext();
       await signOut(auth);
       navigate('/');
     } catch (error) {
@@ -58,6 +62,8 @@ const SettingsPage = () => {
     try {
       const response = await api.user.clearAllData();
       if (response.success) {
+        // Clear global articles context
+        clearArticlesContext();
         alert('All data has been deleted successfully.');
         // Redirect to dashboard to see empty state
         navigate('/dashboard');
@@ -86,6 +92,8 @@ const SettingsPage = () => {
     try {
       const response = await api.user.deleteAccount();
       if (response.success) {
+        // Clear global articles context
+        clearArticlesContext();
         alert('Your account has been deleted successfully.');
         // Sign out and redirect to login
         await signOut(auth);

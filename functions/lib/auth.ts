@@ -82,3 +82,12 @@ export async function requireAuth(
   }
   return user;
 }
+
+/**
+ * Check if user is a test account (created via Quick Create Test Account)
+ * Test accounts have email format: test-{number}@test.com
+ */
+export function isTestAccount(email: string | undefined): boolean {
+  if (!email) return false;
+  return /^test-\d+@test\.com$/i.test(email);
+}

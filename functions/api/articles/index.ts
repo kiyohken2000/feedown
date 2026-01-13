@@ -38,25 +38,16 @@ export async function onRequestGet(context: any): Promise<Response> {
 
     const config = getFirebaseConfig(env);
 
-    // Smart refresh logic: check if we need to refresh
-    const shouldRefresh = await checkShouldRefresh(uid, idToken, config);
+    // Fetch feeds, articles, and read articles in parallel for better performance
+    const [shouldRefresh, allFeeds, allArticles, readArticles] = await Promise.all([
+      checkShouldRefresh(uid, idToken, config),
+      listDocuments(`users/${uid}/feeds`, idToken, config, 100),
+      listDocuments(`users/${uid}/articles`, idToken, config, 1000),
+      listDocuments(`users/${uid}/readArticles`, idToken, config, 1000),
+    ]);
 
-    // Get all feeds to filter out deleted feeds
-    const allFeeds = await listDocuments(
-      `users/${uid}/feeds`,
-      idToken,
-      config,
-      100
-    );
     const validFeedIds = new Set(allFeeds.map(feed => feed.id));
-
-    // Get all articles (REST API limitation: complex queries are difficult)
-    const allArticles = await listDocuments(
-      `users/${uid}/articles`,
-      idToken,
-      config,
-      1000 // Get up to 1000 articles
-    );
+    const readArticleIds = new Set(readArticles.map(doc => doc.id));
 
     // Filter non-expired articles and articles from deleted feeds
     const now = new Date();
@@ -72,15 +63,6 @@ export async function onRequestGet(context: any): Promise<Response> {
     if (feedId) {
       articles = articles.filter(article => article.feedId === feedId);
     }
-
-    // Get read articles to mark isRead flag
-    const readArticles = await listDocuments(
-      `users/${uid}/readArticles`,
-      idToken,
-      config,
-      1000
-    );
-    const readArticleIds = new Set(readArticles.map(doc => doc.id));
 
     // Add isRead flag to all articles
     articles = articles.map(article => ({

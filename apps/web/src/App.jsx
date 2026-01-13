@@ -8,6 +8,7 @@ import FavoritesPage from './pages/FavoritesPage';
 import SettingsPage from './pages/SettingsPage';
 import ArticleDetailPage from './pages/ArticleDetailPage';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ArticlesProvider } from './contexts/ArticlesContext';
 import { ToastProvider } from './components/ToastContainer';
 
 import './App.css'; // Keep existing CSS
@@ -15,22 +16,24 @@ import './App.css'; // Keep existing CSS
 function App() {
   return (
     <ThemeProvider>
-      <ToastProvider>
-        <Router>
-          <div className="App">
-            <Routes>
-              <Route path="/" element={<LoginPage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/feeds" element={<FeedsPage />} />
-              <Route path="/favorites" element={<FavoritesPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/article/:id" element={<ArticleDetailPage />} />
-              {/* Fallback for unmatched routes */}
-              <Route path="*" element={<h1>404 Not Found</h1>} />
-            </Routes>
-          </div>
-        </Router>
-      </ToastProvider>
+      <ArticlesProvider>
+        <ToastProvider>
+          <Router>
+            <div className="App">
+              <Routes>
+                <Route path="/" element={<LoginPage />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/feeds" element={<FeedsPage />} />
+                <Route path="/favorites" element={<FavoritesPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/article/:id" element={<ArticleDetailPage />} />
+                {/* Fallback for unmatched routes */}
+                <Route path="*" element={<h1>404 Not Found</h1>} />
+              </Routes>
+            </div>
+          </Router>
+        </ToastProvider>
+      </ArticlesProvider>
     </ThemeProvider>
   );
 }

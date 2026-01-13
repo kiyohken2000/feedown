@@ -3,7 +3,7 @@
  * GET: List user's feeds
  * POST: Add new feed
  */
-import { requireAuth, getFirebaseConfig } from '../../lib/auth';
+import { requireAuth, getFirebaseConfig, isTestAccount } from '../../lib/auth';
 import { listDocuments, createDocument } from '../../lib/firebase-rest';
 /**
  * GET /api/feeds
@@ -49,7 +49,7 @@ export async function onRequestPost(context) {
         if (authResult instanceof Response) {
             return authResult;
         }
-        const { uid, idToken } = authResult;
+        const { uid, idToken, email } = authResult;
         // Parse request body
         const body = await request.json();
         const { url, title, description } = body;
@@ -60,9 +60,17 @@ export async function onRequestPost(context) {
         const config = getFirebaseConfig(env);
         // Get existing feeds to check limit and duplicates
         const existingFeeds = await listDocuments(`users/${uid}/feeds`, idToken, config, 100);
-        // Check feed limit (max 100 feeds per user)
-        if (existingFeeds.length >= 100) {
-            return new Response(JSON.stringify({ error: 'Maximum 100 feeds allowed' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        // Check feed limit
+        // Test accounts (test-*@test.com): max 3 feeds
+        // Regular accounts: max 100 feeds
+        const isTest = isTestAccount(email);
+        const maxFeeds = isTest ? 3 : 100;
+        if (existingFeeds.length >= maxFeeds) {
+            return new Response(JSON.stringify({
+                error: isTest
+                    ? 'Test accounts can only have up to 3 feeds. Please use a regular account for more feeds.'
+                    : 'Maximum 100 feeds allowed'
+            }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
         // Check if feed already exists
         const duplicateFeed = existingFeeds.find(feed => feed.url === url);
