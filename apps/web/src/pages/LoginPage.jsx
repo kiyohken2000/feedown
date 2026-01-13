@@ -32,6 +32,23 @@ const LoginPage = () => {
     }
   };
 
+  const handleQuickCreate = async () => {
+    setLoading(true);
+    try {
+      const randomNum = Math.floor(Math.random() * 1000000);
+      const testEmail = `test-${randomNum}@test.com`;
+      const testPassword = '111111';
+
+      await createUserWithEmailAndPassword(auth, testEmail, testPassword);
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Quick account creation failed:', error.message);
+      alert('Quick account creation failed: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const styles = {
     container: {
       minHeight: '100vh',
@@ -123,6 +140,42 @@ const LoginPage = () => {
       backgroundColor: '#ccc',
       cursor: 'not-allowed',
     },
+    quickCreateButton: {
+      padding: '1rem',
+      backgroundColor: '#3b82f6',
+      color: 'white',
+      border: 'none',
+      borderRadius: '6px',
+      fontSize: '1rem',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'background-color 0.3s',
+      marginTop: '0.5rem',
+    },
+    divider: {
+      display: 'flex',
+      alignItems: 'center',
+      margin: '1.5rem 0',
+      color: isDarkMode ? '#666' : '#999',
+    },
+    dividerLine: {
+      flex: 1,
+      height: '1px',
+      backgroundColor: isDarkMode ? '#444' : '#e0e0e0',
+    },
+    dividerText: {
+      padding: '0 1rem',
+      fontSize: '0.85rem',
+    },
+    notice: {
+      backgroundColor: isDarkMode ? '#3a3a2a' : '#fff3cd',
+      border: isDarkMode ? '1px solid #666633' : '1px solid #ffc107',
+      borderRadius: '6px',
+      padding: '0.75rem',
+      marginTop: '1rem',
+      fontSize: '0.85rem',
+      color: isDarkMode ? '#e0e0a0' : '#856404',
+    },
   };
 
   return (
@@ -198,6 +251,33 @@ const LoginPage = () => {
             {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Create Account')}
           </button>
         </form>
+
+        {!isLogin && (
+          <>
+            <div style={styles.divider}>
+              <div style={styles.dividerLine}></div>
+              <span style={styles.dividerText}>OR</span>
+              <div style={styles.dividerLine}></div>
+            </div>
+
+            <button
+              onClick={handleQuickCreate}
+              style={{
+                ...styles.quickCreateButton,
+                ...(loading ? styles.buttonDisabled : {}),
+              }}
+              disabled={loading}
+              onMouseOver={(e) => !loading && (e.target.style.backgroundColor = '#2563eb')}
+              onMouseOut={(e) => !loading && (e.target.style.backgroundColor = '#3b82f6')}
+            >
+              Quick Create Test Account
+            </button>
+          </>
+        )}
+
+        <div style={styles.notice}>
+          ⚠️ If you didn't set a custom password, the default password is <strong>111111</strong>
+        </div>
       </div>
     </div>
   );
