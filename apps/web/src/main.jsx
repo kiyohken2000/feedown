@@ -22,12 +22,19 @@ const app = initializeApp(firebaseConfig);
 
 // Firebase Auth の永続化設定（ブラウザを閉じてもログイン状態を維持）
 const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.error('Failed to set Firebase Auth persistence:', error);
-});
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// 永続化を設定してからアプリをレンダリング
+(async () => {
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+    console.log('✅ Firebase Auth persistence set to LOCAL');
+  } catch (error) {
+    console.error('❌ Failed to set Firebase Auth persistence:', error);
+  }
+
+  createRoot(document.getElementById('root')).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+})();

@@ -38,7 +38,7 @@ const DashboardPage = () => {
   const articleRefs = useRef({});
   const loadMoreRef = useRef(null);
   const loadMoreObserverRef = useRef(null);
-  const viewedArticles = useRef(new Set());
+  const fullyViewedArticles = useRef(new Set()); // Track articles that were 100% visible
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '',
@@ -214,16 +214,32 @@ const DashboardPage = () => {
           const articleId = entry.target.dataset.articleId;
           if (!articleId || readArticles.has(articleId)) return;
 
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
-            // Article entered viewport - mark as "viewed" immediately
-            if (!viewedArticles.current.has(articleId)) {
-              viewedArticles.current.add(articleId);
-              // console.log('Article viewed:', articleId); // Disabled to reduce console noise
+          // Mark as fully viewed when 100% visible
+          if (entry.isIntersecting && entry.intersectionRatio >= 1.0) {
+            if (!fullyViewedArticles.current.has(articleId)) {
+              fullyViewedArticles.current.add(articleId);
+              // console.log('Article 100% visible:', articleId);
             }
-          } else if (!entry.isIntersecting && viewedArticles.current.has(articleId)) {
-            // Article left viewport and was viewed - mark as read immediately
-            // console.log('Article scrolled past, marking as read:', articleId); // Disabled to reduce console noise
-            viewedArticles.current.delete(articleId);
+          }
+
+          // Mark as read when scrolled past (50% or less visible) after being fully viewed
+          if (entry.isIntersecting && entry.intersectionRatio <= 0.5 && fullyViewedArticles.current.has(articleId)) {
+            // console.log('Article scrolled past 50%, marking as read:', articleId);
+            fullyViewedArticles.current.delete(articleId);
+
+            api.articles.markAsRead(articleId)
+              .then(() => {
+                setReadArticles(prev => new Set([...prev, articleId]));
+              })
+              .catch(error => {
+                console.error('Failed to mark as read:', error);
+              });
+          }
+
+          // Also mark as read when completely leaving viewport after being fully viewed
+          if (!entry.isIntersecting && fullyViewedArticles.current.has(articleId)) {
+            // console.log('Article left viewport, marking as read:', articleId);
+            fullyViewedArticles.current.delete(articleId);
 
             api.articles.markAsRead(articleId)
               .then(() => {
@@ -235,7 +251,7 @@ const DashboardPage = () => {
           }
         });
       },
-      { threshold: [0, 0.5] } // Trigger at 0% (leaving) and 50% (entering)
+      { threshold: [0, 0.5, 1.0] } // Trigger at 0% (leaving), 50% (half visible), and 100% (fully visible)
     );
 
     // Observe all article cards
