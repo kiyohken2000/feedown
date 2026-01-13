@@ -19,7 +19,7 @@ const FavoritesPage = () => {
   const { isDarkMode } = useTheme();
 
   const apiClient = useMemo(() => createApiClient(
-    import.meta.env.VITE_API_BASE_URL || '/api',
+    import.meta.env.VITE_API_BASE_URL || '',
     async () => auth.currentUser ? auth.currentUser.getIdToken() : null
   ), [auth]);
 
