@@ -4,9 +4,60 @@
 
 Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完了しました。Feedly風の洗練されたUIに加え、Favicon表示、ドラッグ&ドロップによるフィード並べ替え、サムネイル画像抽出の大幅改善、ダークモード、アカウント削除機能、おすすめフィード機能、トースト通知システム、ワンクリックテストアカウント作成など、すべてのコア機能とユーザビリティ向上機能が実装されました。
 
-**最新デプロイURL**: `https://1df6fe0b.feedown.pages.dev` / `https://feedown.pages.dev`
-**最新コミット**: `0856e52` - "Fix duplicated API path issue (api/api -> api)"
-**プロジェクト進捗**: Phase 5 完了、Phase 6 完了、Phase 7へ移行可能
+**最新デプロイURL**: `https://28da7037.feedown.pages.dev` / `https://feedown.pages.dev`
+**最新コミット**: `cf0a47f` - "Reduce console noise by disabling verbose debug logs"
+**プロジェクト進捗**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)、Phase 7へ移行可能
+
+## ⭐ 最新のセッションで完了した内容（2026-01-13 Phase 5 最終）
+
+### Phase 5 最終バグ修正とUX改善
+
+このセッションでPhase 5の残っていたすべてのバグを修正し、完全に動作する状態になりました。
+
+#### 修正した問題
+
+1. ✅ **スクロール既読機能の実装**
+   - 記事が50%以上表示され画面外に出たら即座に既読マーク
+   - Intersection Observerで実装
+   - Unreadフィルター時は無効化（既存機能）
+
+2. ✅ **モーダル表示時に既読マーク**
+   - 記事カードをクリックしてモーダルを開くと即座に既読
+   - 楽観的UI更新でスムーズな体験
+   - エラー時は自動ロールバック
+
+3. ✅ **Refreshボタンの反応改善**
+   - クリックと同時にローディング表示
+   - ボタン無効化で二重クリック防止
+   - エラー時の状態リセット処理
+
+4. ✅ **全Feedの記事が表示されない問題を修正（Too many subrequests）**
+   - **問題**: Cloudflare Workers/Functionsの50サブリクエスト制限に引っかかっていた
+   - **原因**: 各記事ごとに`getDocument()`で既存チェックを行い、大量のサブリクエストが発生
+   - **解決策**:
+     - 1回の`listDocuments()`で全既存記事を取得
+     - メモリ上（Set）で既存チェック
+     - サブリクエスト数を44回以上 → 5回に大幅削減
+   - **効果**: 4つ全てのFeedから記事が正常に取得されるようになった
+
+5. ✅ **Clear All DataとDelete Accountの修正**
+   - readArticlesとfavoritesコレクションの削除を追加
+   - Delete AccountのCREDENTIAL_TOO_OLD_LOGIN_AGAINエラーに対応
+   - ユーザーフレンドリーなエラーメッセージ表示
+
+6. ✅ **コンソールログのクリーンアップ**
+   - 大量の「Article viewed」ログを無効化
+   - Refresh成功メッセージを簡潔に改善
+   - エラーログは維持して問題発見しやすく
+
+#### Gitコミット履歴（Phase 5 最終セッション）
+
+1. `c710f21` - "Fix Phase 5 issues: scroll-based read marking, data deletion, and article display"
+2. `e52325c` - "Add debug logs and improve Delete Account error handling"
+3. `52b648a` - "Make scroll mark-as-read instant and add extensive debug logs"
+4. `13dc46d` - "Add modal mark-as-read and detailed failed feed error reporting"
+5. `b895c98` - "Fix 'Too many subrequests' error by optimizing article existence check"
+6. `cf0a47f` - "Reduce console noise by disabling verbose debug logs"
 
 ---
 
@@ -1380,14 +1431,49 @@ apps/mobile/
 | 2026-01-12 12:30 | Claude Sonnet 4.5 | 無限スクロール（ページネーション）実装完了 |
 | 2026-01-13 前半 | Claude Sonnet 4.5 | ダークモード、アカウント削除機能、おすすめフィード機能、記事リスト表示改善、API Client エラーハンドリング改善 |
 | 2026-01-13 後半 | Claude Sonnet 4.5 | トースト通知システム、ワンクリックテストアカウント作成、Dashboard更新タイミング最適化、自動Refresh、Clear Data/Delete Account修正 |
-| **2026-01-13 最終** | **Claude Sonnet 4.5** | **React Native Expoボイラープレート解析、モバイルアプリの構造・技術スタック・実装手順をドキュメント化** |
+| 2026-01-13 夕方 | Claude Sonnet 4.5 | React Native Expoボイラープレート解析、モバイルアプリの構造・技術スタック・実装手順をドキュメント化 |
+| **2026-01-13 最終** | **Claude Sonnet 4.5** | **Phase 5完全完了: スクロール既読、モーダル既読、マルチフィード対応(Too many subrequests修正)、Refreshボタン改善、コンソールログクリーンアップ** |
 
 ---
 
-**最終更新**: 2026-01-13
+**最終更新**: 2026-01-13 19:30
 **担当者**: Claude Sonnet 4.5
-**現在のフェーズ**: Phase 5 完了 (100%)、Phase 6 完了 (100%)
+**現在のフェーズ**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)
 **次のフェーズ**: Phase 7 - Mobile アプリ (0%)
-**最新デプロイURL**: https://1df6fe0b.feedown.pages.dev / https://feedown.pages.dev
-**最新コミット**: 0856e52 - "Fix duplicated API path issue (api/api -> api)"
+**最新デプロイURL**: https://28da7037.feedown.pages.dev / https://feedown.pages.dev
+**最新コミット**: cf0a47f - "Reduce console noise by disabling verbose debug logs"
 **デプロイ方法**: 手動デプロイ（GitHub連携なし）
+
+## Phase 5 完了状況サマリー
+
+### ✅ 実装済み機能（完全動作）
+- Feedly風UI
+- Favicon表示
+- ドラッグ&ドロップフィード並べ替え
+- サムネイル画像抽出（10種類の方法）
+- 無限スクロール（ページネーション）
+- **スクロール既読機能** ← NEW
+- **モーダル表示時の既読マーク** ← NEW
+- 自動既読マーク
+- 一括既読マーク
+- Unreadフィルター（既読無効化）
+- ダークモード
+- アカウント削除機能
+- おすすめフィード機能
+- トースト通知システム
+- ワンクリックテストアカウント作成
+- **マルチフィード対応（Too many subrequests修正）** ← NEW
+- Refreshボタンの即座反応 ← NEW
+
+### 🐛 修正済みバグ
+- ✅ 記事リストが一時的に消える問題
+- ✅ JSON parsing error
+- ✅ readArticles/favorites削除漏れ
+- ✅ Delete AccountのCREDENTIAL_TOO_OLD_LOGIN_AGAIN
+- ✅ API path重複問題（api/api → api）
+- ✅ **Too many subrequests（マルチフィード対応）** ← NEW
+- ✅ Refreshボタンの反応遅延 ← NEW
+
+### 🎉 Phase 5の状態
+**すべての機能が実装され、すべてのバグが修正されました。**
+Phase 7（モバイルアプリ）に進む準備が整っています。
