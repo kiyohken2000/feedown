@@ -1199,7 +1199,6 @@ Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUI�
 - **React Native**: 0.81.4
 - **React Navigation**: 7.x (Stack, Drawer, Tab Navigation)
 - **Redux Toolkit**: グローバル状態管理
-- **TypeScript**: 型安全性サポート
 - **AsyncStorage**: ローカルストレージ
 - **Toast Notifications**: `react-native-toast-message`
 - **Lottie**: アニメーション
@@ -1210,7 +1209,7 @@ Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUI�
 apps/mobile/
 ├── App.js                    # アプリエントリーポイント
 ├── app.json                  # Expo設定ファイル
-├── babel.config.js           # Babel設定（module resolver付き）
+├── babel.config.js           # Babel設定
 ├── metro.config.js           # Metro bundler設定
 ├── package.json              # 依存関係
 └── src/
@@ -1302,24 +1301,6 @@ apps/mobile/
 - **Details.js**: 詳細画面（サンプル）
 - その他のサンプル画面（Post, Read, Write, Print, Modal, Menu, Loading）
 
-#### Babel設定（モジュールエイリアス）
-
-`babel.config.js` でパスエイリアスが設定されているため、絶対パスでimportできます:
-```javascript
-// 相対パスの代わりに
-import Button from '../../components/Button'
-
-// エイリアスを使用
-import Button from 'components/Button'
-```
-
-**利用可能なエイリアス:**
-- `components` → `./src/components`
-- `scenes` → `./src/scenes`
-- `theme` → `./src/theme`
-- `utils` → `./src/utils`
-- `slices` → `./src/slices`
-
 #### Phase 7 実装時の推奨手順
 
 **1. 既存のボイラープレートを理解する**
@@ -1357,6 +1338,10 @@ import Button from 'components/Button'
    - **Modal → React Navigation Modal**: 記事詳細をモーダルで表示
    - **CSS → StyleSheet**: インラインスタイルまたはStyleSheetを使用
    - **WebView**: 記事詳細を外部リンクで表示する場合に使用
+   
+**7. 動作確認**
+   - 開発サーバーの起動`yarn start`もしくは`npx expo start`
+   - Expo Goを使用
 
 #### 重要な技術ポイント（Mobile）
 
