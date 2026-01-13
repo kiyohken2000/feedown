@@ -430,6 +430,7 @@ function extractFaviconUrl(feedUrl: string): string {
 
 /**
  * Store articles in Firestore with TTL
+ * Optimized to reduce subrequests by batch-checking existing articles
  */
 async function storeArticles(
   uid: string,
@@ -445,18 +446,23 @@ async function storeArticles(
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
 
+  // Get all existing articles for this user in one request to reduce subrequests
+  console.log(`[storeArticles] Fetching existing articles for user ${uid}`);
+  const existingArticles = await listDocuments(
+    `users/${uid}/articles`,
+    idToken,
+    config,
+    1000
+  );
+  const existingArticleIds = new Set(existingArticles.map(a => a.id));
+  console.log(`[storeArticles] Found ${existingArticleIds.size} existing articles`);
+
   for (const article of articles) {
     // Generate article hash (feedId + guid)
     const articleHash = await generateArticleHash(feedId, article.guid);
 
-    // Check if article already exists
-    const existingArticle = await getDocument(
-      `users/${uid}/articles/${articleHash}`,
-      idToken,
-      config
-    );
-
-    if (existingArticle) {
+    // Check if article already exists (in-memory check, no subrequest)
+    if (existingArticleIds.has(articleHash)) {
       continue; // Skip existing articles
     }
 
