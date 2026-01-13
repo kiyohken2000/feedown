@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { getAuth } from 'firebase/auth';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
@@ -43,7 +43,7 @@ const DashboardPage = () => {
 
   const api = useMemo(() => new FeedOwnAPI(apiClient), [apiClient]);
 
-  const fetchFeeds = async () => {
+  const fetchFeeds = useCallback(async () => {
     try {
       const response = await api.feeds.list();
       if (response.success) {
@@ -52,9 +52,9 @@ const DashboardPage = () => {
     } catch (error) {
       console.error('Failed to fetch feeds:', error);
     }
-  };
+  }, [api]);
 
-  const fetchArticles = async (reset = true) => {
+  const fetchArticles = useCallback(async (reset = true) => {
     if (reset) {
       setArticlesLoading(true);
       // Don't clear articles to keep them visible during refresh
@@ -112,9 +112,9 @@ const DashboardPage = () => {
         setLoadingMore(false);
       }
     }
-  };
+  }, [api, articles.length]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     // Set loading state immediately for better UX
     setArticlesLoading(true);
     try {
@@ -141,30 +141,29 @@ const DashboardPage = () => {
       setArticlesError('Failed to refresh feeds.');
       setArticlesLoading(false);
     }
-  };
+  }, [api, fetchFeeds, fetchArticles]);
 
   // Auto-refresh on initial load
   useEffect(() => {
     handleRefresh();
   }, []);
 
-  // Auto-refresh every 1 minute if 10 minutes have passed since last fetch
+  // Auto-refresh RSS feeds every 10 minutes
   useEffect(() => {
-
     const checkInterval = setInterval(() => {
       if (lastArticleFetchTime) {
         const now = Date.now();
         const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
 
         if (now - lastArticleFetchTime >= tenMinutes) {
-          console.log('Auto-refreshing articles (10 minutes elapsed)');
-          fetchArticles(true);
+          console.log('🔄 Auto-refresh triggered (10 minutes elapsed) - fetching new articles from RSS feeds');
+          handleRefresh(); // Fetch new articles from RSS feeds and update article list
         }
       }
     }, 60 * 1000); // Check every 1 minute
 
     return () => clearInterval(checkInterval);
-  }, [lastArticleFetchTime]);
+  }, [lastArticleFetchTime, handleRefresh]);
 
   // Calculate unread count
   const unreadCount = useMemo(() => {
