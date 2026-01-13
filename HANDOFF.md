@@ -4,8 +4,8 @@
 
 Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完了しました。Feedly風の洗練されたUIに加え、Favicon表示、ドラッグ&ドロップによるフィード並べ替え、サムネイル画像抽出の大幅改善、ダークモード、アカウント削除機能、おすすめフィード機能、トースト通知システム、ワンクリックテストアカウント作成など、すべてのコア機能とユーザビリティ向上機能が実装されました。
 
-**最新デプロイURL**: `https://feedown.pages.dev`（自動デプロイ済み）
-**最新コミット**: `1db46f1` - "Improve UX and implement test account limitations"
+**最新デプロイURL**: `https://1df6fe0b.feedown.pages.dev` / `https://feedown.pages.dev`
+**最新コミット**: `0856e52` - "Fix duplicated API path issue (api/api -> api)"
 **プロジェクト進捗**: Phase 5 完了、Phase 6 完了、Phase 7へ移行可能
 
 ---
@@ -14,32 +14,24 @@ Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完了しま�
 
 ### Cloudflare Pages へのデプロイ
 
-#### 自動デプロイ（推奨）
-GitHubにpushすると自動的にデプロイされます：
+**注意**: このプロジェクトはGitHub連携を使用していないため、手動でデプロイする必要があります。
+
+#### 手動デプロイ手順
 
 ```bash
-git add .
-git commit -m "Your commit message"
-git push origin main
-```
+# ルートディレクトリから実行（推奨）
 
-#### 手動デプロイ
-コマンドラインから直接デプロイする場合：
+# 1. Webアプリをビルド
+yarn build:web
 
-```bash
-# Webアプリをビルド
-cd apps/web
-npm run build
-
-# Cloudflare Pagesにデプロイ
-npx wrangler pages deploy dist --project-name=feedown
-
-# またはルートディレクトリから
-cd ../..
+# 2. Cloudflare Pagesにデプロイ
 npx wrangler pages deploy apps/web/dist --project-name=feedown
 ```
 
-**注意**: `feedown` はあなたのCloudflare Pagesプロジェクト名に置き換えてください。
+**注意**:
+- `feedown` はあなたのCloudflare Pagesプロジェクト名に置き換えてください
+- デプロイ後、新しいURLが表示されます（例: `https://1df6fe0b.feedown.pages.dev`）
+- 本番URL（`https://feedown.pages.dev`）にも自動的に反映されます
 
 ### Cloudflare Workers のデプロイ
 
@@ -64,6 +56,20 @@ npm run build
 ## 今回のセッションで実装した機能（2026-01-13 最新）
 
 ### 実装した機能一覧
+
+#### 0. ✅ **API path重複問題の修正** (commit: 0856e52) **NEW**
+- **問題**: API呼び出し時にパスが重複し、`/api/api/refresh`のようになっていた
+- **原因**: 各ページで`baseURL`を`'/api'`に設定し、エンドポイントも`'/api/refresh'`と定義していたため
+- **修正内容**:
+  - 5つのページコンポーネントでAPI baseURLを `'/api'` → `''`（空文字列）に変更
+  - `apps/web/src/pages/FeedsPage.jsx`
+  - `apps/web/src/pages/DashboardPage.jsx`
+  - `apps/web/src/pages/SettingsPage.jsx`
+  - `apps/web/src/pages/ArticleDetailPage.jsx`
+  - `apps/web/src/pages/FavoritesPage.jsx`
+- **効果**:
+  - API呼び出しが正しいパス（`/api/refresh`）で行われるようになった
+  - 405 Method Not Allowedエラーが解消
 
 #### 1. ✅ **サイトタイトルとfavicon設定** (commit: 1db46f1)
 - **サイトタイトル変更**: 「web」→「FeedOwn」
@@ -793,9 +799,10 @@ feedown/
 | 2026-01-12 03:00 | `af73564c.feedown.pages.dev` | スティッキーヘッダー |
 | 2026-01-12 03:30 | `1bf93f7d.feedown.pages.dev` | モーダル画像調整、スティッキーコントロール |
 | 2026-01-12 04:00 | `7a58f493.feedown.pages.dev` | 一括既読、透過背景 |
-| 2026-01-12 11:00 | 自動デプロイ済み | Favicon表示、ドラッグ&ドロップ、画像抽出改善 |
-| 2026-01-12 11:15 | 自動デプロイ済み | Unreadフィルター時自動既読無効化、全件表示 |
-| **2026-01-12 12:30** | **自動デプロイ中** | **無限スクロール（ページネーション）実装** |
+| 2026-01-12 11:00 | 手動デプロイ済み | Favicon表示、ドラッグ&ドロップ、画像抽出改善 |
+| 2026-01-12 11:15 | 手動デプロイ済み | Unreadフィルター時自動既読無効化、全件表示 |
+| 2026-01-12 12:30 | 手動デプロイ済み | 無限スクロール（ページネーション）実装 |
+| **2026-01-13 16:52** | **`1df6fe0b.feedown.pages.dev`** | **API path重複問題の修正 (api/api → api)** |
 
 ---
 
@@ -1396,6 +1403,6 @@ import Button from 'components/Button'
 **担当者**: Claude Sonnet 4.5
 **現在のフェーズ**: Phase 5 完了 (100%)、Phase 6 完了 (100%)
 **次のフェーズ**: Phase 7 - Mobile アプリ (0%)
-**最新デプロイURL**: https://feedown.pages.dev（自動デプロイ済み）
-**最新手動デプロイURL**: https://66aa3f5d.feedown.pages.dev
-**最新コミット**: 50e10c1 - "Auto-refresh feeds on Dashboard initial load"
+**最新デプロイURL**: https://1df6fe0b.feedown.pages.dev / https://feedown.pages.dev
+**最新コミット**: 0856e52 - "Fix duplicated API path issue (api/api -> api)"
+**デプロイ方法**: 手動デプロイ（GitHub連携なし）

@@ -90,19 +90,10 @@ cd ../..
 npx wrangler pages deploy apps/web/dist --project-name=feedown
 ```
 
-**Note**: Replace `feedown` with your Cloudflare Pages project name.
-
-#### Deploy to Cloudflare Pages (Automatic via Git)
-
-Cloudflare Pages automatically deploys when you push to the main branch:
-
-```bash
-git add .
-git commit -m "Your commit message"
-git push origin main
-```
-
-The deployment will be triggered automatically on Cloudflare Pages.
+**Note**:
+- Replace `feedown` with your Cloudflare Pages project name.
+- This project uses manual deployment (GitHub integration is not configured).
+- After deployment, you'll receive a unique URL (e.g., `https://1df6fe0b.feedown.pages.dev`).
 
 #### Deploy Cloudflare Workers
 
