@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import React, { useState } from 'react';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import logoLarge from '../assets/images/logo-lg.png';
@@ -12,13 +12,6 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const auth = getAuth();
   const { isDarkMode } = useTheme();
-
-  // Set Firebase Auth persistence to LOCAL on component mount
-  useEffect(() => {
-    setPersistence(auth, browserLocalPersistence).catch((error) => {
-      console.error('Failed to set persistence:', error);
-    });
-  }, [auth]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

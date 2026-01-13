@@ -5,6 +5,7 @@ import App from './App.jsx'
 
 // Firebase SDKのインポート
 import { initializeApp } from 'firebase/app';
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 
 // Firebase設定 (Viteの環境変数を使用)
 const firebaseConfig = {
@@ -18,6 +19,12 @@ const firebaseConfig = {
 
 // Firebaseの初期化
 const app = initializeApp(firebaseConfig);
+
+// Firebase Auth の永続化設定（ブラウザを閉じてもログイン状態を維持）
+const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('Failed to set Firebase Auth persistence:', error);
+});
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
