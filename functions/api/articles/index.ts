@@ -54,13 +54,34 @@ export async function onRequestGet(context: any): Promise<Response> {
 
     // Filter non-expired articles and articles from deleted feeds
     const now = new Date();
+    console.log(`[articles/index] Before filtering: ${allArticles.length} articles`);
+
     let articles = allArticles.filter(article => {
-      if (!article.expiresAt) return false;
+      if (!article.expiresAt) {
+        console.log(`[articles/index] Article ${article.id} has no expiresAt`);
+        return false;
+      }
       const expiresAt = new Date(article.expiresAt);
-      if (expiresAt <= now) return false;
+      if (expiresAt <= now) {
+        console.log(`[articles/index] Article ${article.id} expired at ${expiresAt}`);
+        return false;
+      }
       // Exclude articles from deleted feeds
-      return validFeedIds.has(article.feedId);
+      if (!validFeedIds.has(article.feedId)) {
+        console.log(`[articles/index] Article ${article.id} from deleted feed ${article.feedId}`);
+        return false;
+      }
+      return true;
     });
+
+    console.log(`[articles/index] After filtering: ${articles.length} articles`);
+
+    // Group articles by feedId for debugging
+    const articlesByFeed: Record<string, number> = {};
+    articles.forEach(article => {
+      articlesByFeed[article.feedId] = (articlesByFeed[article.feedId] || 0) + 1;
+    });
+    console.log(`[articles/index] Articles by feed:`, articlesByFeed);
 
     // Filter by feed if specified
     if (feedId) {

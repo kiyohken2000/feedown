@@ -39,7 +39,6 @@ const DashboardPage = () => {
   const loadMoreRef = useRef(null);
   const loadMoreObserverRef = useRef(null);
   const viewedArticles = useRef(new Set());
-  const viewTimers = useRef({});
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '',
@@ -194,10 +193,6 @@ const DashboardPage = () => {
       observerRef.current.disconnect();
     }
 
-    // Clear all timers
-    Object.values(viewTimers.current).forEach(timer => clearTimeout(timer));
-    viewTimers.current = {};
-
     // Disable auto-mark-as-read when viewing Unread filter
     if (filter === 'unread') {
       return;
@@ -210,15 +205,13 @@ const DashboardPage = () => {
           if (!articleId || readArticles.has(articleId)) return;
 
           if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
-            // Article entered viewport - start timer to mark it as "viewed"
-            if (!viewTimers.current[articleId]) {
-              viewTimers.current[articleId] = setTimeout(() => {
-                viewedArticles.current.add(articleId);
-                console.log('Article viewed:', articleId);
-              }, 2000); // Mark as viewed after 2 seconds
+            // Article entered viewport - mark as "viewed" immediately
+            if (!viewedArticles.current.has(articleId)) {
+              viewedArticles.current.add(articleId);
+              console.log('Article viewed:', articleId);
             }
           } else if (!entry.isIntersecting && viewedArticles.current.has(articleId)) {
-            // Article left viewport and was viewed - mark as read
+            // Article left viewport and was viewed - mark as read immediately
             console.log('Article scrolled past, marking as read:', articleId);
             viewedArticles.current.delete(articleId);
 
@@ -229,12 +222,6 @@ const DashboardPage = () => {
               .catch(error => {
                 console.error('Failed to mark as read:', error);
               });
-          }
-
-          // Clear timer if article left before 2 seconds
-          if (!entry.isIntersecting && viewTimers.current[articleId]) {
-            clearTimeout(viewTimers.current[articleId]);
-            delete viewTimers.current[articleId];
           }
         });
       },
@@ -252,9 +239,6 @@ const DashboardPage = () => {
       if (observerRef.current) {
         observerRef.current.disconnect();
       }
-      // Clear all timers on cleanup
-      Object.values(viewTimers.current).forEach(timer => clearTimeout(timer));
-      viewTimers.current = {};
     };
   }, [filteredArticles, readArticles, api, filter]);
 

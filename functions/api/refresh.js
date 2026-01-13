@@ -42,6 +42,7 @@ export async function onRequestPost(context) {
             newArticles: 0,
         };
         console.log(`[Refresh] Starting refresh for ${feeds.length} feeds`);
+        console.log(`[Refresh] Feed list:`, feeds.map(f => ({ id: f.id, title: f.title, url: f.url })));
         // Get Worker URL from environment
         const workerUrl = env.WORKER_URL || env.VITE_WORKER_URL;
         if (!workerUrl) {
@@ -69,9 +70,10 @@ export async function onRequestPost(context) {
                 const xmlText = await rssResponse.text();
                 // Parse RSS XML
                 const parsedFeed = await parseRssXml(xmlText);
+                console.log(`[Refresh] Feed ${feedId}: Parsed ${parsedFeed.items.length} items from RSS`);
                 // Store articles in Firestore
                 const newArticleCount = await storeArticles(uid, feedId, parsedFeed.items, feed.title || parsedFeed.title, idToken, config);
-                console.log(`[Refresh] Feed ${feedId}: ${newArticleCount} new articles`);
+                console.log(`[Refresh] Feed ${feedId}: ${newArticleCount} new articles (out of ${parsedFeed.items.length} total)`);
                 stats.newArticles += newArticleCount;
                 stats.successfulFeeds++;
                 // Extract favicon if not already set
