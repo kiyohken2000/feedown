@@ -128,14 +128,13 @@ const DashboardPage = () => {
         const stats = refreshResponse.data.stats;
         console.log(`✅ Refresh complete: ${stats.successfulFeeds}/${stats.totalFeeds} feeds, ${stats.newArticles} new articles`);
 
-        // Show failed feeds if any
+        // Log failed feeds if any (no alert popup)
         if (stats && stats.failedFeeds > 0 && stats.failedFeedDetails) {
           console.error(`⚠️ Failed to refresh ${stats.failedFeeds} feed(s):`);
           stats.failedFeedDetails.forEach((failed) => {
             console.error(`  - ${failed.feedTitle} (${failed.feedUrl})`);
             console.error(`    Error: ${failed.error}`);
           });
-          alert(`Warning: ${stats.failedFeeds} feed(s) failed to refresh. Check console for details.`);
         }
       }
       // その後、フィードと記事一覧を再取得

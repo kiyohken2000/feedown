@@ -83,7 +83,18 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
-    // Process each feed
+    // Get all existing articles once to reduce subrequests
+    console.log(`[Refresh] Fetching existing articles for user ${uid}`);
+    const existingArticles = await listDocuments(
+      `users/${uid}/articles`,
+      idToken,
+      config,
+      1000
+    );
+    const existingArticleIds = new Set(existingArticles.map(a => a.id));
+    console.log(`[Refresh] Found ${existingArticleIds.size} existing articles`);
+
+    // Process each feed sequentially
     for (const feed of feeds) {
       const feedId = feed.id;
       const feedUrl = feed.url;
@@ -128,7 +139,8 @@ export async function onRequestPost(context: any): Promise<Response> {
           parsedFeed.items,
           feed.title || parsedFeed.title,
           idToken,
-          config
+          config,
+          existingArticleIds
         );
 
         console.log(`[Refresh] Feed ${feedId}: ${newArticleCount} new articles (out of ${parsedFeed.items.length} total)`);
@@ -430,7 +442,7 @@ function extractFaviconUrl(feedUrl: string): string {
 
 /**
  * Store articles in Firestore with TTL
- * Optimized to reduce subrequests by batch-checking existing articles
+ * Optimized to reduce subrequests by using pre-fetched existing articles
  */
 async function storeArticles(
   uid: string,
@@ -438,24 +450,14 @@ async function storeArticles(
   articles: any[],
   feedTitle: string,
   idToken: string,
-  config: any
+  config: any,
+  existingArticleIds: Set<string>
 ): Promise<number> {
   if (articles.length === 0) return 0;
 
   let newArticleCount = 0;
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
-
-  // Get all existing articles for this user in one request to reduce subrequests
-  console.log(`[storeArticles] Fetching existing articles for user ${uid}`);
-  const existingArticles = await listDocuments(
-    `users/${uid}/articles`,
-    idToken,
-    config,
-    1000
-  );
-  const existingArticleIds = new Set(existingArticles.map(a => a.id));
-  console.log(`[storeArticles] Found ${existingArticleIds.size} existing articles`);
 
   for (const article of articles) {
     // Generate article hash (feedId + guid)
