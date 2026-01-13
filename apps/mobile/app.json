@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "react-native-boilerplate",
-    "slug": "react-native-boilerplate",
+    "name": "FeedOwn",
+    "slug": "feedown",
     "privacy": "public",
     "platforms": [
       "ios",
@@ -24,8 +24,8 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "reactnative.expo.boilerplate",
+      "supportsTablet": false,
+      "bundleIdentifier": "net.votepurchase.feedown",
       "buildNumber": "1",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Use the photo library to change your avatar.",
@@ -34,7 +34,7 @@
       "userInterfaceStyle": "automatic"
     },
     "android": {
-      "package": "reactnative.expo.boilerplate",
+      "package": "net.votepurchase.feedown",
       "versionCode": 1,
       "userInterfaceStyle": "automatic",
       "permissions": [
