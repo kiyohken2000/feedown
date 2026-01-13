@@ -20,6 +20,7 @@ const DashboardPage = () => {
   const [feeds, setFeeds] = useState([]);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [lastArticleFetchTime, setLastArticleFetchTime] = useState(null);
 
   const navigate = useNavigate();
   const auth = getAuth();
@@ -87,6 +88,11 @@ const DashboardPage = () => {
           }
         });
         setReadArticles(readSet);
+
+        // Update last fetch time only on reset (not for pagination)
+        if (reset) {
+          setLastArticleFetchTime(Date.now());
+        }
       } else {
         throw new Error(response.error);
       }
@@ -117,17 +123,24 @@ const DashboardPage = () => {
     return () => unsubscribe();
   }, [auth, navigate, api]);
 
-  // Auto-refresh on window focus
+  // Auto-refresh every 1 minute if 10 minutes have passed since last fetch
   useEffect(() => {
-    const handleFocus = async () => {
-      if (user) {
-        await fetchArticles(true);
-      }
-    };
+    if (!user) return;
 
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [user]);
+    const checkInterval = setInterval(() => {
+      if (lastArticleFetchTime) {
+        const now = Date.now();
+        const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+        if (now - lastArticleFetchTime >= tenMinutes) {
+          console.log('Auto-refreshing articles (10 minutes elapsed)');
+          fetchArticles(true);
+        }
+      }
+    }, 60 * 1000); // Check every 1 minute
+
+    return () => clearInterval(checkInterval);
+  }, [user, lastArticleFetchTime]);
 
   // Calculate unread count
   const unreadCount = useMemo(() => {

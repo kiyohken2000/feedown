@@ -391,19 +391,29 @@ export async function deleteCollection(
   config: FirebaseConfig
 ): Promise<boolean> {
   try {
+    console.log(`[deleteCollection] Starting deletion for: ${collectionPath}`);
+
     // List all documents in the collection
     const documents = await listDocuments(collectionPath, idToken, config, 500);
+    console.log(`[deleteCollection] Found ${documents.length} documents to delete in ${collectionPath}`);
+
+    if (documents.length === 0) {
+      console.log(`[deleteCollection] No documents to delete in ${collectionPath}`);
+      return true;
+    }
 
     // Delete each document
     const deletePromises = documents.map((doc) => {
       const docPath = `${collectionPath}/${doc.id}`;
+      console.log(`[deleteCollection] Deleting document: ${docPath}`);
       return deleteDocument(docPath, idToken, config);
     });
 
     await Promise.all(deletePromises);
+    console.log(`[deleteCollection] Successfully deleted ${documents.length} documents from ${collectionPath}`);
     return true;
   } catch (error) {
-    console.error('Error deleting collection:', error);
+    console.error(`[deleteCollection] Error deleting collection ${collectionPath}:`, error);
     return false;
   }
 }

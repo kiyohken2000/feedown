@@ -24,17 +24,29 @@ export async function onRequestDelete(context: any): Promise<Response> {
     const config = getFirebaseConfig(env);
 
     try {
+      console.log('Starting data deletion for user:', uid);
+
       // Delete feeds subcollection
+      console.log('Deleting feeds...');
       await deleteCollection(`users/${uid}/feeds`, idToken, config);
+      console.log('Feeds deleted');
 
       // Delete articles subcollection
+      console.log('Deleting articles...');
       await deleteCollection(`users/${uid}/articles`, idToken, config);
+      console.log('Articles deleted');
 
       // Delete readArticles subcollection
+      console.log('Deleting readArticles...');
       await deleteCollection(`users/${uid}/readArticles`, idToken, config);
+      console.log('ReadArticles deleted');
 
       // Delete favorites subcollection
+      console.log('Deleting favorites...');
       await deleteCollection(`users/${uid}/favorites`, idToken, config);
+      console.log('Favorites deleted');
+
+      console.log('All data cleared successfully for user:', uid);
 
       return new Response(
         JSON.stringify({
