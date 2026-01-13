@@ -15,12 +15,13 @@ const RECOMMENDED_FEEDS = [
   { name: 'Weekly ASCII Plus', url: 'http://weekly.ascii.jp/cate/1/rss.xml' },
   { name: 'National Geographic', url: 'http://nationalgeographic.jp/nng/rss/index.rdf' },
   { name: 'Lifehacker', url: 'http://www.lifehacker.jp/index.xml' },
-  { name: 'Reuters', url: 'http://feeds.reuters.com/reuters/JPTopNews?format=xml' },
+  { name: 'WIRED.jp', url: 'http://wired.jp/rssfeeder/' },
   { name: 'GIGAZINE', url: 'https://gigazine.net/news/rss_2.0/' },
   { name: 'Gizmodo', url: 'http://feeds.gizmodo.jp/rss/gizmodo/index.xml' },
   { name: 'CNET Japan', url: 'http://feed.japan.cnet.com/rss/index.rdf' },
   { name: 'AAPL Ch.', url: 'http://applech2.com/index.rdf' },
   { name: 'Kitamori Kawaraban', url: 'https://northwood.blog.fc2.com/?xml' },
+  { name: 'EE Times Japan', url: 'https://rss.itmedia.co.jp/rss/2.0/eetimes.xml' },
 ];
 
 const FeedsPage = () => {
