@@ -17,13 +17,69 @@
 
 ### 📊 最新情報
 
-**最新デプロイURL**: `https://16cfadb1.feedown.pages.dev` / `https://feedown.pages.dev`
-**最新コミット**: `d8d6be4` - "Update HANDOFF.md with complete Phase 5 session summary"
-**プロジェクト進捗**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)、Phase 7へ移行可能
-**最終更新日**: 2026-01-14 01:45
+**最新デプロイURL**: `https://b765a42c.feedown.pages.dev` / `https://feedown.pages.dev`
+**最新コミット**: `3acc76d` - "Organize documentation and add Japanese README"
+**プロジェクト進捗**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)、Phase 7（Firestore最適化）準備完了
+**最終更新日**: 2026-01-14
 **担当**: Claude Sonnet 4.5
 
-## ⭐ 最新のセッションで完了した内容（2026-01-14 Phase 5 完全完了）
+### 🎯 次のセッションの計画 - Firestore読み取り最適化（Phase 7）
+
+**目的**: Firestore読み取り回数を約95%削減し、コストとパフォーマンスを大幅に改善する
+
+**現状**: セッションあたり約4500回以上の読み取り
+**目標**: セッションあたり約200回の読み取り（95%削減）
+
+詳細な分析結果と実装計画は以下に記載。
+
+## ⭐ 最新のセッションで完了した内容
+
+### 📚 ドキュメント整理とFirestore分析（2026-01-14）
+
+このセッションでは、ドキュメントの整理とFirestore最適化の詳細な分析を実施しました。
+
+#### 完了した作業
+
+1. **ドキュメントの整理**
+   - 設計ドキュメントを`docs/`ディレクトリに移動
+     - `DESIGN.md` → `docs/DESIGN.md`
+     - `PROGRESS.md` → `docs/PROGRESS.md`
+     - `HANDOFF.md` → `docs/HANDOFF.md`
+     - `PHASE4_SUMMARY.md` → `docs/PHASE4_SUMMARY.md`
+     - `specification.md` → `docs/specification.md`
+   - README.mdのドキュメントリンクを更新
+
+2. **日本語READMEの追加**
+   - `README.ja.md`を作成（英語版の完全翻訳）
+   - 両方のREADMEに言語切り替えリンクを追加
+
+3. **Firestore読み取りパターンの包括的分析**
+   - 全APIエンドポイントの読み取りパターンを調査
+   - クライアント側のキャッシュ戦略を分析
+   - 95%削減可能な最適化計画を策定
+
+#### Gitコミット履歴
+
+1. `1d005dd` - "Implement automatic RSS refresh every 10 minutes"
+2. `3acc76d` - "Organize documentation and add Japanese README"
+
+#### 自動RSS更新機能の実装（前回セッション完了分）
+
+**実装内容**:
+- Dashboard画面を開きっぱなしにすると10分ごとに自動でRSSフィードから新しい記事を取得
+- `DashboardPage.jsx`の`handleRefresh()`を10分間隔で自動実行
+- `useCallback`でメモ化し、無限ループを防止
+
+**変更ファイル**:
+- `apps/web/src/pages/DashboardPage.jsx`
+  - lines 46-55: `fetchFeeds`をメモ化
+  - lines 57-115: `fetchArticles`をメモ化
+  - lines 117-144: `handleRefresh`をメモ化
+  - lines 151-166: 10分間隔の自動リフレッシュ実装
+
+---
+
+## ⭐ 過去のセッション - Phase 5 完全完了（2026-01-14）
 
 ### Phase 5 最終修正 - すべての問題を解決
 
@@ -1788,4 +1844,920 @@ apps/mobile/
 
 ### 🎉 Phase 5の状態
 **すべての機能が実装され、すべてのバグが修正されました。**
-Phase 7（モバイルアプリ）に進む準備が整っています。
+Phase 7（Firestore最適化）に進む準備が整っています。
+
+---
+
+# 🚀 Phase 7: Firestore読み取り最適化計画
+
+## 📊 現状分析サマリー
+
+### 現在の読み取りパターン
+
+**セッションあたりの概算読み取り回数**: 約4500回以上
+
+| 操作 | 読み取り回数 | 頻度 | 累計 |
+|------|------------|------|------|
+| Dashboard初回表示 | feeds(100) + articles(1000) + readArticles(1000) | 1回 | 2100 |
+| Feedsページ表示 | feeds(100) | 1回 | 100 |
+| Favoritesページ表示 | feeds(100) + favorites(1000) | 1回 | 1100 |
+| RSS Refresh | feeds(100) + articles(1000) | 1回 | 1100 |
+| **合計** | | | **約4400回** |
+
+### 特定された問題点
+
+#### 🔴 Priority 1: 重複フィード読み取り（即効性高）
+**場所**: `functions/api/articles/index.ts:42-47`
+
+```typescript
+const [shouldRefresh, allFeeds, allArticles, readArticles] = await Promise.all([
+  checkShouldRefresh(uid, idToken, config),  // ← feedsを読み取る
+  listDocuments(`users/${uid}/feeds`, ...),   // ← 同じfeedsを再度読み取り
+  listDocuments(`users/${uid}/articles`, ...),
+  listDocuments(`users/${uid}/readArticles`, ...),
+]);
+```
+
+**問題**: `checkShouldRefresh()`内で既にフィード一覧を読み込んでいるのに、直後にもう一度同じものを読み込んでいる
+
+**削減効果**: Dashboardを開くたびに1回分（100ドキュメント）の読み取りを節約
+
+---
+
+#### 🔴 Priority 2: フィード重複検出の非効率（中効果）
+**場所**: `functions/api/feeds/index.ts:87-119`
+
+```typescript
+const existingFeeds = await listDocuments(
+  `users/${uid}/feeds`,
+  idToken,
+  config,
+  100
+);
+// 全フィードを読み込んで線形探索
+```
+
+**問題**: 新規フィード追加時に全フィード（100件）を読み込んでURLの重複チェック
+
+**改善案**: Firestore REST APIの`:runQuery`エンドポイントでWHERE句を使用
+
+```typescript
+// 新しい関数を追加
+export async function queryDocuments(
+  collectionPath: string,
+  where: { field: string; operator: string; value: any },
+  idToken: string,
+  config: FirebaseConfig
+): Promise<any[]> {
+  // WHERE url == feedUrl のクエリで1-2件のみ取得
+}
+```
+
+**削減効果**: 100件読み取り → 1-2件読み取り（98%削減）
+
+---
+
+#### 🔴 Priority 3: お気に入りのページネーション不足（高効果）
+**場所**: `functions/api/favorites.ts`
+
+```typescript
+const favorites = await listDocuments(
+  `users/${uid}/favorites`,
+  idToken,
+  config,
+  1000  // 常に全件読み込み
+);
+```
+
+**問題**: お気に入りを常に1000件一度に読み込んでいる
+
+**改善案**: サーバーサイドページネーションの実装
+
+```typescript
+export async function onRequestGet(context: any): Promise<Response> {
+  const url = new URL(request.url);
+  const limit = parseInt(url.searchParams.get('limit') || '20');
+  const offset = parseInt(url.searchParams.get('offset') || '0');
+
+  const favorites = await listDocumentsWithPagination(
+    `users/${uid}/favorites`,
+    idToken,
+    config,
+    limit,
+    offset
+  );
+
+  return new Response(JSON.stringify({
+    favorites,
+    total: favorites.length,
+    hasMore: offset + limit < 1000
+  }));
+}
+```
+
+**削減効果**: 1000件 → 20件（98%削減）
+
+---
+
+#### 🟡 Priority 4: テストアカウントお気に入り制限チェック（小効果）
+**場所**: `functions/api/articles/[id]/favorite.ts:51-66`
+
+```typescript
+if (isTest) {
+  const existingFavorites = await listDocuments(
+    `users/${uid}/favorites`,
+    idToken,
+    config,
+    100  // 制限チェックなのに100件読み込み
+  );
+  if (existingFavorites.length >= 10) {
+    return error;
+  }
+}
+```
+
+**問題**: 10件制限をチェックするのに100件読み込んでいる
+
+**改善**: limitを10に変更
+
+```typescript
+const existingFavorites = await listDocuments(
+  `users/${uid}/favorites`,
+  idToken,
+  config,
+  10  // 10件のみ読み込み
+);
+```
+
+**削減効果**: 100件 → 10件（90%削減）
+
+---
+
+#### 🔴 Priority 5: 既読記事の全件読み込み（最大効果）
+**場所**: `functions/api/articles/index.ts:45`
+
+```typescript
+readArticles = await listDocuments(
+  `users/${uid}/readArticles`,
+  idToken,
+  config,
+  1000  // 常に全件読み込み
+);
+```
+
+**問題**: ユーザーの既読記事を毎回1000件全部読み込んでいる。実際に表示するのは50件程度なのに。
+
+**改善案 A**: 表示中の記事IDのみクエリ
+
+```typescript
+// 表示中の記事IDのみ既読状態をチェック
+const articleIds = allArticles.slice(offset, offset + limit).map(a => a.id);
+const readStatus = await queryDocuments(
+  `users/${uid}/readArticles`,
+  { field: 'id', operator: 'in', value: articleIds },
+  idToken,
+  config
+);
+```
+
+**改善案 B**: articlesコレクションに`isRead`フィールドを追加（構造変更）
+
+```typescript
+// readArticlesコレクションを廃止し、articlesに統合
+// これで1コレクション分の読み取りが完全に不要に
+```
+
+**削減効果**:
+- 案A: 1000件 → 50件（95%削減）
+- 案B: 読み取り0件（100%削減、ただし構造変更必要）
+
+---
+
+#### 🟡 Priority 6: HTTPキャッシュヘッダー不在（中効果）
+**場所**: すべてのAPIエンドポイント
+
+**問題**: レスポンスにCache-ControlやETagがない
+
+**改善**:
+
+```typescript
+return new Response(
+  JSON.stringify({ articles, shouldRefresh, hasMore }),
+  {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'private, max-age=60',  // 60秒キャッシュ
+      'ETag': generateETag(articles),           // 条件付きリクエスト用
+    },
+  }
+);
+```
+
+**削減効果**: 同一リクエストの重複を60秒間防止
+
+---
+
+#### 🔴 Priority 7: リフレッシュ時の重複読み取り（高効果）
+**場所**: `apps/web/src/pages/DashboardPage.jsx:117-144`
+
+```typescript
+const handleRefresh = useCallback(async () => {
+  await api.refresh.refreshAll();      // feeds + articles読み取り
+  await fetchFeeds();                  // feeds再読み取り
+  await fetchArticles(true);           // articles再読み取り
+}, [api, fetchFeeds, fetchArticles]);
+```
+
+**問題**:
+1. `api.refresh.refreshAll()` → feeds + articles読み取り
+2. `fetchFeeds()` → feeds再読み取り
+3. `fetchArticles(true)` → articles再読み取り
+
+**改善**:
+
+```typescript
+const handleRefresh = useCallback(async () => {
+  const refreshResponse = await api.refresh.refreshAll();
+
+  // サーバーが新規記事数を返す
+  if (refreshResponse.data.stats.newArticles > 0) {
+    await fetchArticles(true);  // 新規記事がある場合のみ
+  }
+
+  // サーバーがフィード情報も返す
+  if (refreshResponse.data.feeds) {
+    setFeeds(refreshResponse.data.feeds);  // 再読み取り不要
+  }
+}, [api, setFeeds, fetchArticles]);
+```
+
+**削減効果**: 3-4回読み取り → 1回読み取り（75%削減）
+
+---
+
+## 📋 実装ロードマップ
+
+### Phase 1: クイックウィン（約1時間、低リスク）
+
+#### Task 1.1: 重複フィード読み取り修正
+**ファイル**: `functions/api/articles/index.ts`
+
+**変更内容**:
+```typescript
+// Before
+const [shouldRefresh, allFeeds, ...] = await Promise.all([
+  checkShouldRefresh(uid, idToken, config),
+  listDocuments(`users/${uid}/feeds`, ...),
+  ...
+]);
+
+// After
+const [allFeeds, allArticles, readArticles] = await Promise.all([
+  listDocuments(`users/${uid}/feeds`, idToken, config, 100),
+  listDocuments(`users/${uid}/articles`, idToken, config, 1000),
+  listDocuments(`users/${uid}/readArticles`, idToken, config, 1000),
+]);
+const shouldRefresh = checkShouldRefreshFromFeeds(allFeeds);  // 引数でfeedsを渡す
+```
+
+**新しい関数**:
+```typescript
+function checkShouldRefreshFromFeeds(feeds: any[]): boolean {
+  if (feeds.length === 0) return false;
+  const now = Date.now();
+  const thirtyMinutes = 30 * 60 * 1000;
+  return feeds.some(feed =>
+    !feed.lastFetchedAt || (now - feed.lastFetchedAt) > thirtyMinutes
+  );
+}
+```
+
+**テスト**: Dashboard表示 → コンソールで読み取り回数確認
+
+---
+
+#### Task 1.2: テストアカウント制限チェック最適化
+**ファイル**: `functions/api/articles/[id]/favorite.ts`
+
+**変更内容**:
+```typescript
+// Line 51-66
+if (isTest) {
+  const existingFavorites = await listDocuments(
+    `users/${uid}/favorites`,
+    idToken,
+    config,
+    10  // 100 → 10に変更
+  );
+  if (existingFavorites.length >= 10) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Test accounts can only add up to 10 favorites'
+    }), { status: 400 });
+  }
+}
+```
+
+**テスト**: テストアカウントでお気に入り追加
+
+---
+
+#### Task 1.3: HTTPキャッシュヘッダー追加
+**ファイル**:
+- `functions/api/articles/index.ts`
+- `functions/api/feeds/index.ts`
+- `functions/api/favorites.ts`
+
+**変更内容**:
+```typescript
+return new Response(
+  JSON.stringify({ ... }),
+  {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'private, max-age=60',
+    },
+  }
+);
+```
+
+**テスト**: Network tabでCache-Controlヘッダー確認
+
+---
+
+### Phase 2: 中程度の改善（約2-3時間、中リスク）
+
+#### Task 2.1: queryDocuments関数の実装
+**ファイル**: `functions/lib/firebase-rest.ts`
+
+**新規追加**:
+```typescript
+export async function queryDocuments(
+  collectionPath: string,
+  where: { field: string; operator: string; value: any },
+  idToken: string,
+  config: FirebaseConfig,
+  limit: number = 100
+): Promise<any[]> {
+  const baseUrl = `https://firestore.googleapis.com/v1`;
+  const parent = `projects/${config.projectId}/databases/(default)/documents`;
+
+  const query = {
+    structuredQuery: {
+      from: [{ collectionId: collectionPath.split('/').pop() }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: where.field },
+          op: where.operator.toUpperCase(),
+          value: convertToFirestoreValue(where.value)
+        }
+      },
+      limit: limit
+    }
+  };
+
+  const response = await fetch(`${baseUrl}/${parent}:runQuery`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(query)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Firestore query failed: ${response.statusText}`);
+  }
+
+  const results = await response.json();
+  return results
+    .filter((r: any) => r.document)
+    .map((r: any) => convertFromFirestoreDocument(r.document));
+}
+
+function convertToFirestoreValue(value: any): any {
+  if (typeof value === 'string') return { stringValue: value };
+  if (typeof value === 'number') return { integerValue: value };
+  if (typeof value === 'boolean') return { booleanValue: value };
+  if (Array.isArray(value)) {
+    return { arrayValue: { values: value.map(convertToFirestoreValue) } };
+  }
+  throw new Error(`Unsupported value type: ${typeof value}`);
+}
+```
+
+**テスト**: 単体テストを書いてクエリ動作確認
+
+---
+
+#### Task 2.2: フィード重複検出の最適化
+**ファイル**: `functions/api/feeds/index.ts`
+
+**変更内容**:
+```typescript
+// Line 87-119
+// Before
+const existingFeeds = await listDocuments(
+  `users/${uid}/feeds`,
+  idToken,
+  config,
+  100
+);
+const duplicate = existingFeeds.find(f => f.url === feedUrl);
+
+// After
+const duplicateFeeds = await queryDocuments(
+  `users/${uid}/feeds`,
+  { field: 'url', operator: '==', value: feedUrl },
+  idToken,
+  config,
+  1
+);
+
+if (duplicateFeeds.length > 0) {
+  return new Response(JSON.stringify({
+    success: false,
+    error: 'Feed already exists'
+  }), { status: 400 });
+}
+```
+
+**テスト**: 重複フィード追加を試みる
+
+---
+
+#### Task 2.3: お気に入りのページネーション実装
+**ファイル**:
+- `functions/api/favorites.ts` (サーバー側)
+- `apps/web/src/pages/FavoritesPage.jsx` (クライアント側)
+
+**サーバー側変更**:
+```typescript
+export async function onRequestGet(context: any): Promise<Response> {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
+  const offset = parseInt(url.searchParams.get('offset') || '0');
+
+  try {
+    // 認証チェック...
+
+    const allFavorites = await listDocuments(
+      `users/${uid}/favorites`,
+      idToken,
+      config,
+      limit,
+      offset
+    );
+
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        favorites: allFavorites,
+        pagination: {
+          limit,
+          offset,
+          hasMore: allFavorites.length === limit
+        }
+      }
+    }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'private, max-age=60',
+      }
+    });
+  } catch (error) {
+    // エラーハンドリング...
+  }
+}
+```
+
+**クライアント側変更**:
+```typescript
+// FavoritesPage.jsx
+const [favorites, setFavorites] = useState([]);
+const [offset, setOffset] = useState(0);
+const [hasMore, setHasMore] = useState(true);
+const limit = 20;
+
+const fetchFavorites = async (reset = false) => {
+  const currentOffset = reset ? 0 : offset;
+  const response = await api.favorites.list({
+    limit,
+    offset: currentOffset
+  });
+
+  if (response.success) {
+    if (reset) {
+      setFavorites(response.data.favorites);
+    } else {
+      setFavorites(prev => [...prev, ...response.data.favorites]);
+    }
+    setHasMore(response.data.pagination.hasMore);
+    setOffset(currentOffset + response.data.favorites.length);
+  }
+};
+
+// 無限スクロール実装...
+```
+
+**テスト**: お気に入りページで無限スクロール動作確認
+
+---
+
+### Phase 3: 大規模な最適化（約3-4時間、やや高リスク）
+
+#### Task 3.1: 既読記事の最適化（案A: クエリベース）
+**ファイル**: `functions/api/articles/index.ts`
+
+**変更内容**:
+```typescript
+// Line 42-70
+const [allFeeds, allArticles] = await Promise.all([
+  listDocuments(`users/${uid}/feeds`, idToken, config, 100),
+  listDocuments(`users/${uid}/articles`, idToken, config, 1000),
+]);
+
+const shouldRefresh = checkShouldRefreshFromFeeds(allFeeds);
+
+// ページネーション
+const offset = parseInt(url.searchParams.get('offset') || '0');
+const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
+
+// ソート・フィルタリング
+let filteredArticles = allArticles
+  .sort((a, b) => b.publishedAt - a.publishedAt);
+
+const paginatedArticles = filteredArticles.slice(offset, offset + limit);
+
+// 表示中の記事のみ既読状態をクエリ
+const articleIds = paginatedArticles.map(a => a.id);
+const readArticles = await queryDocuments(
+  `users/${uid}/readArticles`,
+  { field: 'id', operator: 'in', value: articleIds },
+  idToken,
+  config,
+  articleIds.length
+);
+
+const readArticleIds = new Set(readArticles.map(a => a.id));
+
+// 既読フラグを追加
+const articlesWithReadStatus = paginatedArticles.map(article => ({
+  ...article,
+  isRead: readArticleIds.has(article.id)
+}));
+
+return new Response(JSON.stringify({
+  success: true,
+  data: {
+    articles: articlesWithReadStatus,
+    shouldRefresh,
+    pagination: {
+      offset,
+      limit,
+      total: filteredArticles.length,
+      hasMore: offset + limit < filteredArticles.length
+    }
+  }
+}), {
+  status: 200,
+  headers: {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'private, max-age=60',
+  }
+});
+```
+
+**注意**: Firestore REST APIの`in`オペレーターは最大10個までなので、50記事の場合は5回のクエリが必要（それでも50回より遥かに少ない）
+
+**テスト**: Dashboard表示、既読マーク動作確認
+
+---
+
+#### Task 3.2: リフレッシュロジックの最適化
+**ファイル**:
+- `functions/api/refresh.ts` (サーバー側)
+- `apps/web/src/pages/DashboardPage.jsx` (クライアント側)
+
+**サーバー側変更**:
+```typescript
+// functions/api/refresh.ts の最後
+return new Response(JSON.stringify({
+  success: true,
+  data: {
+    stats: {
+      totalFeeds: feeds.length,
+      successfulFeeds,
+      failedFeeds,
+      newArticles: totalNewArticles,
+      errors: errorMessages.length > 0 ? errorMessages : undefined
+    },
+    feeds: feeds,  // 更新されたフィード情報も返す
+    shouldRefreshArticles: totalNewArticles > 0  // クライアントに再取得が必要か伝える
+  }
+}), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' }
+});
+```
+
+**クライアント側変更**:
+```typescript
+// DashboardPage.jsx Line 117-144
+const handleRefresh = useCallback(async () => {
+  setArticlesLoading(true);
+  try {
+    const refreshResponse = await api.refresh.refreshAll();
+
+    if (!refreshResponse.success) {
+      throw new Error('Refresh failed');
+    }
+
+    // サーバーから返されたフィード情報を使用（再取得不要）
+    if (refreshResponse.data.feeds) {
+      setFeeds(refreshResponse.data.feeds);
+    }
+
+    // 新規記事がある場合のみ記事一覧を再取得
+    if (refreshResponse.data.shouldRefreshArticles) {
+      console.log(`🆕 ${refreshResponse.data.stats.newArticles} new articles found`);
+      await fetchArticles(true);
+    } else {
+      console.log('✅ No new articles');
+      setArticlesLoading(false);
+    }
+
+    // 成功トースト
+    showToast(
+      'success',
+      `Refreshed ${refreshResponse.data.stats.successfulFeeds} feeds`,
+      refreshResponse.data.stats.newArticles > 0
+        ? `Found ${refreshResponse.data.stats.newArticles} new articles`
+        : 'No new articles'
+    );
+  } catch (error) {
+    console.error('Failed to refresh:', error);
+    setArticlesError('Failed to refresh feeds.');
+    setArticlesLoading(false);
+    showToast('error', 'Refresh failed', 'Please try again');
+  }
+}, [api, fetchArticles, showToast]);
+```
+
+**テスト**:
+1. 新規記事がある場合のリフレッシュ
+2. 新規記事がない場合のリフレッシュ
+3. ネットワークタブで読み取り回数確認
+
+---
+
+### Phase 4: 計測とモニタリング（約1時間）
+
+#### Task 4.1: Firestore読み取り回数ロギング
+**ファイル**: `functions/lib/firebase-rest.ts`
+
+**変更内容**:
+```typescript
+// グローバルカウンター
+let firestoreReadCount = 0;
+
+export function resetReadCount() {
+  firestoreReadCount = 0;
+}
+
+export function getReadCount() {
+  return firestoreReadCount;
+}
+
+export async function listDocuments(...) {
+  // 既存のロジック
+  const result = await fetch(...);
+
+  // 読み取り回数をカウント
+  const docs = await result.json();
+  firestoreReadCount += docs.documents?.length || 0;
+
+  console.log(`[Firestore] Read ${docs.documents?.length || 0} documents from ${collectionPath}`);
+  console.log(`[Firestore] Total reads this request: ${firestoreReadCount}`);
+
+  return convertedDocs;
+}
+
+export async function queryDocuments(...) {
+  // 既存のロジック
+  const results = await response.json();
+  const docCount = results.filter(r => r.document).length;
+
+  firestoreReadCount += docCount;
+  console.log(`[Firestore] Query read ${docCount} documents from ${collectionPath}`);
+  console.log(`[Firestore] Total reads this request: ${firestoreReadCount}`);
+
+  return convertedDocs;
+}
+```
+
+**各APIエンドポイントの最後に追加**:
+```typescript
+const readCount = getReadCount();
+console.log(`[Firestore] 🔢 Total reads for this request: ${readCount}`);
+resetReadCount();
+```
+
+**テスト**: 各ページ表示時のコンソールログで読み取り回数確認
+
+---
+
+#### Task 4.2: Before/After比較ドキュメント作成
+**ファイル**: 新規 `docs/FIRESTORE_OPTIMIZATION_RESULTS.md`
+
+**内容**:
+```markdown
+# Firestore最適化結果
+
+## 最適化前後の比較
+
+### Dashboard初回表示
+- **最適化前**: 2200回読み取り
+- **最適化後**: 200回読み取り
+- **削減率**: 91%
+
+### お気に入りページ表示
+- **最適化前**: 1100回読み取り
+- **最適化後**: 140回読み取り
+- **削減率**: 87%
+
+### RSS Refresh
+- **最適化前**: 1100回読み取り
+- **最適化後**: 100回読み取り
+- **削減率**: 91%
+
+### 1セッション合計
+- **最適化前**: 約4500回読み取り
+- **最適化後**: 約200回読み取り
+- **削減率**: 95.6%
+
+## コスト試算
+
+### Firestore料金（2026年1月時点）
+- Read: $0.06 per 100,000 reads
+
+### 最適化前（月間1000セッション想定）
+- 4500 reads/session × 1000 sessions = 4,500,000 reads/month
+- コスト: $2.70/month
+
+### 最適化後
+- 200 reads/session × 1000 sessions = 200,000 reads/month
+- コスト: $0.12/month
+
+### 削減効果
+- **月間削減**: $2.58
+- **年間削減**: $30.96
+```
+
+---
+
+## 🧪 テスト計画
+
+### Phase 1テスト（クイックウィン）
+1. ✅ Dashboard表示 → コンソールで読み取り回数確認
+2. ✅ テストアカウントでお気に入り追加
+3. ✅ Network tabでCache-Controlヘッダー確認
+
+### Phase 2テスト（中程度）
+1. ✅ queryDocuments関数の単体テスト
+2. ✅ 重複フィード追加を試みる
+3. ✅ お気に入りページで無限スクロール動作確認
+4. ✅ ページネーションの境界値テスト
+
+### Phase 3テスト（大規模）
+1. ✅ Dashboard表示、既読マーク動作確認
+2. ✅ 50記事以上の既読状態確認
+3. ✅ 新規記事がある場合のリフレッシュ
+4. ✅ 新規記事がない場合のリフレッシュ
+5. ✅ ネットワークタブで読み取り回数確認
+6. ✅ 大量データ（1000記事）での動作確認
+
+### Phase 4テスト（計測）
+1. ✅ 各ページ表示時のコンソールログで読み取り回数確認
+2. ✅ Before/After比較表作成
+3. ✅ パフォーマンステスト（読み込み時間測定）
+
+---
+
+## ⚠️ リスク評価
+
+### 低リスク変更
+- ✅ Cache-Controlヘッダー追加（非破壊的）
+- ✅ 関数の引数追加（内部リファクタリング）
+- ✅ ページネーション追加（既存コードと互換性あり）
+
+### 中リスク変更
+- ⚠️ queryDocuments実装（新機能、テスト必須）
+- ⚠️ リフレッシュロジック変更（ユーザー体験に影響）
+
+### 高リスク変更
+- 🔴 既読記事の読み込み方法変更（コアロジック変更）
+- 🔴 大量データでのテストが必須
+
+### リスク軽減策
+1. 各Phaseごとに動作確認
+2. 本番デプロイ前にテストアカウントで十分なテスト
+3. ロールバック可能なデプロイ手順の確立
+4. コンソールログで読み取り回数を可視化
+
+---
+
+## 📁 修正ファイル一覧
+
+### Phase 1（低リスク）
+- ✏️ `functions/api/articles/index.ts` - 重複読み取り修正
+- ✏️ `functions/api/articles/[id]/favorite.ts` - 制限チェック最適化
+- ✏️ `functions/api/articles/index.ts` - Cache-Control追加
+- ✏️ `functions/api/feeds/index.ts` - Cache-Control追加
+- ✏️ `functions/api/favorites.ts` - Cache-Control追加
+
+### Phase 2（中リスク）
+- ✨ `functions/lib/firebase-rest.ts` - queryDocuments関数追加
+- ✏️ `functions/api/feeds/index.ts` - 重複検出最適化
+- ✏️ `functions/api/favorites.ts` - ページネーション実装
+- ✏️ `apps/web/src/pages/FavoritesPage.jsx` - 無限スクロール実装
+
+### Phase 3（やや高リスク）
+- ✏️ `functions/api/articles/index.ts` - 既読記事最適化
+- ✏️ `functions/api/refresh.ts` - レスポンス拡張
+- ✏️ `apps/web/src/pages/DashboardPage.jsx` - リフレッシュロジック最適化
+
+### Phase 4（計測）
+- ✏️ `functions/lib/firebase-rest.ts` - ロギング追加
+- ✨ `docs/FIRESTORE_OPTIMIZATION_RESULTS.md` - 結果ドキュメント作成
+
+---
+
+## 📊 期待される効果サマリー
+
+| 最適化項目 | 削減効果 | リスク | 優先度 |
+|-----------|---------|--------|--------|
+| 重複フィード読み取り修正 | 10% | 低 | 🔴 高 |
+| フィード重複検出最適化 | 98% | 中 | 🟡 中 |
+| お気に入りページネーション | 98% | 低 | 🔴 高 |
+| テストアカウント制限最適化 | 90% | 低 | 🟡 中 |
+| 既読記事最適化 | 95% | やや高 | 🔴 高 |
+| HTTPキャッシュヘッダー | 中 | 低 | 🟡 中 |
+| リフレッシュ最適化 | 75% | 中 | 🔴 高 |
+| **全体** | **95%** | **中** | **🔴 高** |
+
+---
+
+## 🚀 実装開始時の最初のステップ
+
+1. **ブランチ作成**
+   ```bash
+   git checkout -b feature/firestore-optimization
+   ```
+
+2. **Phase 1から順に実装**
+   - Task 1.1 → テスト → コミット
+   - Task 1.2 → テスト → コミット
+   - Task 1.3 → テスト → コミット
+
+3. **Phase 1完了後デプロイ&検証**
+   ```bash
+   cd apps/web && npm run build
+   npx wrangler pages deploy dist --project-name=feedown
+   ```
+
+4. **コンソールで読み取り回数を確認**
+   - Dashboardを開く
+   - DevToolsのConsoleタブで`[Firestore]`ログを確認
+   - 読み取り回数が減少していることを確認
+
+5. **Phase 2以降も同様に進める**
+
+---
+
+## 📝 次のセッションの担当者へ
+
+このドキュメントには、Firestore読み取り最適化のための完全な実装計画が含まれています。
+
+**推奨実装順序**:
+1. Phase 1（1時間、低リスク、即効性）
+2. Phase 2（2-3時間、中リスク、高効果）
+3. Phase 3（3-4時間、やや高リスク、最大効果）
+4. Phase 4（1時間、計測とドキュメント化）
+
+**合計推定時間**: 7-9時間（半日〜1日）
+
+**期待される成果**:
+- Firestore読み取り回数95%削減
+- ページ読み込み速度向上
+- 月間コスト$2.58削減（年間$30.96削減）
+
+すべてのコード例とテスト計画が記載されているので、このドキュメントに従って実装を進めてください。
+
+質問や不明点があれば、このドキュメントを参照するか、`functions/lib/firebase-rest.ts`のコードを確認してください。
+
+**頑張ってください！ 🚀**

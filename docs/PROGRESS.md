@@ -2,7 +2,7 @@
 
 **最終更新**: 2026-01-14
 **現在のフェーズ**: 🟢 Phase 5 完全完了（Web UI）、🟢 Phase 6 完了（Cloudflare Pages デプロイ）
-**次のフェーズ**: Phase 7（Mobile アプリ）へ移行可能
+**次のフェーズ**: Phase 7（Firestore最適化）準備完了 → Phase 8（Mobile アプリ）へ移行可能
 
 ---
 
@@ -231,11 +231,67 @@
 - [ ] カスタムドメイン設定（任意）
 
 **完了条件**: `https://feedown-{username}.pages.dev` でアクセス可能 ✅
-**デプロイURL**: https://8522aa45.feedown.pages.dev
+**デプロイURL**: https://b765a42c.feedown.pages.dev
 
 ---
 
-## Phase 7: Mobile アプリ（Expo）
+## Phase 7: Firestore読み取り最適化 🟡
+
+### 目的
+- Firestore読み取り回数を約95%削減し、コストとパフォーマンスを大幅に改善
+- 現状: セッションあたり約4500回以上の読み取り
+- 目標: セッションあたり約200回の読み取り
+
+### Phase 1: クイックウィン（約1時間、低リスク）
+- [ ] Task 1.1: 重複フィード読み取り修正
+  - [ ] `functions/api/articles/index.ts` の `checkShouldRefresh` を関数化
+  - [ ] フィード一覧を引数で渡すように変更
+- [ ] Task 1.2: テストアカウント制限チェック最適化
+  - [ ] `functions/api/articles/[id]/favorite.ts` のlimitを100→10に変更
+- [ ] Task 1.3: HTTPキャッシュヘッダー追加
+  - [ ] `functions/api/articles/index.ts` にCache-Control追加
+  - [ ] `functions/api/feeds/index.ts` にCache-Control追加
+  - [ ] `functions/api/favorites.ts` にCache-Control追加
+
+### Phase 2: 中程度の改善（約2-3時間、中リスク）
+- [ ] Task 2.1: queryDocuments関数の実装
+  - [ ] `functions/lib/firebase-rest.ts` に新しい関数追加
+  - [ ] Firestore REST API の `:runQuery` エンドポイント使用
+- [ ] Task 2.2: フィード重複検出の最適化
+  - [ ] `functions/api/feeds/index.ts` でqueryDocumentsを使用
+  - [ ] 100件読み取り → 1-2件読み取りに削減
+- [ ] Task 2.3: お気に入りのページネーション実装
+  - [ ] `functions/api/favorites.ts` にページネーション追加
+  - [ ] `apps/web/src/pages/FavoritesPage.jsx` に無限スクロール実装
+
+### Phase 3: 大規模な最適化（約3-4時間、やや高リスク）
+- [ ] Task 3.1: 既読記事の最適化（クエリベース）
+  - [ ] `functions/api/articles/index.ts` で表示中の記事のみ既読状態を取得
+  - [ ] 1000件読み取り → 50件読み取りに削減
+- [ ] Task 3.2: リフレッシュロジックの最適化
+  - [ ] `functions/api/refresh.ts` でフィード情報も返すように拡張
+  - [ ] `apps/web/src/pages/DashboardPage.jsx` でリフレッシュ時の重複取得を削減
+
+### Phase 4: 計測とモニタリング（約1時間）
+- [ ] Task 4.1: Firestore読み取り回数ロギング
+  - [ ] `functions/lib/firebase-rest.ts` にカウンター追加
+  - [ ] 各APIエンドポイントで読み取り回数をログ出力
+- [ ] Task 4.2: Before/After比較ドキュメント作成
+  - [ ] `docs/FIRESTORE_OPTIMIZATION_RESULTS.md` 作成
+  - [ ] 削減効果とコスト試算を記録
+
+**完了条件**: セッションあたりの読み取り回数が約200回に削減され、ログで確認可能
+
+**期待される効果**:
+- Firestore読み取り回数95%削減
+- ページ読み込み速度向上
+- 月間コスト$2.58削減（年間$30.96削減）
+
+**詳細**: `docs/HANDOFF.md` の「Phase 7: Firestore読み取り最適化計画」セクションを参照
+
+---
+
+## Phase 8: Mobile アプリ（Expo）
 
 ### セットアップ
 - [ ] Expo プロジェクト初期化
@@ -270,7 +326,7 @@
 
 ---
 
-## Phase 8: テスト & ドキュメント
+## Phase 9: テスト & ドキュメント
 
 ### テスト
 - [ ] Workers: RSS取得テスト（複数のRSSフィード）
@@ -297,7 +353,7 @@
 
 ---
 
-## Phase 9: App Store/Google Play リリース（任意）
+## Phase 10: App Store/Google Play リリース（任意）
 
 ### iOS
 - [ ] Apple Developer アカウント登録
@@ -327,10 +383,11 @@
 | Phase 4: Pages Functions | 18 | 18 | 100% | 🟢 完了 |
 | Phase 5: Web UI（拡張含む） | 39 | 39 | 100% | 🟢 完了 |
 | Phase 6: Cloudflare Pages デプロイ | 6 | 6 | 100% | 🟢 完了 |
-| Phase 7: Mobile | 13 | 0 | 0% | 🔴 未着手 |
-| Phase 8: テスト & ドキュメント | 12 | 0 | 0% | 🔴 未着手 |
-| Phase 9: App Store リリース | 10 | 0 | 0% | 🔴 未着手 |
-| **合計** | **138** | **103** | **75%** | 🟡 進行中 |
+| Phase 7: Firestore最適化 | 11 | 0 | 0% | 🟡 準備完了 |
+| Phase 8: Mobile | 13 | 0 | 0% | 🔴 未着手 |
+| Phase 9: テスト & ドキュメント | 12 | 0 | 0% | 🔴 未着手 |
+| Phase 10: App Store リリース | 10 | 0 | 0% | 🔴 未着手 |
+| **合計** | **149** | **103** | **69%** | 🟡 進行中 |
 
 **ステータス凡例**:
 - 🔴 未着手
@@ -356,21 +413,50 @@
 
 **Phase 5とPhase 6が完了しました！**
 
-次は **Phase 7: Mobile アプリ（Expo）** に進みます。
+次は **Phase 7: Firestore読み取り最適化** に進みます。
 
 ### Phase 7の概要
+- Firestore読み取り回数を約95%削減し、コストとパフォーマンスを大幅に改善
+- 現状: セッションあたり約4500回以上の読み取り
+- 目標: セッションあたり約200回の読み取り（95%削減）
+- 推定作業時間: 7-9時間（半日〜1日）
+
+### 実装ロードマップ
+1. **Phase 1: クイックウィン**（1時間、低リスク、即効性）
+   - 重複フィード読み取り修正
+   - テストアカウント制限チェック最適化
+   - HTTPキャッシュヘッダー追加
+
+2. **Phase 2: 中程度の改善**（2-3時間、中リスク、高効果）
+   - queryDocuments関数の実装
+   - フィード重複検出の最適化
+   - お気に入りのページネーション実装
+
+3. **Phase 3: 大規模な最適化**（3-4時間、やや高リスク、最大効果）
+   - 既読記事の最適化
+   - リフレッシュロジックの最適化
+
+4. **Phase 4: 計測とモニタリング**（1時間）
+   - Firestore読み取り回数ロギング
+   - Before/After比較ドキュメント作成
+
+### 期待される効果
+- Firestore読み取り回数95%削減
+- ページ読み込み速度向上
+- 月間コスト$2.58削減（年間$30.96削減）
+
+詳細は `docs/HANDOFF.md` の「Phase 7: Firestore読み取り最適化計画」セクションを参照してください。
+
+---
+
+### その後: Phase 8 - Mobile アプリ（Expo）
+
+Phase 7完了後は、モバイルアプリの開発に進みます。
+
 - Expo + React Nativeを使用したモバイルアプリケーション開発
 - 共通アプリ型（全ユーザーが同じアプリを使用）
 - 初期設定でPages Functions URLを入力
 - Firebase Client SDK不要（すべてAPI経由）
 - Webで実装した機能をモバイルで再現
-
-### 推奨される開始手順
-1. `apps/mobile` ディレクトリの確認・セットアップ
-2. React Navigation設定
-3. `packages/shared/api` を活用したAPI連携
-4. InitScreen（URL入力）の実装
-5. AuthScreen（ログイン/登録）の実装
-6. HomeScreen（記事一覧）の実装
 
 詳細は `DESIGN.md` Section 7「モバイルアプリのアーキテクチャ」を参照してください。
