@@ -4,11 +4,65 @@
 
 Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完了しました。Feedly風の洗練されたUIに加え、Favicon表示、ドラッグ&ドロップによるフィード並べ替え、サムネイル画像抽出の大幅改善、ダークモード、アカウント削除機能、おすすめフィード機能、トースト通知システム、ワンクリックテストアカウント作成など、すべてのコア機能とユーザビリティ向上機能が実装されました。
 
-**最新デプロイURL**: `https://5c8417a9.feedown.pages.dev` / `https://feedown.pages.dev`
-**最新コミット**: `ffdb233` - "Fix Phase 5 issues: subrequests optimization, remove alert, persist login"
+**最新デプロイURL**: `https://16cfadb1.feedown.pages.dev` / `https://feedown.pages.dev`
+**最新コミット**: `620fe71` - "Implement global auth state management to fix login persistence"
 **プロジェクト進捗**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)、Phase 7へ移行可能
 
-## ⭐ 最新のセッションで完了した内容（2026-01-13 Phase 5 完全版）
+## ⭐ 最新のセッションで完了した内容（2026-01-14 Phase 5 完全完了）
+
+### Phase 5 最終修正 - すべての問題を解決
+
+このセッションで以下の4つの重要な問題を修正し、Phase 5が完全に完了しました。
+
+#### 修正した問題
+
+1. ✅ **"Too many subrequests"エラーの根本的解決**
+   - **問題**: 7フィードを処理する際に累積サブリクエスト数が50回の制限を超えていた
+   - **原因**: 各フィードごとに`listDocuments()`で全記事を取得していた（7フィード × 複数記事チェック）
+   - **解決策**:
+     - 全フィード処理開始前に**1回だけ**`listDocuments()`で全記事を取得
+     - `existingArticleIds`を`Set`で管理し、全フィードで共有
+     - サブリクエスト数を劇的に削減（7フィード × N回 → 1回のみ）
+   - **効果**: すべてのフィード（ロケットニュース24含む）から記事が正常に取得されるようになった
+
+2. ✅ **警告アラートポップアップの削除**
+   - Dashboard画面の`alert()`ポップアップを削除
+   - エラー情報はコンソールログに出力（開発者向け）
+   - ユーザー体験の向上
+
+3. ✅ **既読マークのタイミング最適化**
+   - **変更前**: 50%以上表示されて画面外に出たら既読
+   - **変更後**: **100%表示された状態からスクロールして50%以下になったら既読**
+   - **新しいロジック**:
+     - 記事が100%表示されたら「fullyViewed」としてマーク
+     - そこからスクロールして50%以下になったら既読
+     - より確実に記事を閲覧してから既読マーク
+   - **効果**: 誤って既読になることが減り、より直感的な読書体験
+
+4. ✅ **ログイン状態の永続化（完全解決）**
+   - **問題**: ブラウザを開きなおすとログイン画面に戻ってしまう
+   - **原因**:
+     - 各ページで個別に`onAuthStateChanged`を呼び出していた
+     - Firebase Authの状態復元が完了する前にルーティングが実行されていた
+   - **解決策**:
+     - `App.jsx`レベルでグローバルに認証状態を管理
+     - `onAuthStateChanged`をアプリルートで実行
+     - `ProtectedRoute`コンポーネントで保護されたルートをラップ
+     - Auth確認中はローディング表示
+     - 認証状態が確定するまでルーティングを待機
+   - **効果**: ブラウザを完全に閉じて再起動してもログイン状態が保持される
+
+#### Gitコミット履歴（本セッション）
+
+1. `ffdb233` - "Fix Phase 5 issues: subrequests optimization, remove alert, persist login"
+2. `c68d357` - "Update HANDOFF.md with latest session changes"
+3. `f9417e2` - "Fix login state persistence by setting it at Firebase initialization"
+4. `84b9b60` - "Improve login persistence and adjust mark-as-read timing"
+5. `620fe71` - "Implement global auth state management to fix login persistence"
+
+---
+
+## 前回のセッションで完了した内容（2026-01-13 Phase 5 完全版）
 
 ### Phase 5 最終調整と最適化
 
@@ -887,7 +941,10 @@ feedown/
 | 2026-01-12 11:15 | 手動デプロイ済み | Unreadフィルター時自動既読無効化、全件表示 |
 | 2026-01-12 12:30 | 手動デプロイ済み | 無限スクロール（ページネーション）実装 |
 | 2026-01-13 16:52 | `1df6fe0b.feedown.pages.dev` | API path重複問題の修正 (api/api → api) |
-| **2026-01-13 23:00** | **`5c8417a9.feedown.pages.dev`** | **Too many subrequests修正、警告アラート削除、ログイン永続化** |
+| 2026-01-13 23:00 | `5c8417a9.feedown.pages.dev` | Too many subrequests修正、警告アラート削除 |
+| 2026-01-14 00:15 | `9341bde4.feedown.pages.dev` | ログイン永続化の初期実装 |
+| 2026-01-14 00:45 | `22cd66f5.feedown.pages.dev` | 既読マークタイミング調整、async/await追加 |
+| **2026-01-14 01:30** | **`16cfadb1.feedown.pages.dev`** | **グローバル認証管理実装、ログイン永続化完全解決** |
 
 ---
 
