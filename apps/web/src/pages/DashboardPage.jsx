@@ -108,15 +108,32 @@ const DashboardPage = () => {
     }
   };
 
+  const handleRefresh = async () => {
+    // Don't set articlesLoading here - let fetchArticles handle it
+    try {
+      // まずフィードからRSSを取得して記事を保存
+      const refreshResponse = await api.refresh.refreshAll();
+      if (refreshResponse.success) {
+        console.log('Refresh successful:', refreshResponse.data);
+      }
+      // その後、フィードと記事一覧を再取得
+      await fetchFeeds();
+      await fetchArticles(true); // reset=true for full reload
+    } catch (error) {
+      console.error('Failed to refresh:', error);
+      setArticlesError('Failed to refresh feeds.');
+    }
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
         navigate('/');
       } else {
         setUser(currentUser);
         setLoading(false);
-        fetchFeeds();
-        fetchArticles();
+        // Auto-refresh on initial load
+        await handleRefresh();
       }
     });
 
@@ -233,23 +250,6 @@ const DashboardPage = () => {
       }
     };
   }, [hasMore, loadingMore, articlesLoading]);
-
-  const handleRefresh = async () => {
-    // Don't set articlesLoading here - let fetchArticles handle it
-    try {
-      // まずフィードからRSSを取得して記事を保存
-      const refreshResponse = await api.refresh.refreshAll();
-      if (refreshResponse.success) {
-        console.log('Refresh successful:', refreshResponse.data);
-      }
-      // その後、フィードと記事一覧を再取得
-      await fetchFeeds();
-      await fetchArticles(true); // reset=true for full reload
-    } catch (error) {
-      console.error('Failed to refresh:', error);
-      setArticlesError('Failed to refresh feeds.');
-    }
-  };
 
   const handleMarkAllAsRead = async () => {
     if (articlesLoading) return;
