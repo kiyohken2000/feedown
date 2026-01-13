@@ -260,25 +260,43 @@ export async function deleteDocument(path, idToken, config) {
 }
 /**
  * List documents in a collection
+ * Handles pagination automatically to retrieve all documents up to maxDocuments
  */
-export async function listDocuments(collectionPath, idToken, config, pageSize = 100) {
+export async function listDocuments(collectionPath, idToken, config, maxDocuments = 1000) {
     try {
-        const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/${collectionPath}?pageSize=${pageSize}`;
-        const response = await fetch(url, {
-            headers: {
-                Authorization: `Bearer ${idToken}`,
-            },
-        });
-        if (!response.ok) {
-            console.error('List documents failed:', response.status);
-            return [];
-        }
-        const data = await response.json();
-        const documents = data.documents || [];
-        return documents.map((doc) => ({
-            id: doc.name.split('/').pop(),
-            ...fromFirestoreDocument(doc),
-        }));
+        const allDocuments = [];
+        let pageToken = null;
+        const pageSize = Math.min(maxDocuments, 300); // Firestore max page size is 300
+        do {
+            let url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/${collectionPath}?pageSize=${pageSize}`;
+            if (pageToken) {
+                url += `&pageToken=${encodeURIComponent(pageToken)}`;
+            }
+            const response = await fetch(url, {
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
+            if (!response.ok) {
+                console.error('List documents failed:', response.status);
+                break;
+            }
+            const data = await response.json();
+            const documents = data.documents || [];
+            allDocuments.push(...documents.map((doc) => ({
+                id: doc.name.split('/').pop(),
+                ...fromFirestoreDocument(doc),
+            })));
+            // Get next page token
+            pageToken = data.nextPageToken || null;
+            // Stop if we've reached the max documents limit
+            if (allDocuments.length >= maxDocuments) {
+                console.log(`[listDocuments] Reached max documents limit: ${maxDocuments}`);
+                break;
+            }
+        } while (pageToken);
+        console.log(`[listDocuments] Retrieved ${allDocuments.length} documents from ${collectionPath}`);
+        return allDocuments.slice(0, maxDocuments);
     }
     catch (error) {
         console.error('Error listing documents:', error);

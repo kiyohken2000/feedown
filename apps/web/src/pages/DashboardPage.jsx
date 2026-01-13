@@ -38,6 +38,8 @@ const DashboardPage = () => {
   const articleRefs = useRef({});
   const loadMoreRef = useRef(null);
   const loadMoreObserverRef = useRef(null);
+  const viewedArticles = useRef(new Set());
+  const viewTimers = useRef({});
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '',
@@ -118,7 +120,8 @@ const DashboardPage = () => {
   };
 
   const handleRefresh = async () => {
-    // Don't set articlesLoading here - let fetchArticles handle it
+    // Set loading state immediately for better UX
+    setArticlesLoading(true);
     try {
       // まずフィードからRSSを取得して記事を保存
       const refreshResponse = await api.refresh.refreshAll();
@@ -131,6 +134,7 @@ const DashboardPage = () => {
     } catch (error) {
       console.error('Failed to refresh:', error);
       setArticlesError('Failed to refresh feeds.');
+      setArticlesLoading(false);
     }
   };
 
@@ -190,6 +194,10 @@ const DashboardPage = () => {
       observerRef.current.disconnect();
     }
 
+    // Clear all timers
+    Object.values(viewTimers.current).forEach(timer => clearTimeout(timer));
+    viewTimers.current = {};
+
     // Disable auto-mark-as-read when viewing Unread filter
     if (filter === 'unread') {
       return;
@@ -198,25 +206,39 @@ const DashboardPage = () => {
     observerRef.current = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.8) {
-            const articleId = entry.target.dataset.articleId;
-            if (articleId && !readArticles.has(articleId)) {
-              // Mark as read after 5 seconds of viewing (80% visible)
-              setTimeout(async () => {
-                if (entry.target && entry.isIntersecting) {
-                  try {
-                    await api.articles.markAsRead(articleId);
-                    setReadArticles(prev => new Set([...prev, articleId]));
-                  } catch (error) {
-                    console.error('Failed to mark as read:', error);
-                  }
-                }
-              }, 5000);
+          const articleId = entry.target.dataset.articleId;
+          if (!articleId || readArticles.has(articleId)) return;
+
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            // Article entered viewport - start timer to mark it as "viewed"
+            if (!viewTimers.current[articleId]) {
+              viewTimers.current[articleId] = setTimeout(() => {
+                viewedArticles.current.add(articleId);
+                console.log('Article viewed:', articleId);
+              }, 2000); // Mark as viewed after 2 seconds
             }
+          } else if (!entry.isIntersecting && viewedArticles.current.has(articleId)) {
+            // Article left viewport and was viewed - mark as read
+            console.log('Article scrolled past, marking as read:', articleId);
+            viewedArticles.current.delete(articleId);
+
+            api.articles.markAsRead(articleId)
+              .then(() => {
+                setReadArticles(prev => new Set([...prev, articleId]));
+              })
+              .catch(error => {
+                console.error('Failed to mark as read:', error);
+              });
+          }
+
+          // Clear timer if article left before 2 seconds
+          if (!entry.isIntersecting && viewTimers.current[articleId]) {
+            clearTimeout(viewTimers.current[articleId]);
+            delete viewTimers.current[articleId];
           }
         });
       },
-      { threshold: 0.8 }
+      { threshold: [0, 0.5] } // Trigger at 0% (leaving) and 50% (entering)
     );
 
     // Observe all article cards
@@ -230,6 +252,9 @@ const DashboardPage = () => {
       if (observerRef.current) {
         observerRef.current.disconnect();
       }
+      // Clear all timers on cleanup
+      Object.values(viewTimers.current).forEach(timer => clearTimeout(timer));
+      viewTimers.current = {};
     };
   }, [filteredArticles, readArticles, api, filter]);
 

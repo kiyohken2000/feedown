@@ -335,34 +335,58 @@ export async function deleteDocument(
 
 /**
  * List documents in a collection
+ * Handles pagination automatically to retrieve all documents up to maxDocuments
  */
 export async function listDocuments(
   collectionPath: string,
   idToken: string,
   config: FirebaseConfig,
-  pageSize: number = 100
+  maxDocuments: number = 1000
 ): Promise<any[]> {
   try {
-    const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/${collectionPath}?pageSize=${pageSize}`;
+    const allDocuments: any[] = [];
+    let pageToken: string | null = null;
+    const pageSize = Math.min(maxDocuments, 300); // Firestore max page size is 300
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-      },
-    });
+    do {
+      let url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/${collectionPath}?pageSize=${pageSize}`;
 
-    if (!response.ok) {
-      console.error('List documents failed:', response.status);
-      return [];
-    }
+      if (pageToken) {
+        url += `&pageToken=${encodeURIComponent(pageToken)}`;
+      }
 
-    const data: any = await response.json();
-    const documents = data.documents || [];
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
 
-    return documents.map((doc: any) => ({
-      id: doc.name.split('/').pop(),
-      ...fromFirestoreDocument(doc),
-    }));
+      if (!response.ok) {
+        console.error('List documents failed:', response.status);
+        break;
+      }
+
+      const data: any = await response.json();
+      const documents = data.documents || [];
+
+      allDocuments.push(...documents.map((doc: any) => ({
+        id: doc.name.split('/').pop(),
+        ...fromFirestoreDocument(doc),
+      })));
+
+      // Get next page token
+      pageToken = data.nextPageToken || null;
+
+      // Stop if we've reached the max documents limit
+      if (allDocuments.length >= maxDocuments) {
+        console.log(`[listDocuments] Reached max documents limit: ${maxDocuments}`);
+        break;
+      }
+
+    } while (pageToken);
+
+    console.log(`[listDocuments] Retrieved ${allDocuments.length} documents from ${collectionPath}`);
+    return allDocuments.slice(0, maxDocuments);
   } catch (error) {
     console.error('Error listing documents:', error);
     return [];
