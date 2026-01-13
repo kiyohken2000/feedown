@@ -5,13 +5,124 @@
 Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完了しました。Feedly風の洗練されたUIに加え、Favicon表示、ドラッグ&ドロップによるフィード並べ替え、サムネイル画像抽出の大幅改善、ダークモード、アカウント削除機能、おすすめフィード機能、トースト通知システム、ワンクリックテストアカウント作成など、すべてのコア機能とユーザビリティ向上機能が実装されました。
 
 **最新デプロイURL**: `https://feedown.pages.dev`（自動デプロイ済み）
-**最新手動デプロイURL**: `https://66aa3f5d.feedown.pages.dev`
-**最新コミット**: `50e10c1` - "Auto-refresh feeds on Dashboard initial load"
+**最新コミット**: `1db46f1` - "Improve UX and implement test account limitations"
 **プロジェクト進捗**: Phase 5 完了、Phase 6 完了、Phase 7へ移行可能
 
 ---
 
-## 今回のセッションで実装した機能（2026-01-13）
+## デプロイコマンド
+
+### Cloudflare Pages へのデプロイ
+
+#### 自動デプロイ（推奨）
+GitHubにpushすると自動的にデプロイされます：
+
+```bash
+git add .
+git commit -m "Your commit message"
+git push origin main
+```
+
+#### 手動デプロイ
+コマンドラインから直接デプロイする場合：
+
+```bash
+# Webアプリをビルド
+cd apps/web
+npm run build
+
+# Cloudflare Pagesにデプロイ
+npx wrangler pages deploy dist --project-name=feedown
+
+# またはルートディレクトリから
+cd ../..
+npx wrangler pages deploy apps/web/dist --project-name=feedown
+```
+
+**注意**: `feedown` はあなたのCloudflare Pagesプロジェクト名に置き換えてください。
+
+### Cloudflare Workers のデプロイ
+
+```bash
+cd workers
+npx wrangler deploy
+```
+
+### Functions（TypeScript）のビルド
+
+デプロイ前にTypeScriptをビルドする必要があります：
+
+```bash
+cd functions
+npm run build
+```
+
+ビルドされた `.js` ファイルは自動的にCloudflare Pages Functionsとしてデプロイされます。
+
+---
+
+## 今回のセッションで実装した機能（2026-01-13 最新）
+
+### 実装した機能一覧
+
+#### 1. ✅ **サイトタイトルとfavicon設定** (commit: 1db46f1)
+- **サイトタイトル変更**: 「web」→「FeedOwn」
+- **favicon設定**: `apps/web/src/assets/images/favicon.ico` を使用
+- ブラウザタブに表示されるタイトルとアイコンが適切に設定される
+
+#### 2. ✅ **グローバルstateで記事一覧を保持** (commit: 1db46f1)
+- **ArticlesContext作成**
+  - React Context APIで記事一覧、既読記事、お気に入り、フィードをグローバル管理
+  - `apps/web/src/contexts/ArticlesContext.jsx` - 新規作成
+
+- **主な機能**
+  - 他のページからDashboardに戻っても記事一覧が保持される
+  - 記事取得中に「No Articles」が表示されない
+  - スムーズなページ遷移体験
+
+- **統合**
+  - `apps/web/src/App.jsx` - ArticlesProvider追加
+  - `apps/web/src/pages/DashboardPage.jsx` - ArticlesContext使用
+  - `apps/web/src/pages/SettingsPage.jsx` - ログアウト/削除時にクリア
+
+#### 3. ✅ **テストアカウントの制限** (commit: 1db46f1)
+- **対象アカウント**: `test-*@test.com`（Quick Create Test Accountで作成）
+- **フィード制限**: 最大3個まで（通常アカウントは100個）
+- **お気に入り制限**: 最大10個まで（通常アカウントは無制限）
+- **実装場所**:
+  - `functions/lib/auth.ts` - `isTestAccount()` 関数追加
+  - `functions/api/feeds/index.ts` - フィード追加時に制限チェック
+  - `functions/api/articles/[id]/favorite.ts` - お気に入り追加時に制限チェック
+- **エラーメッセージ**: 制限超過時にわかりやすいメッセージを表示
+
+#### 4. ✅ **記事一覧取得のパフォーマンス改善** (commit: 1db46f1)
+- **並列リクエスト**: `Promise.all()` を使用
+  - feeds、articles、readArticlesを並列で取得
+  - 以前は順次実行（3回のAPI呼び出しを待つ）
+- **効果**: Dashboardの読み込みとリフレッシュが高速化
+- **実装場所**: `functions/api/articles/index.ts`
+
+### 変更したファイル
+
+#### フロントエンド
+- `apps/web/index.html` - タイトルとfavicon設定
+- `apps/web/src/App.jsx` - ArticlesProvider追加
+- `apps/web/src/contexts/ArticlesContext.jsx` - 新規作成
+- `apps/web/src/pages/DashboardPage.jsx` - ArticlesContext統合
+- `apps/web/src/pages/SettingsPage.jsx` - ログアウト時にグローバルstateクリア
+
+#### バックエンド
+- `functions/lib/auth.ts` - `isTestAccount()` 関数追加
+- `functions/api/feeds/index.ts` - テストアカウントのフィード制限
+- `functions/api/articles/index.ts` - 並列リクエストでパフォーマンス改善
+- `functions/api/articles/[id]/favorite.ts` - テストアカウントのお気に入り制限
+
+### Gitコミット履歴（最新セッション）
+1. `1db46f1` - "Improve UX and implement test account limitations"
+
+---
+
+## 前回のセッションで実装した機能（2026-01-13 前半）
 
 ### 実装した機能一覧
 

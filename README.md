@@ -68,6 +68,47 @@ yarn build:web
 
 # Build Workers
 yarn build:workers
+
+# Build Functions (TypeScript)
+cd functions && npm run build
+```
+
+### Deploy
+
+#### Deploy to Cloudflare Pages (Manual)
+
+```bash
+# Build web app first
+cd apps/web
+npm run build
+
+# Deploy to Cloudflare Pages
+npx wrangler pages deploy dist --project-name=feedown
+
+# Or deploy from root directory
+cd ../..
+npx wrangler pages deploy apps/web/dist --project-name=feedown
+```
+
+**Note**: Replace `feedown` with your Cloudflare Pages project name.
+
+#### Deploy to Cloudflare Pages (Automatic via Git)
+
+Cloudflare Pages automatically deploys when you push to the main branch:
+
+```bash
+git add .
+git commit -m "Your commit message"
+git push origin main
+```
+
+The deployment will be triggered automatically on Cloudflare Pages.
+
+#### Deploy Cloudflare Workers
+
+```bash
+cd workers
+npx wrangler deploy
 ```
 
 ## Project Structure
