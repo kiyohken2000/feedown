@@ -40,6 +40,7 @@ export async function onRequestPost(context) {
             successfulFeeds: 0,
             failedFeeds: 0,
             newArticles: 0,
+            failedFeedDetails: [],
         };
         console.log(`[Refresh] Starting refresh for ${feeds.length} feeds`);
         console.log(`[Refresh] Feed list:`, feeds.map(f => ({ id: f.id, title: f.title, url: f.url })));
@@ -62,8 +63,17 @@ export async function onRequestPost(context) {
                     },
                 });
                 if (!rssResponse.ok) {
-                    console.error(`Failed to fetch feed ${feedId}: ${rssResponse.status}`);
+                    const errorText = await rssResponse.text();
+                    const errorMsg = `HTTP ${rssResponse.status}: ${errorText.substring(0, 200)}`;
+                    console.error(`[Refresh] Failed to fetch feed ${feedId} (${feed.title || feedUrl})`);
+                    console.error(`[Refresh] ${errorMsg}`);
                     stats.failedFeeds++;
+                    stats.failedFeedDetails?.push({
+                        feedId,
+                        feedTitle: feed.title || 'Unknown',
+                        feedUrl,
+                        error: errorMsg
+                    });
                     await updateFeedError(uid, feedId, idToken, config);
                     continue;
                 }
@@ -92,8 +102,22 @@ export async function onRequestPost(context) {
                 }, idToken, config);
             }
             catch (error) {
-                console.error(`[Refresh] Error refreshing feed ${feedId}:`, error);
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                console.error(`[Refresh] Error refreshing feed ${feedId} (${feed.title || feedUrl}):`, error);
+                console.error(`[Refresh] Error details:`, {
+                    feedId,
+                    feedUrl,
+                    feedTitle: feed.title,
+                    errorMessage: errorMsg,
+                    errorStack: error instanceof Error ? error.stack : undefined
+                });
                 stats.failedFeeds++;
+                stats.failedFeedDetails?.push({
+                    feedId,
+                    feedTitle: feed.title || 'Unknown',
+                    feedUrl,
+                    error: errorMsg.substring(0, 200)
+                });
                 await updateFeedError(uid, feedId, idToken, config);
             }
         }

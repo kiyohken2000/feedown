@@ -126,6 +126,17 @@ const DashboardPage = () => {
       const refreshResponse = await api.refresh.refreshAll();
       if (refreshResponse.success) {
         console.log('Refresh successful:', refreshResponse.data);
+
+        // Show failed feeds if any
+        const stats = refreshResponse.data.stats;
+        if (stats && stats.failedFeeds > 0 && stats.failedFeedDetails) {
+          console.error(`⚠️ Failed to refresh ${stats.failedFeeds} feed(s):`);
+          stats.failedFeedDetails.forEach((failed) => {
+            console.error(`  - ${failed.feedTitle} (${failed.feedUrl})`);
+            console.error(`    Error: ${failed.error}`);
+          });
+          alert(`Warning: ${stats.failedFeeds} feed(s) failed to refresh. Check console for details.`);
+        }
       }
       // その後、フィードと記事一覧を再取得
       await fetchFeeds();
@@ -302,8 +313,27 @@ const DashboardPage = () => {
     }
   };
 
-  const handleArticleClick = (article) => {
+  const handleArticleClick = async (article) => {
     setSelectedArticle(article);
+
+    // Mark as read when opening modal
+    if (!readArticles.has(article.id)) {
+      try {
+        // Optimistically update UI
+        setReadArticles(prev => new Set([...prev, article.id]));
+        // Call API in background
+        await api.articles.markAsRead(article.id);
+        console.log('Article marked as read on modal open:', article.id);
+      } catch (error) {
+        console.error('Failed to mark as read on modal open:', error);
+        // Rollback on error
+        setReadArticles(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(article.id);
+          return newSet;
+        });
+      }
+    }
   };
 
   const handleCloseModal = () => {
