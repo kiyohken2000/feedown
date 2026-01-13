@@ -4,6 +4,8 @@
 
 Self-hosted RSS reader powered by Firebase and Cloudflare.
 
+English | [日本語](README.ja.md)
+
 ## Features
 
 - 📱 **Cross-platform**: Web (React) and Mobile (Expo)
@@ -120,7 +122,10 @@ feedown/
 
 - [Setup Guide](docs/SETUP.md)
 - [API Documentation](docs/API.md)
-- [Architecture](DESIGN.md)
+- [Architecture](docs/DESIGN.md)
+- [Progress Tracking](docs/PROGRESS.md)
+- [Handoff Documentation](docs/HANDOFF.md)
+- [Specification](docs/specification.md)
 
 ## License
 
