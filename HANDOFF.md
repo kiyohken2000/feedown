@@ -1,12 +1,13 @@
-# 引継ぎメモ - Phase 5 完全完了、Phase 6 完了（追加機能実装済み）
+# 引継ぎメモ - Phase 5 完了、Phase 6 完了
 
 ## 概要
 
-Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完了しました。Feedly風の洗練されたUIに加え、Favicon表示、ドラッグ&ドロップによるフィード並べ替え、サムネイル画像抽出の大幅改善、ダークモード、アカウント削除機能、おすすめフィード機能などの追加機能が実装されました。すべてのコア機能が正常に動作しています。
+Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完了しました。Feedly風の洗練されたUIに加え、Favicon表示、ドラッグ&ドロップによるフィード並べ替え、サムネイル画像抽出の大幅改善、ダークモード、アカウント削除機能、おすすめフィード機能、トースト通知システム、ワンクリックテストアカウント作成など、すべてのコア機能とユーザビリティ向上機能が実装されました。
 
 **最新デプロイURL**: `https://feedown.pages.dev`（自動デプロイ済み）
-**最新コミット**: `9c0cde7` - "Fix JSON parsing error in API client for empty responses"
-**プロジェクト進捗**: 75% (97/129 タスク完了)
+**最新手動デプロイURL**: `https://66aa3f5d.feedown.pages.dev`
+**最新コミット**: `50e10c1` - "Auto-refresh feeds on Dashboard initial load"
+**プロジェクト進捗**: Phase 5 完了、Phase 6 完了、Phase 7へ移行可能
 
 ---
 
@@ -136,7 +137,7 @@ Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完�
 **修正内容**: `packages/shared/src/api/client.ts` でContent-Typeチェックと安全なJSON parsingを実装
 **結果**: 空レスポンスでもエラーが発生しない
 
-### Gitコミット履歴（このセッション）
+### Gitコミット履歴（前半セッション）
 1. `ea491d6` - "Implement dark mode across the entire application"
 2. `c714598` - "Keep article list visible during refresh"
 3. `b2db50d` - "Fix: Remove duplicate articlesLoading state setting in handleRefresh"
@@ -145,6 +146,144 @@ Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完�
 6. `305b473` - "Add recommended feeds section to Feeds page"
 7. `cc39992` - "Reorder sections: move Recommended Feeds after Your Feeds"
 8. `9c0cde7` - "Fix JSON parsing error in API client for empty responses"
+
+---
+
+## 今回のセッションで実装した機能（2026-01-13 続き）
+
+### 実装した機能一覧
+
+#### 1. ✅ **Dashboard更新タイミング最適化** (commit: 893206b)
+- **Firestoreの読み取り回数削減**
+  - ウィンドウフォーカス時の自動更新を削除（無駄な読み取りを削減）
+  - 更新タイミングを以下の2つに限定：
+    1. Refreshボタンを押したとき
+    2. Dashboard表示中、前回更新から10分経過したとき
+  - 10分経過チェックは1分ごとに実行
+
+- **実装詳細**
+  - `lastArticleFetchTime` state追加（最終更新日時を記録）
+  - `useEffect`で1分ごとのインターバルチェック
+  - 10分（600,000ms）経過時に自動的に`fetchArticles(true)`を実行
+
+#### 2. ✅ **Clear Data/Delete Account機能の修正** (commits: 0720bd9, 893206b)
+- **readArticlesコレクションの削除追加**
+  - `functions/api/user/data.ts` - Clear Data機能
+  - `functions/api/user/account.ts` - Delete Account機能
+  - 削除対象: feeds, articles, **readArticles**, favorites
+
+- **詳細なデバッグログ追加**
+  - 各コレクション削除の前後でログ出力
+  - `deleteCollection()`関数で削除ドキュメント数を表示
+  - エラー発生時の詳細なエラー情報を出力
+
+- **Delete Accountのエラーハンドリング改善** (commit: 2278545)
+  - Firebase Auth削除時の詳細なエラーメッセージ表示
+  - エラーレスポンスのJSONパース処理を追加
+  - Cloudflare Dashboardでログ確認可能
+
+#### 3. ✅ **トースト通知システムの実装** (commits: 2278545, d072215)
+- **新規コンポーネント作成**
+  - `apps/web/src/components/Toast.jsx` - トーストコンポーネント
+  - `apps/web/src/components/ToastContainer.jsx` - ToastProvider（Context API）
+  - `apps/web/src/styles/Toast.css` - トーストスタイル
+
+- **トーストの種類**
+  - `success` (緑) - 成功メッセージ
+  - `error` (赤) - エラーメッセージ
+  - `info` (青) - 情報メッセージ
+
+- **表示位置とアニメーション**
+  - 画面右下に固定
+  - スライドインアニメーション
+  - 3秒後に自動消去（カスタマイズ可能）
+  - 手動閉じるボタン（×）
+
+- **FeedsPageへの適用**
+  - フィード追加成功時のトースト表示
+  - おすすめフィード追加成功時のトースト表示
+  - 既に追加済みの場合はinfoトースト
+  - エラー時のトースト表示
+  - フィード削除成功時のトースト表示
+
+#### 4. ✅ **ワンクリックテストアカウント作成** (commit: 1e34376)
+- **Quick Create Test Accountボタン**
+  - Register画面に青色ボタンを追加
+  - メールアドレス: `test-{6桁のランダム数字}@test.com`
+  - パスワード: `111111`（固定）
+  - 作成後、自動的にログインしてDashboardへ遷移
+
+- **パスワード注意書き**
+  - Login/Register画面両方に表示
+  - 英語: "⚠️ If you didn't set a custom password, the default password is **111111**"
+  - 黄色の警告ボックスで目立つように表示
+  - ダークモード対応
+
+- **UI配置**
+  - Register画面: フォーム → Create Accountボタン → 区切り線（OR） → Quick Create Test Accountボタン → 注意書き
+  - Login画面: 注意書きのみ
+
+#### 5. ✅ **Dashboard初回ロード時の自動Refresh** (commit: 50e10c1)
+- **自動Refresh実行**
+  - Dashboard画面を開いたとき（初回ロード時）に自動的に`handleRefresh()`を実行
+  - ログイン後、またはアカウント作成後に自動的にRSS取得開始
+
+- **実装詳細**
+  - `onAuthStateChanged`のコールバック内で`handleRefresh()`を呼び出し
+  - フィード一覧と記事一覧を自動的に最新化
+  - ユーザーは手動でRefreshボタンを押す必要なし
+
+### 変更したファイル
+
+#### バックエンド
+- `functions/api/user/data.ts` - readArticles削除追加、デバッグログ追加
+- `functions/api/user/data.js` - TypeScriptからビルド
+- `functions/api/user/account.ts` - readArticles削除追加、詳細エラーログ追加
+- `functions/api/user/account.js` - TypeScriptからビルド
+- `functions/lib/firebase-rest.ts` - deleteCollection()にデバッグログ追加
+- `functions/lib/firebase-rest.js` - TypeScriptからビルド
+
+#### 共有パッケージ
+- なし（前回セッションで完了）
+
+#### フロントエンド
+- `apps/web/src/components/Toast.jsx` - 新規作成（トーストコンポーネント）
+- `apps/web/src/components/ToastContainer.jsx` - 新規作成（ToastProvider）
+- `apps/web/src/styles/Toast.css` - 新規作成（トーストスタイル）
+- `apps/web/src/App.jsx` - ToastProvider追加
+- `apps/web/src/pages/DashboardPage.jsx` - 更新タイミング最適化、初回ロード時の自動Refresh
+- `apps/web/src/pages/FeedsPage.jsx` - トースト通知適用、アラート削除
+- `apps/web/src/pages/LoginPage.jsx` - Quick Create Test Accountボタン追加、パスワード注意書き追加
+
+### 修正したバグ
+
+#### Bug 1: Clear Data実行時にreadArticlesとfavoritesが消えない
+**症状**: Settings画面でClear Dataを実行してもreadArticlesとfavoritesコレクションが残る
+**修正内容**:
+- `functions/api/user/data.ts`でreadArticlesコレクションを削除対象に追加
+- `functions/api/user/account.ts`でも同様に追加
+**結果**: すべてのデータが正しく削除される
+
+#### Bug 2: Delete Account実行時のエラー
+**症状**: 「Failed to delete account: Failed to delete account」というエラー
+**修正内容**:
+- 詳細なデバッグログを追加してエラー原因を特定
+- Firebase Auth削除時のエラーメッセージを詳細化
+**結果**: エラーが解消され、アカウント削除が正常に動作
+
+#### Bug 3: Feed追加時にトーストが表示されない
+**症状**: おすすめフィード追加時にアラートは消えたがトーストも表示されない
+**修正内容**:
+- `handleAddRecommendedFeed()`で成功時のトースト表示をコメントアウトしていたのを有効化
+**結果**: トースト通知が正しく表示される
+
+### Gitコミット履歴（後半セッション）
+1. `0720bd9` - "Fix: Include readArticles collection in Clear Data and Delete Account operations"
+2. `893206b` - "Add detailed debug logging to Clear Data operation and optimize Dashboard refresh timing"
+3. `2278545` - "Add toast notifications, improve Delete Account error logging, and optimize Dashboard refresh timing"
+4. `d072215` - "Fix: Show toast notification when adding recommended feeds"
+5. `1e34376` - "Add quick test account creation with default password notice"
+6. `50e10c1` - "Auto-refresh feeds on Dashboard initial load"
 
 ---
 
@@ -806,11 +945,13 @@ npm run android # Androidエミュレータ
 
 ### ドキュメント
 - **設計書**: `DESIGN.md` - Section 7「モバイルアプリのアーキテクチャ」
-- **進捗管理**: `PROGRESS.md` - Phase 5: 100%完了、Phase 6: 83%完了
+- **進捗管理**: `PROGRESS.md` - Phase 5: 100%完了、Phase 6: 100%完了
 - **API仕様**: すべてのエンドポイントはWebと共通
 
 ### 開発リソース
-- **API エンドポイント**: https://7a58f493.feedown.pages.dev/api/*
+- **本番URL**: https://feedown.pages.dev
+- **最新手動デプロイURL**: https://66aa3f5d.feedown.pages.dev
+- **API エンドポイント**: https://feedown.pages.dev/api/*
 - **Worker URL**: https://feedown-worker.votepurchase.workers.dev
 - **Firebase プロジェクト**: feedown-78e22
 
@@ -910,17 +1051,24 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ## 次の担当者へのメッセージ
 
-Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUIになりました。最新のセッションでダークモード、アカウント削除機能、おすすめフィード機能など、ユーザビリティをさらに向上させる機能を追加しました。
+**Phase 5とPhase 6が完了しました！**
+
+Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUIになりました。Feedly風UI、ダークモード、アカウント削除機能、おすすめフィード機能、トースト通知、ワンクリックテストアカウント作成など、すべてのコア機能とユーザビリティ向上機能が実装されています。
 
 ### Webアプリについて
-- 現在のUIは非常に洗練されており、コア機能はすべて実装済みです
-- ダークモード、アカウント削除機能、おすすめフィード機能も実装完了 ✅
-- さらに改善したい場合は、以下のオプション機能を検討してください：
-  - 記事の検索機能（タイトル・本文の全文検索）
-  - キーボードショートカット（j/k で記事移動など）
-  - フィードごとのグループ・フォルダ機能
-  - 記事の並び替えオプション（日付以外の基準）
-  - OPMLインポート/エクスポート
+- ✅ すべてのコア機能が実装済み
+- ✅ Feedly風の洗練されたUI
+- ✅ ダークモード完全対応
+- ✅ トースト通知システム
+- ✅ Firestore読み取り回数最適化
+- ✅ ワンクリックテストアカウント作成
+
+**推奨されるオプション機能**（Phase 7以降で実装可能）:
+- 記事の検索機能（タイトル・本文の全文検索）
+- キーボードショートカット（j/k で記事移動など）
+- フィードごとのグループ・フォルダ機能
+- 記事の並び替えオプション（日付以外の基準）
+- OPMLインポート/エクスポート
 
 ### Mobileアプリについて
 - Webで実装した機能を参考にしてください
@@ -946,13 +1094,15 @@ Phase 5のWebアプリは非常に完成度が高く、Feedlyに匹敵するUI�
 | 2026-01-12 04:30 | Claude Sonnet 4.5 | Phase 5完了、Feedly風UI実装 |
 | 2026-01-12 11:30 | Claude Sonnet 4.5 | Favicon表示、ドラッグ&ドロップ、画像抽出改善、Unreadフィルター改善 |
 | 2026-01-12 12:30 | Claude Sonnet 4.5 | 無限スクロール（ページネーション）実装完了 |
-| **2026-01-13 現在** | **Claude Sonnet 4.5** | **ダークモード、アカウント削除機能、おすすめフィード機能、記事リスト表示改善、API Client エラーハンドリング改善** |
+| 2026-01-13 前半 | Claude Sonnet 4.5 | ダークモード、アカウント削除機能、おすすめフィード機能、記事リスト表示改善、API Client エラーハンドリング改善 |
+| **2026-01-13 後半** | **Claude Sonnet 4.5** | **トースト通知システム、ワンクリックテストアカウント作成、Dashboard更新タイミング最適化、自動Refresh、Clear Data/Delete Account修正** |
 
 ---
 
 **最終更新**: 2026-01-13
 **担当者**: Claude Sonnet 4.5
-**現在のフェーズ**: Phase 5 完了 (100%)、Phase 6 完了 (92%)
+**現在のフェーズ**: Phase 5 完了 (100%)、Phase 6 完了 (100%)
 **次のフェーズ**: Phase 7 - Mobile アプリ (0%)
 **最新デプロイURL**: https://feedown.pages.dev（自動デプロイ済み）
-**最新コミット**: 9c0cde7 - "Fix JSON parsing error in API client for empty responses"
+**最新手動デプロイURL**: https://66aa3f5d.feedown.pages.dev
+**最新コミット**: 50e10c1 - "Auto-refresh feeds on Dashboard initial load"
