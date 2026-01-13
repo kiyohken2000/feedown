@@ -4,11 +4,44 @@
 
 Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完了しました。Feedly風の洗練されたUIに加え、Favicon表示、ドラッグ&ドロップによるフィード並べ替え、サムネイル画像抽出の大幅改善、ダークモード、アカウント削除機能、おすすめフィード機能、トースト通知システム、ワンクリックテストアカウント作成など、すべてのコア機能とユーザビリティ向上機能が実装されました。
 
-**最新デプロイURL**: `https://28da7037.feedown.pages.dev` / `https://feedown.pages.dev`
-**最新コミット**: `cf0a47f` - "Reduce console noise by disabling verbose debug logs"
+**最新デプロイURL**: `https://5c8417a9.feedown.pages.dev` / `https://feedown.pages.dev`
+**最新コミット**: `ffdb233` - "Fix Phase 5 issues: subrequests optimization, remove alert, persist login"
 **プロジェクト進捗**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)、Phase 7へ移行可能
 
-## ⭐ 最新のセッションで完了した内容（2026-01-13 Phase 5 最終）
+## ⭐ 最新のセッションで完了した内容（2026-01-13 Phase 5 完全版）
+
+### Phase 5 最終調整と最適化
+
+このセッションでPhase 5の残っていた問題をすべて修正し、完全に動作する状態になりました。
+
+#### 修正した問題
+
+1. ✅ **"Too many subrequests"エラーの根本的な修正**
+   - **問題**: 各フィードごとに`listDocuments()`を実行し、累積サブリクエスト数が制限を超えていた
+   - **原因**: `storeArticles()`関数内で毎回全記事を取得していた
+   - **解決策**:
+     - 全フィード処理開始前に1回だけ`listDocuments()`を実行
+     - `existingArticleIds`をすべてのフィードで共有
+     - サブリクエスト数を大幅に削減（フィード数 × 記事数 → 1回のみ）
+   - **効果**: すべてのフィードから記事が正常に取得されるようになった
+
+2. ✅ **警告アラートポップアップの削除**
+   - Dashboard画面の`alert()`を削除
+   - エラー情報はコンソールログに出力（開発者向け）
+   - ユーザー体験の向上
+
+3. ✅ **ログイン状態の永続化**
+   - Firebase Auth の `browserLocalPersistence` を明示的に設定
+   - サイトを開きなおしてもログイン状態が保持される
+   - `LoginPage.jsx`の`useEffect`で初期化時に設定
+
+#### Gitコミット履歴（本セッション）
+
+1. `ffdb233` - "Fix Phase 5 issues: subrequests optimization, remove alert, persist login"
+
+---
+
+## 前回のセッションで完了した内容（2026-01-13 Phase 5 最終）
 
 ### Phase 5 最終バグ修正とUX改善
 
@@ -853,7 +886,8 @@ feedown/
 | 2026-01-12 11:00 | 手動デプロイ済み | Favicon表示、ドラッグ&ドロップ、画像抽出改善 |
 | 2026-01-12 11:15 | 手動デプロイ済み | Unreadフィルター時自動既読無効化、全件表示 |
 | 2026-01-12 12:30 | 手動デプロイ済み | 無限スクロール（ページネーション）実装 |
-| **2026-01-13 16:52** | **`1df6fe0b.feedown.pages.dev`** | **API path重複問題の修正 (api/api → api)** |
+| 2026-01-13 16:52 | `1df6fe0b.feedown.pages.dev` | API path重複問題の修正 (api/api → api) |
+| **2026-01-13 23:00** | **`5c8417a9.feedown.pages.dev`** | **Too many subrequests修正、警告アラート削除、ログイン永続化** |
 
 ---
 
