@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import logoIcon from '../assets/images/icon.png';
 
 const Navigation = ({ unreadCount = 0 }) => {
   const location = useLocation();
@@ -32,6 +33,14 @@ const Navigation = ({ unreadCount = 0 }) => {
       fontSize: '1.5rem',
       fontWeight: 'bold',
       textDecoration: 'none',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.75rem',
+    },
+    brandLogo: {
+      width: '32px',
+      height: '32px',
+      borderRadius: '6px',
     },
     navList: {
       display: 'flex',
@@ -69,6 +78,7 @@ const Navigation = ({ unreadCount = 0 }) => {
     <nav style={styles.nav}>
       <div style={styles.navContainer}>
         <Link to="/dashboard" style={styles.brand}>
+          <img src={logoIcon} alt="FeedOwn" style={styles.brandLogo} />
           FeedOwn
         </Link>
         <ul style={styles.navList}>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import logoLarge from '../assets/images/logo-lg.png';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -69,6 +70,13 @@ const LoginPage = () => {
     logo: {
       textAlign: 'center',
       marginBottom: '2rem',
+    },
+    logoImage: {
+      width: '120px',
+      height: '120px',
+      margin: '0 auto 1rem',
+      display: 'block',
+      borderRadius: '20px',
     },
     logoText: {
       fontSize: '2.5rem',
@@ -182,6 +190,7 @@ const LoginPage = () => {
     <div style={styles.container}>
       <div style={styles.card}>
         <div style={styles.logo}>
+          <img src={logoLarge} alt="FeedOwn Logo" style={styles.logoImage} />
           <div style={styles.logoText}>FeedOwn</div>
           <div style={styles.tagline}>Own your feeds, own your data</div>
         </div>
