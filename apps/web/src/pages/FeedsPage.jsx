@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import { useTheme } from '../contexts/ThemeContext';
+import { useToast } from '../components/ToastContainer';
 
 // Recommended feeds
 const RECOMMENDED_FEEDS = [
@@ -35,6 +36,7 @@ const FeedsPage = () => {
   const navigate = useNavigate();
   const auth = getAuth();
   const { isDarkMode } = useTheme();
+  const { showToast } = useToast();
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '/api',
@@ -85,11 +87,12 @@ const FeedsPage = () => {
       if (response.success) {
         setNewFeedUrl('');
         fetchFeeds();
+        showToast('Feed added successfully', 'success');
       } else {
         throw new Error(response.error);
       }
     } catch (error) {
-      alert('Failed to add feed: ' + error.message);
+      showToast('Failed to add feed: ' + error.message, 'error');
     } finally {
       setAddingFeed(false);
     }
@@ -99,7 +102,7 @@ const FeedsPage = () => {
     // Check if already added
     const alreadyAdded = feeds.some(feed => feed.url === feedUrl);
     if (alreadyAdded) {
-      alert(`${feedName} is already in your feed list.`);
+      showToast(`${feedName} is already in your feed list`, 'info');
       return;
     }
 
@@ -108,12 +111,12 @@ const FeedsPage = () => {
       const response = await api.feeds.add(feedUrl);
       if (response.success) {
         await fetchFeeds();
-        alert(`${feedName} has been added successfully!`);
+        // Success toast removed as requested
       } else {
         throw new Error(response.error);
       }
     } catch (error) {
-      alert('Failed to add feed: ' + error.message);
+      showToast('Failed to add feed: ' + error.message, 'error');
     } finally {
       setAddingRecommended(prev => ({ ...prev, [feedUrl]: false }));
     }
@@ -126,11 +129,12 @@ const FeedsPage = () => {
       const response = await api.feeds.delete(feedId);
       if (response.success) {
         fetchFeeds();
+        showToast('Feed deleted successfully', 'success');
       } else {
         throw new Error(response.error);
       }
     } catch (error) {
-      alert('Failed to delete feed: ' + error.message);
+      showToast('Failed to delete feed: ' + error.message, 'error');
     }
   };
 

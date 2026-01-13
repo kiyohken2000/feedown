@@ -16,8 +16,8 @@ Set these in Cloudflare Pages dashboard:
 
 ```bash
 # From service-account.json
-FIREBASE_PROJECT_ID=feedown-e78c4
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@feedown-e78c4.iam.gserviceaccount.com
+FIREBASE_PROJECT_ID=feedown-78e22
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@feedown-78e22.iam.gserviceaccount.com
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 
 # Workers URL

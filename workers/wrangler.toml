@@ -13,7 +13,7 @@ preview_id = "737baa0c5e164e17a9c185cf7e4d4f1a"
 
 # Environment variables
 [vars]
-FIREBASE_PROJECT_ID = "feedown-e78c4"
+FIREBASE_PROJECT_ID = "feedown-78e22"
 
 # Observability (optional)
 [observability]

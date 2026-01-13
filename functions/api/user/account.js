@@ -18,8 +18,11 @@ export async function onRequestDelete(context) {
         }
         const { uid, idToken } = authResult;
         const config = getFirebaseConfig(env);
+        console.log('Starting account deletion for user:', uid);
+        console.log('Firebase Project ID:', config.projectId);
         // Delete all user data from Firestore
         try {
+            console.log('Deleting Firestore data...');
             // Delete feeds subcollection
             await deleteCollection(`users/${uid}/feeds`, idToken, config);
             // Delete articles subcollection
@@ -30,6 +33,7 @@ export async function onRequestDelete(context) {
             await deleteCollection(`users/${uid}/favorites`, idToken, config);
             // Delete user document
             await deleteDocument(`users/${uid}`, idToken, config);
+            console.log('Firestore data deleted successfully');
         }
         catch (error) {
             console.error('Error deleting Firestore data:', error);
@@ -37,7 +41,9 @@ export async function onRequestDelete(context) {
         }
         // Delete Firebase Auth user
         try {
+            console.log('Deleting Firebase Auth user...');
             const deleteAuthUrl = `https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${config.apiKey}`;
+            console.log('Delete Auth URL:', deleteAuthUrl);
             const deleteAuthResponse = await fetch(deleteAuthUrl, {
                 method: 'POST',
                 headers: {
@@ -47,11 +53,23 @@ export async function onRequestDelete(context) {
                     idToken: idToken,
                 }),
             });
+            console.log('Delete Auth Response Status:', deleteAuthResponse.status);
             if (!deleteAuthResponse.ok) {
-                const error = await deleteAuthResponse.text();
-                console.error('Failed to delete Firebase Auth user:', error);
-                return new Response(JSON.stringify({ error: 'Failed to delete account' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+                const errorText = await deleteAuthResponse.text();
+                console.error('Failed to delete Firebase Auth user. Status:', deleteAuthResponse.status);
+                console.error('Error response:', errorText);
+                let errorMessage = 'Failed to delete account';
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    errorMessage = errorJson.error?.message || errorMessage;
+                }
+                catch (e) {
+                    // If parsing fails, use the text as is
+                    errorMessage = errorText || errorMessage;
+                }
+                return new Response(JSON.stringify({ error: errorMessage }), { status: 500, headers: { 'Content-Type': 'application/json' } });
             }
+            console.log('Firebase Auth user deleted successfully');
         }
         catch (error) {
             console.error('Error deleting Firebase Auth user:', error);

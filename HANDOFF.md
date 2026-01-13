@@ -812,7 +812,7 @@ npm run android # Androidエミュレータ
 ### 開発リソース
 - **API エンドポイント**: https://7a58f493.feedown.pages.dev/api/*
 - **Worker URL**: https://feedown-worker.votepurchase.workers.dev
-- **Firebase プロジェクト**: feedown-e78c4
+- **Firebase プロジェクト**: feedown-78e22
 
 ---
 

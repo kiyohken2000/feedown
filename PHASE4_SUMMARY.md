@@ -221,8 +221,8 @@ async function parseRssXml(xmlText: string): Promise<any> {
 ### Environment Variables Needed
 
 ```bash
-FIREBASE_PROJECT_ID=feedown-e78c4
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@feedown-e78c4.iam.gserviceaccount.com
+FIREBASE_PROJECT_ID=feedown-78e22
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@feedown-78e22.iam.gserviceaccount.com
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 WORKER_URL=https://feedown-worker.votepurchase.workers.dev
 ```
