@@ -1,6 +1,5 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { getAuth } from 'firebase/auth';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import ArticleModal from '../components/ArticleModal';
@@ -8,8 +7,6 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useArticles } from '../contexts/ArticlesContext';
 
 const DashboardPage = () => {
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
   const [filteredArticles, setFilteredArticles] = useState([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [articlesError, setArticlesError] = useState(null);
@@ -17,7 +14,6 @@ const DashboardPage = () => {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const navigate = useNavigate();
   const auth = getAuth();
   const { isDarkMode } = useTheme();
   const {
@@ -147,24 +143,13 @@ const DashboardPage = () => {
     }
   };
 
+  // Auto-refresh on initial load
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        navigate('/');
-      } else {
-        setUser(currentUser);
-        setLoading(false);
-        // Auto-refresh on initial load
-        await handleRefresh();
-      }
-    });
-
-    return () => unsubscribe();
-  }, [auth, navigate, api]);
+    handleRefresh();
+  }, []);
 
   // Auto-refresh every 1 minute if 10 minutes have passed since last fetch
   useEffect(() => {
-    if (!user) return;
 
     const checkInterval = setInterval(() => {
       if (lastArticleFetchTime) {
@@ -179,7 +164,7 @@ const DashboardPage = () => {
     }, 60 * 1000); // Check every 1 minute
 
     return () => clearInterval(checkInterval);
-  }, [user, lastArticleFetchTime]);
+  }, [lastArticleFetchTime]);
 
   // Calculate unread count
   const unreadCount = useMemo(() => {
@@ -625,18 +610,6 @@ const DashboardPage = () => {
       fontSize: '0.9rem',
     },
   };
-
-  if (loading) {
-    return (
-      <div>
-        <Navigation unreadCount={0} />
-        <div style={styles.container}>
-          <div style={styles.loadingSpinner}></div>
-          <p style={{ textAlign: 'center' }}>Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div>
