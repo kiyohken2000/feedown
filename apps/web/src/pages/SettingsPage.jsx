@@ -99,11 +99,22 @@ const SettingsPage = () => {
         await signOut(auth);
         navigate('/');
       } else {
-        alert('Failed to delete account: ' + (response.error || 'Unknown error'));
+        // Check if error is related to credential age
+        const errorMessage = response.error || 'Unknown error';
+        if (errorMessage.includes('CREDENTIAL_TOO_OLD_LOGIN_AGAIN') || errorMessage.includes('credential')) {
+          alert('For security reasons, you need to log in again before deleting your account.\n\nPlease log out and log back in, then try again.');
+        } else {
+          alert('Failed to delete account: ' + errorMessage);
+        }
       }
     } catch (error) {
       console.error('Delete account failed:', error);
-      alert('Failed to delete account: ' + error.message);
+      const errorMessage = error.message || error.toString();
+      if (errorMessage.includes('CREDENTIAL_TOO_OLD_LOGIN_AGAIN') || errorMessage.includes('credential')) {
+        alert('For security reasons, you need to log in again before deleting your account.\n\nPlease log out and log back in, then try again.');
+      } else {
+        alert('Failed to delete account: ' + errorMessage);
+      }
     }
   };
 

@@ -46,6 +46,9 @@ export async function onRequestGet(context: any): Promise<Response> {
       listDocuments(`users/${uid}/readArticles`, idToken, config, 1000),
     ]);
 
+    console.log(`[articles/index] Fetched ${allFeeds.length} feeds, ${allArticles.length} articles, ${readArticles.length} read articles`);
+    console.log(`[articles/index] Feed IDs:`, allFeeds.map(f => f.id));
+
     const validFeedIds = new Set(allFeeds.map(feed => feed.id));
     const readArticleIds = new Set(readArticles.map(doc => doc.id));
 
