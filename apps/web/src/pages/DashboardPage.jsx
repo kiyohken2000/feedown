@@ -125,10 +125,10 @@ const DashboardPage = () => {
       // まずフィードからRSSを取得して記事を保存
       const refreshResponse = await api.refresh.refreshAll();
       if (refreshResponse.success) {
-        console.log('Refresh successful:', refreshResponse.data);
+        const stats = refreshResponse.data.stats;
+        console.log(`✅ Refresh complete: ${stats.successfulFeeds}/${stats.totalFeeds} feeds, ${stats.newArticles} new articles`);
 
         // Show failed feeds if any
-        const stats = refreshResponse.data.stats;
         if (stats && stats.failedFeeds > 0 && stats.failedFeedDetails) {
           console.error(`⚠️ Failed to refresh ${stats.failedFeeds} feed(s):`);
           stats.failedFeedDetails.forEach((failed) => {
@@ -219,11 +219,11 @@ const DashboardPage = () => {
             // Article entered viewport - mark as "viewed" immediately
             if (!viewedArticles.current.has(articleId)) {
               viewedArticles.current.add(articleId);
-              console.log('Article viewed:', articleId);
+              // console.log('Article viewed:', articleId); // Disabled to reduce console noise
             }
           } else if (!entry.isIntersecting && viewedArticles.current.has(articleId)) {
             // Article left viewport and was viewed - mark as read immediately
-            console.log('Article scrolled past, marking as read:', articleId);
+            // console.log('Article scrolled past, marking as read:', articleId); // Disabled to reduce console noise
             viewedArticles.current.delete(articleId);
 
             api.articles.markAsRead(articleId)
@@ -323,7 +323,7 @@ const DashboardPage = () => {
         setReadArticles(prev => new Set([...prev, article.id]));
         // Call API in background
         await api.articles.markAsRead(article.id);
-        console.log('Article marked as read on modal open:', article.id);
+        // console.log('Article marked as read on modal open:', article.id); // Disabled to reduce console noise
       } catch (error) {
         console.error('Failed to mark as read on modal open:', error);
         // Rollback on error
