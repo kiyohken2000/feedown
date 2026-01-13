@@ -111,7 +111,7 @@ const FeedsPage = () => {
       const response = await api.feeds.add(feedUrl);
       if (response.success) {
         await fetchFeeds();
-        // Success toast removed as requested
+        showToast(`${feedName} added successfully`, 'success');
       } else {
         throw new Error(response.error);
       }
