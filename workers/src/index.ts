@@ -67,9 +67,10 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // GET /fetch?url={rssUrl}
+    // GET /fetch?url={rssUrl}&bypass_cache=1
     if (url.pathname === '/fetch' && request.method === 'GET') {
       const rssUrl = url.searchParams.get('url');
+      const bypassCache = url.searchParams.get('bypass_cache') === '1';
 
       if (!rssUrl) {
         return new Response(JSON.stringify({ error: 'Missing url parameter' }), {
@@ -89,17 +90,19 @@ export default {
       try {
         const cacheKey = getCacheKey(rssUrl);
 
-        // Check KV cache
-        const cached = await env.CACHE.get(cacheKey, { type: 'text' });
-        if (cached) {
-          return new Response(cached, {
-            status: 200,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/xml',
-              'X-Cache': 'HIT',
-            },
-          });
+        // Check KV cache (skip if bypass_cache=1)
+        if (!bypassCache) {
+          const cached = await env.CACHE.get(cacheKey, { type: 'text' });
+          if (cached) {
+            return new Response(cached, {
+              status: 200,
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/xml',
+                'X-Cache': 'HIT',
+              },
+            });
+          }
         }
 
         // Fetch RSS feed

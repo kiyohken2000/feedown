@@ -106,8 +106,8 @@ export async function onRequestPost(context: any): Promise<Response> {
       console.log(`[Refresh] Processing feed ${feedId}: ${feed.title || feedUrl}`);
 
       try {
-        // Fetch RSS XML via Worker
-        const rssResponse = await fetch(`${workerUrl}/fetch?url=${encodeURIComponent(feedUrl)}`, {
+        // Fetch RSS XML via Worker (bypass cache to get fresh data)
+        const rssResponse = await fetch(`${workerUrl}/fetch?url=${encodeURIComponent(feedUrl)}&bypass_cache=1`, {
           method: 'GET',
           headers: {
             'User-Agent': 'FeedOwn/1.0',
