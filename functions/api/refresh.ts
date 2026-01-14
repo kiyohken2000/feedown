@@ -94,10 +94,6 @@ export async function onRequestPost(context: any): Promise<Response> {
     const existingArticleIds = new Set(existingArticles.map(a => a.id));
     console.log(`[Refresh] Found ${existingArticleIds.size} existing articles`);
 
-    // DEBUG: Log sample of existing article IDs
-    const sampleIds = Array.from(existingArticleIds).slice(0, 5);
-    console.log(`[Refresh] Sample existing article IDs:`, sampleIds);
-
     // Process each feed sequentially
     for (const feed of feeds) {
       const feedId = feed.id;
@@ -137,7 +133,7 @@ export async function onRequestPost(context: any): Promise<Response> {
         console.log(`[Refresh] Feed ${feedId}: Parsed ${parsedFeed.items.length} items from RSS`);
 
         // Store articles in Firestore
-        const newArticleCount = await storeArticles(
+        const storeResult = await storeArticles(
           uid,
           feedId,
           parsedFeed.items,
@@ -147,9 +143,9 @@ export async function onRequestPost(context: any): Promise<Response> {
           existingArticleIds
         );
 
-        console.log(`[Refresh] Feed ${feedId}: ${newArticleCount} new articles (out of ${parsedFeed.items.length} total)`);
+        console.log(`[Refresh] Feed ${feedId}: ${storeResult.count} new articles (out of ${parsedFeed.items.length} total)`);
 
-        stats.newArticles += newArticleCount;
+        stats.newArticles += storeResult.count;
         stats.successfulFeeds++;
 
         // Extract favicon if not already set
@@ -447,6 +443,10 @@ function extractFaviconUrl(feedUrl: string): string {
   }
 }
 
+interface StoreArticlesResult {
+  count: number;
+}
+
 /**
  * Store articles in Firestore with TTL
  * Optimized to use batch write (single request for all articles)
@@ -459,8 +459,8 @@ async function storeArticles(
   idToken: string,
   config: any,
   existingArticleIds: Set<string>
-): Promise<number> {
-  if (articles.length === 0) return 0;
+): Promise<StoreArticlesResult> {
+  if (articles.length === 0) return { count: 0 };
 
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
@@ -495,9 +495,11 @@ async function storeArticles(
     });
   }
 
+  console.log(`[storeArticles] newArticles.length = ${newArticles.length} for feed ${feedId}`);
+
   if (newArticles.length === 0) {
     console.log(`[storeArticles] No new articles to add for feed ${feedId}`);
-    return 0;
+    return { count: 0 };
   }
 
   console.log(`[storeArticles] Batch writing ${newArticles.length} new articles for feed ${feedId}`);
@@ -506,7 +508,7 @@ async function storeArticles(
   const result = await batchSetDocuments(newArticles, idToken, config);
 
   console.log(`[storeArticles] Batch write complete: ${result.success} success, ${result.failed} failed`);
-  return result.success;
+  return { count: result.success };
 }
 
 /**

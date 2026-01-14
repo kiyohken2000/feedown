@@ -642,12 +642,12 @@ export async function batchSetDocuments(
   documents: Array<{ path: string; data: any }>,
   idToken: string,
   config: FirebaseConfig
-): Promise<{ success: number; failed: number }> {
+): Promise<{ success: number; failed: number; error?: string }> {
   if (documents.length === 0) {
     return { success: 0, failed: 0 };
   }
 
-  const results = { success: 0, failed: 0 };
+  const results: { success: number; failed: number; error?: string } = { success: 0, failed: 0 };
   const batchSize = 500; // Firestore batch limit
 
   // Process in batches of 500
@@ -700,10 +700,12 @@ export async function batchSetDocuments(
         const errorText = await response.text();
         console.error(`[batchSetDocuments] Batch write failed: ${response.status}`, errorText);
         results.failed += batch.length;
+        results.error = `HTTP ${response.status}: ${errorText.substring(0, 500)}`;
       }
     } catch (error) {
       console.error('[batchSetDocuments] Error:', error);
       results.failed += batch.length;
+      results.error = `Exception: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
 
