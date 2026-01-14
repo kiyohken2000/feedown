@@ -19,7 +19,7 @@
 ### Dashboard無限スクロールが動作しない
 - **症状**: 一番下までスクロールしても過去の記事が読み込まれない
 - **調査箇所**:
-  - `apps/web/src/pages/DashboardPage.jsx` - 無限スクロールロジック
+  - `apps/web/src/pages/DashboardPage.jsx` - 無限スクロールロジック。新着記事が表示されない
   - `functions/api/articles/index.ts` - ページネーション処理
 - **優先度**: 高
 
