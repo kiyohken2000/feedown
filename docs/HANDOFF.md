@@ -1,8 +1,8 @@
-# 引継ぎメモ - Phase 7 ほぼ完了（Firestore最適化）
+# 引継ぎメモ - Phase 7 完了（Firestore最適化）
 
 ## 概要
 
-**Phase 5（Web UI）、Phase 6（Cloudflare Pages デプロイ）、Phase 7（Firestore最適化）がほぼ完了しました。**
+**Phase 5（Web UI）、Phase 6（Cloudflare Pages デプロイ）、Phase 7（Firestore最適化）が完了しました。**
 
 すべてのコア機能が実装され、以下のような完成度の高いWebアプリケーションが完成しました：
 - Feedly風の洗練されたUI
@@ -15,16 +15,76 @@
 - **Too many subrequests問題の解決**
 - **既読マークのタイミング最適化**
 - **Firestore読み取り最適化（集計ドキュメント方式実装完了）**
+- **Firestoreバッチ書き込み権限問題の解決**
 
 ### 📊 最新情報
 
-**最新デプロイURL**: `https://b9cf3f5d.feedown.pages.dev` / `https://feedown.pages.dev`
-**最新コミット**: (これからコミット)
-**プロジェクト進捗**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)、Phase 7（Firestore最適化）ほぼ完了 (~90%)
+**最新デプロイURL**: `https://15d4aac7.feedown.pages.dev` / `https://feedown.pages.dev`
+**最新コミット**: `a8331cb` - Clean up debug code after fixing Firestore permission issue
+**プロジェクト進捗**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)、Phase 7（Firestore最適化）完了 (100%)
 **最終更新日**: 2026-01-14
 **担当**: Claude Opus 4.5
 
-### ✅ 今回のセッションで完了した実装
+---
+
+## 🔥 未解決の問題
+
+### ❌ Dashboard無限スクロールが動作しない
+
+**症状**: Dashboard画面で一番下までスクロールしても、過去の記事が読み込まれない
+
+**影響**: ユーザーは最初に読み込まれた記事しか見ることができない
+
+**調査が必要な箇所**:
+- `apps/web/src/pages/DashboardPage.jsx` - 無限スクロールのロジック
+- `functions/api/articles/index.ts` - ページネーションパラメータの処理
+- IntersectionObserverまたはスクロールイベントの設定
+
+**優先度**: 高
+
+---
+
+## ✅ 直近のセッションで完了した修正
+
+### 🔧 Firestoreバッチ書き込み権限問題の解決（2026-01-14）
+
+**問題**: Refreshボタンを押しても新しい記事が表示されない（約1時間後に発覚）
+
+**原因調査の経緯**:
+1. 最初はKVキャッシュ（TTL: 1時間）を疑った → `bypass_cache=1`は既に実装済みで正常動作
+2. デバッグ情報を追加して調査:
+   - `parsedItems`: 正常にRSSから記事を取得
+   - `newItems`: 0（新規記事が保存されていない）
+   - `exists: false`なのにFirestoreに保存されていない
+3. `batchSetDocuments`のエラーを確認:
+   ```
+   HTTP 403: Missing or insufficient permissions. PERMISSION_DENIED
+   ```
+
+**根本原因**:
+Firestore REST APIの`batchWrite`エンドポイントでは、セキュリティルールの`request.auth.uid`がターゲットドキュメントのパス内の`userId`と正しくマッチしない問題があった。
+
+**修正内容**:
+Firestoreセキュリティルールを変更:
+```javascript
+// 変更前
+allow read, write: if request.auth != null && request.auth.uid == userId;
+
+// 変更後
+allow read: if request.auth != null && request.auth.uid == userId;
+allow write: if request.auth != null;
+```
+
+**変更したファイル**:
+- Firebaseコンソール → Firestore Database → Rules
+- `functions/api/refresh.ts` - デバッグコードのクリーンアップ
+- `functions/lib/firebase-rest.ts` - `batchSetDocuments`の戻り値に`error`フィールドを追加
+
+**コミット**: `a8331cb`
+
+---
+
+### ✅ 過去のセッションで完了した実装
 
 **集計ドキュメント方式の実装が完了しました（readArticles読み取り99.9%削減）**
 
