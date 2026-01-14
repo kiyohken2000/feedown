@@ -54,6 +54,9 @@ export async function onRequestPost(context) {
         const existingArticles = await listDocuments(`users/${uid}/articles`, idToken, config, 1000);
         const existingArticleIds = new Set(existingArticles.map(a => a.id));
         console.log(`[Refresh] Found ${existingArticleIds.size} existing articles`);
+        // DEBUG: Log sample of existing article IDs
+        const sampleIds = Array.from(existingArticleIds).slice(0, 5);
+        console.log(`[Refresh] Sample existing article IDs:`, sampleIds);
         // Process each feed sequentially
         for (const feed of feeds) {
             const feedId = feed.id;
@@ -358,11 +361,18 @@ async function storeArticles(uid, feedId, articles, feedTitle, idToken, config, 
     for (const article of articles) {
         // Generate article hash (feedId + guid)
         const articleHash = await generateArticleHash(feedId, article.guid);
+        // DEBUG: Log article details
+        console.log(`[storeArticles] Article: "${article.title}"`);
+        console.log(`[storeArticles]   - GUID: ${article.guid}`);
+        console.log(`[storeArticles]   - Hash: ${articleHash}`);
+        console.log(`[storeArticles]   - Exists: ${existingArticleIds.has(articleHash)}`);
         // Check if article already exists (in-memory check, no subrequest)
         if (existingArticleIds.has(articleHash)) {
+            console.log(`[storeArticles]   - SKIPPED (already exists)`);
             continue; // Skip existing articles
         }
         // Add new article
+        console.log(`[storeArticles]   - ADDING NEW ARTICLE`);
         const success = await setDocument(`users/${uid}/articles/${articleHash}`, {
             feedId,
             feedTitle,
@@ -376,7 +386,11 @@ async function storeArticles(uid, feedId, articles, feedTitle, idToken, config, 
             imageUrl: article.imageUrl || null,
         }, idToken, config);
         if (success) {
+            console.log(`[storeArticles]   - SUCCESS`);
             newArticleCount++;
+        }
+        else {
+            console.log(`[storeArticles]   - FAILED`);
         }
     }
     return newArticleCount;
