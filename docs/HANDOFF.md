@@ -26,8 +26,199 @@
 
 ### 🎯 次のセッションの計画
 
-**Phase 7の残りタスク**: より高度なFirestore最適化（既読記事のクエリ最適化など）
-**Phase 8**: Mobile アプリ（Expo）の実装
+**Phase 7の残りタスク**: 以下の3つの最適化アプローチを実装予定
+
+---
+
+## 🚀 Phase 7 追加最適化計画（2026-01-14策定）
+
+### 📊 期待される効果
+
+| 状態 | 初回ロード読み取り数 |
+|------|---------------------|
+| 現状 | 15-50回 |
+| 改善後 | 4-8回 |
+| **削減率** | **75-84%** |
+
+---
+
+### 🔴 アプローチ1: readArticles統合（最優先）
+
+**現状の問題**:
+- `articles`と`readArticles`を別々のAPIで取得している
+- `articles/index.ts`で1000件の記事を取得した後、さらに1000件の既読記事を取得
+- 合計で8-20回のFirestore読み取りが発生
+
+**改善内容**:
+- `articles`コレクションに`isRead`フィールドを追加（構造変更）
+- または、`articles/index.ts`で既読状態を含めたレスポンスを返す
+
+**実装方法A: articlesに既読状態を統合（推奨）**
+
+```
+変更ファイル:
+- functions/api/articles/index.ts
+  - readArticlesの取得をそのまま使用
+  - レスポンスに既読状態を含める（isReadフィールド）
+
+- apps/web/src/pages/DashboardPage.jsx
+  - 記事オブジェクトから直接isReadを参照
+  - 別途readArticlesを管理する必要なし
+```
+
+**コード変更**:
+
+```typescript
+// functions/api/articles/index.ts
+// 現在:
+return new Response(JSON.stringify({
+  articles: paginatedArticles,
+  ...
+}));
+
+// 変更後:
+const readArticleIds = new Set(readArticles.map(r => r.id));
+const articlesWithReadStatus = paginatedArticles.map(article => ({
+  ...article,
+  isRead: readArticleIds.has(article.id)
+}));
+
+return new Response(JSON.stringify({
+  articles: articlesWithReadStatus,
+  ...
+}));
+```
+
+**フロントエンド変更**:
+
+```javascript
+// apps/web/src/pages/DashboardPage.jsx
+// 現在:
+const [readArticles, setReadArticles] = useState(new Set());
+// ... readArticlesをAPIから別途取得
+
+// 変更後:
+// readArticlesの状態管理を削除
+// article.isReadを直接参照
+```
+
+**削減効果**: 4-10回削減（readArticles取得が不要に）
+
+---
+
+### 🟡 アプローチ2: フィード取得の重複排除
+
+**現状の問題**:
+DashboardPageで以下の順序でAPIを呼び出している：
+1. `api.refresh.refreshAll()` → feeds + articlesを読み取り
+2. `api.feeds.list()` → feedsを再度読み取り
+3. `api.articles.list()` → articlesを再度読み取り（+ feeds）
+
+**改善内容**:
+- `refresh.ts`のレスポンスに`feeds`を含める（完了済み）
+- DashboardPageで重複取得を排除
+
+**実装方法**:
+
+```javascript
+// apps/web/src/pages/DashboardPage.jsx
+const handleRefresh = useCallback(async () => {
+  setLoading(true);
+  try {
+    const response = await api.refresh.refreshAll();
+
+    // refreshレスポンスからfeedsを取得（重複排除）
+    if (response.data.feeds) {
+      setFeeds(response.data.feeds);
+    }
+
+    // 新規記事がある場合のみ記事を再取得
+    if (response.data.shouldRefreshArticles) {
+      await fetchArticles(true);
+    }
+  } finally {
+    setLoading(false);
+  }
+}, [api, setFeeds, fetchArticles]);
+```
+
+**変更ファイル**:
+- `apps/web/src/pages/DashboardPage.jsx` - handleRefreshの最適化
+
+**削減効果**: 5-8回削減
+
+---
+
+### 🟢 アプローチ3: バッチ既読マークAPI
+
+**現状の問題**:
+- 一括既読ボタンで各記事ごとにAPIを呼び出し
+- 50件の記事を既読にすると50回のAPI呼び出し
+
+**改善内容**:
+- 一括既読用のAPIエンドポイントを追加
+- `POST /api/articles/batch-read` で複数記事を一括処理
+
+**実装方法**:
+
+```typescript
+// functions/api/articles/batch-read.ts（新規作成）
+export async function onRequestPost(context: any): Promise<Response> {
+  const { articleIds } = await request.json();
+
+  // バッチ処理で複数記事を既読に
+  const batch = articleIds.map(id => ({
+    updateMask: { fieldPaths: ['isRead'] },
+    currentDocument: { exists: true },
+    update: {
+      name: `projects/.../documents/users/${uid}/readArticles/${id}`,
+      fields: { articleId: { stringValue: id } }
+    }
+  }));
+
+  await batchWrite(batch, idToken, config);
+
+  return new Response(JSON.stringify({
+    success: true,
+    count: articleIds.length
+  }));
+}
+```
+
+**フロントエンド変更**:
+
+```javascript
+// apps/web/src/pages/DashboardPage.jsx
+const handleMarkAllAsRead = async () => {
+  const unreadIds = articles
+    .filter(a => !a.isRead)
+    .map(a => a.id);
+
+  // 現在: N回のAPI呼び出し
+  // await Promise.all(unreadIds.map(id => api.articles.markAsRead(id)));
+
+  // 変更後: 1回のAPI呼び出し
+  await api.articles.batchMarkAsRead(unreadIds);
+  await fetchArticles(true);
+};
+```
+
+**変更ファイル**:
+- `functions/api/articles/batch-read.ts`（新規）
+- `packages/shared/api/endpoints.ts` - 新APIエンドポイント追加
+- `apps/web/src/pages/DashboardPage.jsx` - バッチAPI使用
+
+**削減効果**: N回 → 1回（一括既読時）
+
+---
+
+### 📋 実装順序
+
+| 順序 | アプローチ | リスク | 工数 |
+|------|-----------|--------|------|
+| 1 | フィード取得の重複排除 | 低 | 小 |
+| 2 | バッチ既読マークAPI | 低 | 中 |
+| 3 | readArticles統合 | 中 | 中 |
 
 ---
 
@@ -327,11 +518,12 @@ if (entry.intersectionRatio <= 0.5 && fullyViewedArticles.current.has(articleId)
 
 #### 推奨される次のステップ
 
-**Option 1: Phase 7 - Mobile アプリ（Expo）**
+**Option 1: Phase 8 - Mobile アプリ（Expo）**
 - `apps/mobile/` ディレクトリに既にボイラープレートが準備されています
 - React Native + Expo でiOS/Androidアプリを実装
 - `packages/shared` のAPIクライアントを再利用可能
 - 詳細は `DESIGN.md` Section 7 を参照
+- **⚠️ 実装時は下記「Phase 8 安全実装ガイド」を必ず参照**
 
 **Option 2: Phase 5 のオプション機能追加**
 - OPMLインポート/エクスポート機能
@@ -384,6 +576,102 @@ if (entry.intersectionRatio <= 0.5 && fullyViewedArticles.current.has(articleId)
 - Intersection Observerの`threshold`設定を確認
 - `fullyViewedArticles`のトラッキングロジックを確認
 - Unreadフィルター時は自動既読が無効化されているか確認
+
+---
+
+## 🛡️ Phase 8 安全実装ガイド
+
+### ⚠️ 重要: Webアプリを壊さないための制約
+
+Phase 8（Mobileアプリ）を実装する際、Webアプリ（`apps/web/`）に影響を与えないよう、以下の制約を厳守してください。
+
+### 変更が許可されるディレクトリ
+
+| ディレクトリ | 変更可否 | 説明 |
+|-------------|---------|------|
+| `apps/mobile/` | ✅ 許可 | Mobileアプリの実装 |
+| `apps/web/` | ❌ 禁止 | Webアプリには触らない |
+| `packages/shared/` | ⚠️ 要確認 | 変更前に必ずユーザーに確認 |
+| `functions/` | ⚠️ 要確認 | 変更前に必ずユーザーに確認 |
+| `workers/` | ❌ 禁止 | 変更不要 |
+
+### 実装前の準備（必須）
+
+```bash
+# 1. 作業用ブランチを作成（mainを保護）
+git checkout -b phase8-mobile
+
+# 2. 現在のWeb動作確認
+cd apps/web && npm run build
+# ビルドが成功することを確認
+```
+
+### 実装中の注意点
+
+1. **`packages/shared/`を変更する必要がある場合**
+   - 変更前にユーザーに確認を取る
+   - 変更理由と影響範囲を説明する
+   - 変更後、`apps/web`のビルドが通ることを確認
+
+2. **`functions/`を変更する必要がある場合**
+   - 新規エンドポイント追加は比較的安全
+   - 既存エンドポイントの変更は要注意
+   - 変更後、Web版で既存機能が動作することを確認
+
+3. **認証方式の違い**
+   - Web: Firebase Client SDK（`firebase/auth`）
+   - Mobile: Pages Functions API経由（Firebase SDK不使用）
+   - `packages/shared/api/`でこの違いを吸収する必要がある場合は要確認
+
+### 実装完了時のチェックリスト
+
+```bash
+# 1. Webアプリのビルド確認
+cd apps/web && npm run build
+# ✅ ビルド成功
+
+# 2. Functions のビルド確認
+cd functions && npm run build
+# ✅ ビルド成功
+
+# 3. Mobile のビルド確認
+cd apps/mobile && npm run build
+# ✅ ビルド成功（またはexpo start）
+```
+
+### 推奨する指示文（次のセッション用）
+
+**シンプル版:**
+```
+docs/HANDOFF.mdとDESIGN.mdを読んで、Phase 8（Mobileアプリ）を実装して。
+apps/mobile/以外は変更しないこと。
+```
+
+**安全版（ブランチ作成付き）:**
+```
+git checkout -b phase8-mobile でブランチを作成してから、
+docs/HANDOFF.mdとDESIGN.mdを読んで、Phase 8（Mobileアプリ）を実装して。
+
+制約:
+- apps/mobile/以外のディレクトリは変更しない
+- packages/sharedやfunctions/を変更する必要がある場合は、先に確認を取る
+- 実装後、npm run build（Web）が通ることを確認する
+```
+
+**詳細版（フル指示）:**
+```
+Phase 8（Mobileアプリ）を実装します。以下の手順で進めてください。
+
+1. git checkout -b phase8-mobile でブランチを作成
+2. docs/HANDOFF.md の「Phase 8 安全実装ガイド」を読む
+3. docs/DESIGN.md Section 7「モバイルアプリのアーキテクチャ」を読む
+4. apps/mobile/ 内でのみ実装を行う
+5. packages/shared/ や functions/ の変更が必要な場合は、事前に私に確認する
+6. 実装完了後、以下を確認:
+   - cd apps/web && npm run build が成功
+   - cd functions && npm run build が成功
+   - Mobileアプリが起動する
+```
 
 ---
 
