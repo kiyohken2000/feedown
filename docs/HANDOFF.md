@@ -140,6 +140,288 @@ apps/web/src/pages/FavoritesPage.jsx（無限スクロール実装）
    - `Cache-Control: private, max-age=60` を設定
    - 60秒間はブラウザキャッシュを使用
 
+4. **自動リフレッシュ間隔調整** (`DashboardPage.jsx:177-192`)
+   - 10分 → 15分に変更（33%のAPI呼び出し削減）
+
+---
+
+## 📝 詳細実装計画（コピペ可能なコード）
+
+### Task 5.3: バッチ既読マークAPI
+
+#### ファイル1: `functions/api/articles/batch-read.ts`（新規作成）
+
+```typescript
+/**
+ * POST /api/articles/batch-read
+ * Mark multiple articles as read in a single request
+ */
+
+import { requireAuth, getFirebaseConfig } from '../../lib/auth';
+import { setDocument } from '../../lib/firebase-rest';
+
+interface BatchReadRequest {
+  articleIds: string[];
+}
+
+export async function onRequestPost(context: any): Promise<Response> {
+  try {
+    const { request, env } = context;
+
+    // Require authentication
+    const authResult = await requireAuth(request, env);
+    if (authResult instanceof Response) {
+      return authResult;
+    }
+    const { uid, idToken } = authResult;
+
+    // Parse request body
+    const body: BatchReadRequest = await request.json();
+    const { articleIds } = body;
+
+    if (!articleIds || !Array.isArray(articleIds) || articleIds.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'articleIds array is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Limit to 100 articles per request to prevent abuse
+    if (articleIds.length > 100) {
+      return new Response(
+        JSON.stringify({ error: 'Maximum 100 articles per request' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const config = getFirebaseConfig(env);
+    const readAt = new Date();
+
+    // Mark all articles as read in parallel
+    const results = await Promise.allSettled(
+      articleIds.map(articleId =>
+        setDocument(
+          `users/${uid}/readArticles/${articleId}`,
+          { readAt },
+          idToken,
+          config
+        )
+      )
+    );
+
+    const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
+    const failedCount = results.length - successCount;
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        processed: articleIds.length,
+        succeeded: successCount,
+        failed: failedCount,
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  } catch (error) {
+    console.error('Batch read error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Failed to mark articles as read' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+```
+
+#### ファイル2: `packages/shared/src/api/endpoints.ts`（追記）
+
+```typescript
+// ArticlesAPI クラスに追加（83行目付近）
+async batchMarkAsRead(articleIds: string[]) {
+  return this.client.post<{ succeeded: number; failed: number }>(
+    '/api/articles/batch-read',
+    { articleIds }
+  );
+}
+```
+
+#### ファイル3: `apps/web/src/pages/DashboardPage.jsx`（修正）
+
+```javascript
+// handleMarkAllAsRead関数を修正（308-339行目）
+const handleMarkAllAsRead = async () => {
+  if (articlesLoading) return;
+
+  const unreadArticleIds = articles.filter(article => !readArticles.has(article.id)).map(a => a.id);
+  if (unreadArticleIds.length === 0) {
+    return;
+  }
+
+  // Optimistically update UI
+  setReadArticles(prev => {
+    const newSet = new Set(prev);
+    unreadArticleIds.forEach(id => newSet.add(id));
+    return newSet;
+  });
+
+  try {
+    // 変更: バッチAPIを使用（N回 → 1回）
+    await api.articles.batchMarkAsRead(unreadArticleIds);
+    // Refresh articles after marking all as read
+    await fetchArticles(true);
+  } catch (error) {
+    console.error('Failed to mark all as read:', error);
+    // Rollback on error
+    setReadArticles(prev => {
+      const newSet = new Set(prev);
+      unreadArticleIds.forEach(id => newSet.delete(id));
+      return newSet;
+    });
+  }
+};
+```
+
+---
+
+### Task 5.4: 自動既読デバウンス処理
+
+#### ファイル: `apps/web/src/pages/DashboardPage.jsx`（修正）
+
+```javascript
+// 新しいref追加（37行目付近）
+const pendingReadArticles = useRef(new Set()); // 保留中の既読記事ID
+const debounceTimerRef = useRef(null);
+
+// デバウンス付きバッチ既読関数（handleMarkAllAsReadの後に追加）
+const flushPendingReads = useCallback(async () => {
+  if (pendingReadArticles.current.size === 0) return;
+
+  const articleIds = Array.from(pendingReadArticles.current);
+  pendingReadArticles.current.clear();
+
+  try {
+    await api.articles.batchMarkAsRead(articleIds);
+    console.log(`✓ Batch marked ${articleIds.length} articles as read`);
+  } catch (error) {
+    console.error('Failed to batch mark as read:', error);
+  }
+}, [api]);
+
+const queueMarkAsRead = useCallback((articleId) => {
+  pendingReadArticles.current.add(articleId);
+  setReadArticles(prev => new Set([...prev, articleId]));
+
+  // デバウンス: 500ms後にバッチ送信
+  if (debounceTimerRef.current) {
+    clearTimeout(debounceTimerRef.current);
+  }
+  debounceTimerRef.current = setTimeout(() => {
+    flushPendingReads();
+  }, 500);
+}, [flushPendingReads]);
+
+// IntersectionObserverのコールバックを修正（240-260行目）
+// 変更前: api.articles.markAsRead(articleId)
+// 変更後: queueMarkAsRead(articleId)
+
+// 例:
+if (entry.isIntersecting && entry.intersectionRatio <= 0.5 && fullyViewedArticles.current.has(articleId)) {
+  fullyViewedArticles.current.delete(articleId);
+  queueMarkAsRead(articleId); // 変更: 個別APIではなくキューに追加
+}
+
+// コンポーネントアンマウント時にフラッシュ
+useEffect(() => {
+  return () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    // 残っている既読をフラッシュ
+    if (pendingReadArticles.current.size > 0) {
+      flushPendingReads();
+    }
+  };
+}, [flushPendingReads]);
+```
+
+---
+
+### Task 5.5: お気に入りページネーション
+
+#### ファイル1: `functions/api/favorites.ts`（修正）
+
+```typescript
+// listファンクションを修正
+export async function onRequestGet(context: any): Promise<Response> {
+  // ... 認証処理 ...
+
+  const url = new URL(request.url);
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
+  const offset = parseInt(url.searchParams.get('offset') || '0');
+
+  const config = getFirebaseConfig(env);
+
+  // 全件取得してページネーション（Firestore REST APIの制限のため）
+  const allFavorites = await listDocuments(
+    `users/${uid}/favorites`,
+    idToken,
+    config,
+    1000
+  );
+
+  // 日付でソート（新しい順）
+  allFavorites.sort((a, b) => {
+    const aTime = a.savedAt ? new Date(a.savedAt).getTime() : 0;
+    const bTime = b.savedAt ? new Date(b.savedAt).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  const paginatedFavorites = allFavorites.slice(offset, offset + limit);
+
+  return new Response(
+    JSON.stringify({
+      favorites: paginatedFavorites,
+      hasMore: offset + limit < allFavorites.length,
+      total: allFavorites.length,
+    }),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'private, max-age=60',
+      },
+    }
+  );
+}
+```
+
+#### ファイル2: `packages/shared/src/api/endpoints.ts`（修正）
+
+```typescript
+// FavoritesAPI クラスを修正
+export class FavoritesAPI {
+  constructor(private client: ApiClient) {}
+
+  async list(params?: { limit?: number; offset?: number }) {
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', params.limit.toString());
+    if (params?.offset) query.set('offset', params.offset.toString());
+
+    const queryString = query.toString();
+    return this.client.get<{ favorites: Favorite[]; hasMore: boolean; total: number }>(
+      `/api/favorites${queryString ? `?${queryString}` : ''}`
+    );
+  }
+}
+```
+
+#### ファイル3: `apps/web/src/pages/FavoritesPage.jsx`（修正概要）
+
+- DashboardPageと同様の無限スクロール実装
+- `hasMore`と`offset`の状態管理追加
+- IntersectionObserverで追加読み込み
+
 ---
 
 ## ⭐ 最新のセッションで完了した内容
