@@ -3,8 +3,8 @@
  * Get user's favorite articles
  */
 
-import { requireAuth, getFirebaseConfig } from '../lib/auth';
-import { listDocuments } from '../lib/firebase-rest';
+import { requireAuth } from '../lib/auth';
+import { createSupabaseClient } from '../lib/supabase';
 
 /**
  * GET /api/favorites
@@ -19,35 +19,36 @@ export async function onRequestGet(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, accessToken } = authResult;
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
     // Get all favorites
-    const favorites = await listDocuments(
-      `users/${uid}/favorites`,
-      idToken,
-      config,
-      1000
-    );
+    const { data: favorites, error } = await supabase
+      .from('favorites')
+      .select('*')
+      .eq('user_id', uid)
+      .order('saved_at', { ascending: false })
+      .limit(1000);
+
+    if (error) {
+      console.error('Get favorites error:', error.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to get favorites' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Transform to expected format
-    const formattedFavorites = favorites.map(fav => ({
+    const formattedFavorites = (favorites || []).map(fav => ({
       articleId: fav.id,
       articleTitle: fav.title,
       articleDescription: fav.description || '',
       articleLink: fav.url,
-      feedTitle: fav.feedTitle || '',
-      imageUrl: fav.imageUrl || null,
-      savedAt: fav.savedAt,
+      feedTitle: fav.feed_title || '',
+      imageUrl: fav.image_url || null,
+      savedAt: fav.saved_at,
     }));
-
-    // Sort by savedAt descending
-    formattedFavorites.sort((a, b) => {
-      const aTime = a.savedAt ? new Date(a.savedAt).getTime() : 0;
-      const bTime = b.savedAt ? new Date(b.savedAt).getTime() : 0;
-      return bTime - aTime;
-    });
 
     return new Response(
       JSON.stringify({

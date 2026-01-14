@@ -4,8 +4,8 @@
  * PATCH: Update feed (e.g., order)
  */
 
-import { requireAuth, getFirebaseConfig } from '../../lib/auth';
-import { getDocument, deleteDocument, updateDocument } from '../../lib/firebase-rest';
+import { requireAuth } from '../../lib/auth';
+import { createSupabaseClient } from '../../lib/supabase';
 
 /**
  * DELETE /api/feeds/:id
@@ -20,7 +20,7 @@ export async function onRequestDelete(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, accessToken } = authResult;
 
     const feedId = params.id;
     if (!feedId) {
@@ -30,30 +30,37 @@ export async function onRequestDelete(context: any): Promise<Response> {
       );
     }
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
     // Check if feed exists
-    const feedPath = `users/${uid}/feeds/${feedId}`;
-    const feed = await getDocument(feedPath, idToken, config);
+    const { data: feed, error: fetchError } = await supabase
+      .from('feeds')
+      .select('id')
+      .eq('id', feedId)
+      .eq('user_id', uid)
+      .single();
 
-    if (!feed) {
+    if (fetchError || !feed) {
       return new Response(
         JSON.stringify({ error: 'Feed not found' }),
         { status: 404, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Delete feed
-    const deleted = await deleteDocument(feedPath, idToken, config);
+    // Delete feed (CASCADE will delete associated articles)
+    const { error } = await supabase
+      .from('feeds')
+      .delete()
+      .eq('id', feedId)
+      .eq('user_id', uid);
 
-    if (!deleted) {
+    if (error) {
+      console.error('Delete feed error:', error.message);
       return new Response(
         JSON.stringify({ error: 'Failed to delete feed' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
-
-    // TODO: Also delete associated articles (optional, or handle with TTL)
 
     return new Response(
       JSON.stringify({ success: true }),
@@ -84,7 +91,7 @@ export async function onRequestPatch(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, accessToken } = authResult;
 
     const feedId = params.id;
     if (!feedId) {
@@ -94,13 +101,17 @@ export async function onRequestPatch(context: any): Promise<Response> {
       );
     }
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
     // Check if feed exists
-    const feedPath = `users/${uid}/feeds/${feedId}`;
-    const feed = await getDocument(feedPath, idToken, config);
+    const { data: feed, error: fetchError } = await supabase
+      .from('feeds')
+      .select('id')
+      .eq('id', feedId)
+      .eq('user_id', uid)
+      .single();
 
-    if (!feed) {
+    if (fetchError || !feed) {
       return new Response(
         JSON.stringify({ error: 'Feed not found' }),
         { status: 404, headers: { 'Content-Type': 'application/json' } }
@@ -119,14 +130,14 @@ export async function onRequestPatch(context: any): Promise<Response> {
     }
 
     // Update feed order
-    const updated = await updateDocument(
-      feedPath,
-      { order },
-      idToken,
-      config
-    );
+    const { error } = await supabase
+      .from('feeds')
+      .update({ order })
+      .eq('id', feedId)
+      .eq('user_id', uid);
 
-    if (!updated) {
+    if (error) {
+      console.error('Update feed error:', error.message);
       return new Response(
         JSON.stringify({ error: 'Failed to update feed' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }

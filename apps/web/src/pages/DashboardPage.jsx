@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { getAuth } from 'firebase/auth';
+import { useLocation } from 'react-router-dom';
+import { getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import ArticleModal from '../components/ArticleModal';
@@ -14,7 +15,7 @@ const DashboardPage = () => {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const auth = getAuth();
+  const location = useLocation();
   const { isDarkMode } = useTheme();
   const {
     articles,
@@ -37,11 +38,12 @@ const DashboardPage = () => {
   const fullyViewedArticles = useRef(new Set()); // Track articles that were 100% visible
   const pendingReadQueue = useRef(new Set()); // Queue for batch read marks
   const debounceTimerRef = useRef(null); // Debounce timer for batch API
+  const handleRefreshRef = useRef(null); // Ref to always get latest handleRefresh
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '',
-    async () => auth.currentUser ? auth.currentUser.getIdToken() : null
-  ), [auth]);
+    getAccessToken
+  ), []);
 
   const api = useMemo(() => new FeedOwnAPI(apiClient), [apiClient]);
 
@@ -186,28 +188,14 @@ const DashboardPage = () => {
 
         // OPTIMIZATION: Use feeds returned by refresh API instead of fetching again
         if (refreshResponse.data.feeds) {
-          console.log('📊 Using feeds from refresh response (optimization)');
           setFeeds(refreshResponse.data.feeds);
         } else {
           // Fallback: fetch feeds if not included in response
           await fetchFeeds();
         }
 
-        // Fetch articles if:
-        // 1. There were new articles, OR
-        // 2. This is the first load (no articles yet)
-        const isFirstLoad = articles.length === 0;
-        if (refreshResponse.data.shouldRefreshArticles || isFirstLoad) {
-          if (isFirstLoad) {
-            console.log('📥 First load, fetching all articles');
-          } else {
-            console.log('🔄 New articles detected, refreshing article list');
-          }
-          await fetchArticles(true); // reset=true for full reload
-        } else {
-          console.log('✓ No new articles, skipping article refresh');
-          setArticlesLoading(false);
-        }
+        // Always fetch articles after refresh to ensure UI is up to date
+        await fetchArticles(true); // reset=true for full reload
       } else {
         // On error, fetch both feeds and articles
         await fetchFeeds();
@@ -218,12 +206,16 @@ const DashboardPage = () => {
       setArticlesError('Failed to refresh feeds.');
       setArticlesLoading(false);
     }
-  }, [api, fetchFeeds, fetchArticles, setFeeds, articles.length]);
+  }, [api, fetchFeeds, fetchArticles, setFeeds]);
 
-  // Auto-refresh on initial load
+  // Keep ref updated with latest handleRefresh
+  handleRefreshRef.current = handleRefresh;
+
+  // Auto-refresh on initial load and when navigating back to dashboard
   useEffect(() => {
-    handleRefresh();
-  }, []);
+    // Use ref to always call latest handleRefresh (avoids stale closure issues)
+    handleRefreshRef.current?.();
+  }, [location.key]);
 
   // Auto-refresh RSS feeds every 15 minutes
   useEffect(() => {
@@ -234,13 +226,13 @@ const DashboardPage = () => {
 
         if (now - lastArticleFetchTime >= fifteenMinutes) {
           console.log('🔄 Auto-refresh triggered (15 minutes elapsed) - fetching new articles from RSS feeds');
-          handleRefresh(); // Fetch new articles from RSS feeds and update article list
+          handleRefreshRef.current?.(); // Use ref to call latest function
         }
       }
     }, 60 * 1000); // Check every 1 minute
 
     return () => clearInterval(checkInterval);
-  }, [lastArticleFetchTime, handleRefresh]);
+  }, [lastArticleFetchTime]);
 
   // Calculate unread count
   const unreadCount = useMemo(() => {
@@ -257,6 +249,11 @@ const DashboardPage = () => {
       setFilteredArticles(articles.filter(article => readArticles.has(article.id)));
     }
   }, [articles, filter, readArticles]);
+
+  // Scroll to top when filter changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [filter]);
 
   // Setup Intersection Observer for auto-mark-as-read
   useEffect(() => {

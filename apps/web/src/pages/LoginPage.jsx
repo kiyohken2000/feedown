@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { useTheme } from '../contexts/ThemeContext';
 import logoLarge from '../assets/images/logo-lg.png';
 
@@ -10,7 +10,6 @@ const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const auth = getAuth();
   const { isDarkMode } = useTheme();
 
   const handleSubmit = async (e) => {
@@ -19,10 +18,18 @@ const LoginPage = () => {
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
         navigate('/dashboard');
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
         navigate('/dashboard');
       }
     } catch (error) {
@@ -40,7 +47,11 @@ const LoginPage = () => {
       const testEmail = `test-${randomNum}@test.com`;
       const testPassword = '111111';
 
-      await createUserWithEmailAndPassword(auth, testEmail, testPassword);
+      const { error } = await supabase.auth.signUp({
+        email: testEmail,
+        password: testPassword,
+      });
+      if (error) throw error;
       navigate('/dashboard');
     } catch (error) {
       console.error('Quick account creation failed:', error.message);

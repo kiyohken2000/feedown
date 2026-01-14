@@ -1,52 +1,111 @@
 # FeedOwn - 実装設計書
 
-## 1. データ保存設計（Firestore）
+## 1. データ保存設計（Supabase PostgreSQL）
 
-### 記事データの保存方針
-**記事のdescriptionをFirestoreに保存し、7日間で自動削除**
+### データベーススキーマ
 
+```sql
+-- ユーザープロファイル（auth.usersの拡張）
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  is_test_account BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- フィード
+CREATE TABLE feeds (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  description TEXT DEFAULT '',
+  favicon_url TEXT,
+  added_at TIMESTAMPTZ DEFAULT NOW(),
+  last_fetched_at TIMESTAMPTZ,
+  last_success_at TIMESTAMPTZ,
+  error_count INTEGER DEFAULT 0,
+  "order" BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000,
+  UNIQUE(user_id, url)
+);
+
+-- 記事（7日TTL）
+CREATE TABLE articles (
+  id TEXT PRIMARY KEY,  -- SHA256ハッシュ(feedId:guid)
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  feed_id UUID NOT NULL REFERENCES feeds(id) ON DELETE CASCADE,
+  feed_title TEXT,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  description TEXT,
+  published_at TIMESTAMPTZ,
+  fetched_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,  -- 7日後
+  author TEXT,
+  image_url TEXT
+);
+
+-- 既読記事（正規化テーブル）
+CREATE TABLE read_articles (
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  article_id TEXT NOT NULL,
+  read_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, article_id)
+);
+
+-- お気に入り（無期限保存）
+CREATE TABLE favorites (
+  id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  description TEXT,
+  feed_title TEXT,
+  image_url TEXT,
+  saved_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, id)
+);
+
+-- インデックス
+CREATE INDEX idx_feeds_user_id ON feeds(user_id);
+CREATE INDEX idx_feeds_order ON feeds(user_id, "order");
+CREATE INDEX idx_articles_user_id ON articles(user_id);
+CREATE INDEX idx_articles_feed_id ON articles(feed_id);
+CREATE INDEX idx_articles_expires_at ON articles(expires_at);
+CREATE INDEX idx_articles_published_at ON articles(user_id, published_at DESC);
+CREATE INDEX idx_read_articles_user_id ON read_articles(user_id);
+CREATE INDEX idx_favorites_user_id ON favorites(user_id);
+CREATE INDEX idx_favorites_saved_at ON favorites(user_id, saved_at DESC);
 ```
-users/
-  └─ {userId}/
-      ├─ feeds/
-      │   └─ {feedId}: {
-      │       url: string,
-      │       title: string,
-      │       description?: string,
-      │       lastFetchedAt: timestamp,
-      │       lastSuccessAt: timestamp,
-      │       errorCount: number,
-      │       addedAt: timestamp
-      │   }
-      ├─ articles/              # 新規追加: 記事の全文保存
-      │   └─ {articleHash}: {    # articleHash = MD5(feedId + article.guid)
-      │       feedId: string,
-      │       title: string,
-      │       url: string,
-      │       description: string,    # 記事のdescription
-      │       publishedAt: timestamp,
-      │       fetchedAt: timestamp,
-      │       expiresAt: timestamp  # fetchedAt + 7日（TTL）
-      │   }
-      ├─ readArticles/
-      │   └─ {articleHash}: {
-      │       readAt: timestamp
-      │   }
-      └─ favorites/
-          └─ {articleHash}: {
-              title: string,
-              url: string,
-              description: string,     # お気に入りは無期限保存
-              feedTitle: string,
-              savedAt: timestamp
-          }
+
+### Row Level Security (RLS)
+
+```sql
+-- 全テーブルでRLS有効化
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feeds ENABLE ROW LEVEL SECURITY;
+ALTER TABLE articles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE read_articles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
+
+-- ポリシー: 自分のデータのみアクセス可能
+CREATE POLICY "Users can manage own profile" ON user_profiles
+  FOR ALL USING (auth.uid() = id);
+CREATE POLICY "Users can manage own feeds" ON feeds
+  FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage own articles" ON articles
+  FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage own read_articles" ON read_articles
+  FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage own favorites" ON favorites
+  FOR ALL USING (auth.uid() = user_id);
 ```
 
-**理由:**
-- Firestoreの無料枠: 5万read/日、2万write/日
-- 1日2回更新 × 100フィード × 平均10記事 = 2000 writes/日（許容範囲）
-- TTL 7日で古い記事を自動削除し、ストレージコストを抑制
-- オフライン閲覧可能（記事descriptionが手元にある）
+### 設計理由
+- **Supabase無料枠**: 500MB Database、無制限API呼び出し（帯域制限のみ）
+- **正規化テーブル**: PostgreSQLの強みを活かしたスケーラブルな設計
+- **TTL 7日**: 古い記事を定期削除しストレージ節約
+- **RLS**: ユーザーごとのデータ分離をDB層で保証
 
 ---
 
@@ -61,57 +120,68 @@ users/
 // - CORSヘッダーを追加
 // - KVキャッシュ (TTL: 1時間)
 // - レート制限: 同じURL 1時間に1回まで
-
-// POST /cron (Cron Trigger: 0 */6 * * *)
-// - 何もしない（Cronは使わない方針に変更 → 理由は後述）
 ```
 
 ### Cloudflare Pages Functions (`functions/api/`)
 **役割: すべてのビジネスロジック**
 
 ```
-/api/auth/*          - Firebase Auth連携
-/api/feeds           - フィードCRUD（Firestore操作）
-/api/refresh         - RSS取得 → Worker経由 → Firestore保存
-/api/articles        - 記事一覧取得（Firestore）
+/api/auth/*          - Supabase Auth連携
+/api/feeds           - フィードCRUD（PostgreSQL操作）
+/api/refresh         - RSS取得 → Worker経由 → PostgreSQL保存
+/api/articles        - 記事一覧取得（PostgreSQL）
 /api/articles/:id/*  - 既読/お気に入り操作
-/api/test-feed       - フィードURL検証（Worker経由）
-/api/opml/*          - OPML インポート/エクスポート
+/api/favorites       - お気に入り一覧
+/api/user/*          - アカウント管理
 ```
 
 **フロー例: `/api/refresh`**
 ```
 Client → Pages Functions /api/refresh
          ↓
-         ├─ 1. Firestoreからフィード一覧取得
+         ├─ 1. PostgreSQLからフィード一覧取得
          ├─ 2. 各フィードのRSSを Worker /fetch?url=... で取得
          ├─ 3. XMLパース → 記事データ抽出
-         ├─ 4. Firestore articles/ に保存（バッチ書き込み）
-         └─ 5. lastFetchedAt更新
+         ├─ 4. PostgreSQL articles テーブルにupsert（バッチ）
+         └─ 5. last_fetched_at更新
 ```
 
 ---
 
-## 3. Cron更新の廃止 → クライアント駆動に変更
+## 3. リアルタイム更新（Supabase Realtime）
 
-### 理由
-1. **認証問題**: Cronから全ユーザーのFirestoreにアクセスするにはAdmin SDK + サービスアカウントが必要
-2. **コスト**: 全ユーザー分の更新を6時間ごとに実行すると無駄が多い
-3. **シンプルさ**: セルフホストの思想に合わない（ユーザーがアクセスしたときだけ更新）
+### 仕組み
+Supabase RealtimeはPostgreSQLの変更をWebSocket経由でクライアントに配信。
 
-### 新方針: スマートリフレッシュ
+```javascript
+// クライアント側購読
+const channel = supabase
+  .channel(`articles:${userId}`)
+  .on('postgres_changes', {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'articles',
+    filter: `user_id=eq.${userId}`,
+  }, (payload) => {
+    // 新着記事を即座にUIに反映
+    addNewArticle(payload.new);
+  })
+  .subscribe();
+```
+
+### メリット
+- **即時更新**: Refreshボタン不要で新着記事が表示
+- **効率的**: ポーリング不要でサーバー負荷軽減
+- **追加コストなし**: Supabase無料枠に含まれる
+
+### スマートリフレッシュ（フォールバック）
 ```typescript
 // 記事一覧取得時に自動チェック
 GET /api/articles
 
-→ lastFetchedAt が 6時間以上前なら自動的に /api/refresh を呼ぶ
-→ クライアント側でバックグラウンド更新（非同期）
+→ last_fetched_at が 6時間以上前なら自動的に /api/refresh を呼ぶ
+→ Realtimeが接続できない場合のフォールバック
 ```
-
-**メリット:**
-- Cron不要（Cloudflare Workersの無料枠節約）
-- アクティブユーザーのみ更新（コスト最適化）
-- 実装がシンプル
 
 ---
 
@@ -142,12 +212,7 @@ return xml;
 
 ## 5. WebとMobileのコード共有戦略
 
-### 現在の問題
-- Web: Vite + React
-- Mobile: Expo + React Native
-- 「スタイリング: React Native Web」だが実際の共有方法が不明
-
-### 推奨: モノレポ + 共通パッケージ
+### モノレポ構成
 
 ```
 feedown/
@@ -155,26 +220,13 @@ feedown/
 │   ├── web/              # Vite + React (Web専用UI)
 │   └── mobile/           # Expo + React Native
 ├── packages/
-│   ├── shared/           # 新規追加: 共通ロジック
-│   │   ├── api/          # API client (fetch wrapper)
-│   │   ├── hooks/        # カスタムフック（useArticles, useFeedsなど）
-│   │   ├── types/        # TypeScript型定義
-│   │   └── utils/        # ユーティリティ関数
-│   └── ui/               # 新規追加: 共通UIコンポーネント（任意）
-│       └── components/   # React Native Web対応コンポーネント
-├── workers/
-├── functions/
+│   └── shared/           # 共通ロジック
+│       ├── api/          # API client (fetch wrapper)
+│       ├── types/        # TypeScript型定義
+│       └── utils/        # ユーティリティ関数
+├── workers/              # Cloudflare Workers (RSSプロキシ)
+├── functions/            # Cloudflare Pages Functions (API)
 └── package.json          # ワークスペース設定
-```
-
-**package.json (ルート)**
-```json
-{
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ]
-}
 ```
 
 **共有するもの:**
@@ -188,26 +240,7 @@ feedown/
 
 ---
 
-## 6. Mobile機能制限の緩和
-
-### 現仕様: フィード追加・削除が Mobile ❌
-
-### 提案: すべて実装可能にする
-
-**理由:**
-- 技術的制限はない（同じAPI使用）
-- UXが著しく悪化する
-- 実装コストも低い
-
-**変更後:**
-```
-フィード追加・削除: Web ✅ → Mobile ✅
-OPMLインポート/エクスポート: Web ✅ → Mobile ❌（ファイル選択UIが複雑）
-```
-
----
-
-## 7. モバイルアプリのアーキテクチャ
+## 6. モバイルアプリのアーキテクチャ
 
 ### Web vs Mobile の根本的な違い
 
@@ -215,42 +248,33 @@ OPMLインポート/エクスポート: Web ✅ → Mobile ❌（ファイル選
 ```
 各ユーザーが自分のCloudflare Pagesにデプロイ
   ↓
-Firebase Client SDK直接使用（認証・Firestore）
+Supabase Client SDK直接使用（認証）
   ↓
-自分のFirebase/Cloudflareにアクセス
+自分のSupabase/Cloudflareにアクセス
 ```
 
 **モバイルアプリ（共通アプリ型）:**
 ```
-App Store/Google Playから共通アプリをダウンロード（全ユーザー共通）
+App Store/Google Playから共通アプリをダウンロード
   ↓
-初期設定でPages Functions URL入力（例: https://feedown-alice.pages.dev）
+初期設定でPages Functions URL入力
   ↓
-Pages Functions API経由でのみアクセス（Firebase Client SDK不要）
+Pages Functions API経由でのみアクセス（Supabase SDK不要）
   ↓
-各ユーザーのFirebase/Cloudflareにアクセス
+各ユーザーのSupabase/Cloudflareにアクセス
 ```
-
-### モバイルアプリの技術構成
-
-**必要なもの:**
-- AsyncStorage（Pages Functions URLの保存のみ）
-- API Client（`packages/shared/api`）
-- Pages Functions APIへのHTTPリクエスト
-
-**不要なもの:**
-- ❌ Firebase Client SDK（firebase パッケージ）
-- ❌ Firebase設定（.env内のFirebase認証情報）
-- ❌ Firestore直接アクセス
 
 ### 認証フロー
 
 **Web:**
 ```typescript
-// Firebase Auth SDK直接使用
-import { signInWithEmailAndPassword } from 'firebase/auth';
-const userCredential = await signInWithEmailAndPassword(auth, email, password);
-const token = await userCredential.user.getIdToken();
+// Supabase Auth SDK直接使用
+import { createClient } from '@supabase/supabase-js';
+const { data, error } = await supabase.auth.signInWithPassword({
+  email,
+  password,
+});
+const token = data.session?.access_token;
 ```
 
 **Mobile:**
@@ -261,127 +285,137 @@ const { token, user } = response.data;
 // トークンをAsyncStorageに保存
 ```
 
-### データアクセスフロー
-
-**Web:**
-```
-Web UI → Firebase Client SDK → Firebase Auth/Firestore
-```
-
-**Mobile:**
-```
-Mobile UI → Pages Functions API → Firebase Admin SDK → Firebase Auth/Firestore
-```
-
-### 環境変数の違い
-
-**Web (.env):**
-```env
-VITE_FIREBASE_API_KEY=...         # 必要
-VITE_FIREBASE_AUTH_DOMAIN=...     # 必要
-VITE_FIREBASE_PROJECT_ID=...      # 必要
-VITE_WORKER_URL=...               # 必要
-VITE_API_BASE_URL=...             # 不要（同一オリジン）
-```
-
-**Mobile (.env or config):**
-```env
-# Firebase設定は不要（全て削除）
-# Pages Functions URLはユーザーが初期設定で入力（AsyncStorage保存）
-APP_NAME=FeedOwn
-APP_VERSION=1.0.0
-```
-
 ---
 
-## 8. パフォーマンス最適化
+## 7. パフォーマンス最適化
 
 ### 記事一覧取得の工夫
-```typescript
-// Firestore クエリ
-articles
-  .where('expiresAt', '>', now)  // 有効期限内のみ
-  .orderBy('publishedAt', 'desc')
-  .limit(50)  // ページネーション
+```sql
+-- PostgreSQL クエリ
+SELECT a.*,
+       CASE WHEN ra.article_id IS NOT NULL THEN true ELSE false END as is_read
+FROM articles a
+LEFT JOIN read_articles ra ON a.id = ra.article_id AND ra.user_id = a.user_id
+WHERE a.user_id = $1
+  AND a.expires_at > NOW()
+ORDER BY a.published_at DESC
+LIMIT 50 OFFSET $2;
 ```
 
 ### 既読マークの楽観的UI更新
 ```typescript
 // クライアント側で即座に反映
-setReadArticles(prev => [...prev, articleId]);
+setReadArticles(prev => new Set([...prev, articleId]));
 
 // バックグラウンドでAPI呼び出し
-fetch('/api/articles/:id/read', { method: 'POST' }).catch(() => {
+api.articles.markAsRead(articleId).catch(() => {
   // 失敗時はロールバック
-  setReadArticles(prev => prev.filter(id => id !== articleId));
+  setReadArticles(prev => {
+    const next = new Set(prev);
+    next.delete(articleId);
+    return next;
+  });
 });
+```
+
+### バッチ既読マーク
+```typescript
+// 複数記事を一括で既読マーク（500msデバウンス）
+const { error } = await supabase
+  .from('read_articles')
+  .upsert(
+    articleIds.map(id => ({ user_id: uid, article_id: id })),
+    { onConflict: 'user_id,article_id' }
+  );
 ```
 
 ---
 
-## 9. セキュリティ設計
+## 8. セキュリティ設計
 
-### Firebase Security Rules
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}
+### Supabase Row Level Security
+```sql
+-- ユーザーは自分のデータのみアクセス可能
+CREATE POLICY "Users can manage own data" ON feeds
+  FOR ALL USING (auth.uid() = user_id);
 ```
 
 ### Pages Functions 認証
 ```typescript
 // すべてのAPI呼び出しでトークン検証
-const idToken = request.headers.get('Authorization')?.replace('Bearer ', '');
-const decodedToken = await admin.auth().verifyIdToken(idToken);
-const userId = decodedToken.uid;
+const authHeader = request.headers.get('Authorization');
+const token = authHeader?.replace('Bearer ', '');
+
+const { data: { user }, error } = await supabase.auth.getUser(token);
+if (error || !user) {
+  return new Response('Unauthorized', { status: 401 });
+}
+const userId = user.id;
 ```
 
 ---
 
-## 10. デプロイフロー
+## 9. デプロイフロー
 
 ### 初期セットアップ
 ```bash
-# 1. Firebase プロジェクト作成
-firebase init
+# 1. Supabase プロジェクト作成
+# supabase.comでプロジェクト作成 → SQLでテーブル作成
 
 # 2. Cloudflare Workers デプロイ
 cd workers && npx wrangler deploy
 
-# 3. Cloudflare Pages デプロイ（GitHub連携）
-# functions/ も自動デプロイされる
+# 3. Cloudflare Pages デプロイ
+npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 # 4. 環境変数設定
-# Pages: FIREBASE_API_KEY など
-# Workers: FIREBASE_PROJECT_ID など
+# Pages: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+# Workers: (なし、または必要に応じて)
 ```
 
 ---
 
-## 11. コスト試算（無料枠での運用）
+## 10. コスト試算（Supabase無料枠での運用）
 
-### ユーザー1人あたり/日
-- 100フィード × 2回更新 = 200 Worker requests
-- 平均10記事/フィード = 1000 Firestore writes
-- 記事閲覧 50記事 = 50 Firestore reads
-- KV reads = 200回
+### 無料枠
+| サービス | 制限 |
+|---------|------|
+| Database | 500MB |
+| Auth | 50,000 MAU |
+| Storage | 1GB |
+| Realtime | 200同時接続 |
+| API | 帯域制限のみ（リクエスト数無制限） |
 
-### 無料枠での上限
-- Workers: 10万req/日 → 約500ユーザー
-- Firestore writes: 2万/日 → 約20ユーザー ⚠️
-- Firestore reads: 5万/日 → 約1000ユーザー
+### Cloudflare無料枠
+| サービス | 制限 |
+|---------|------|
+| Workers | 10万req/日 |
+| KV | 10万read/日、1000write/日 |
+| Pages | 無制限ビルド |
 
-**結論: Firestore writesがボトルネック**
+### 結論
+**Supabase + Cloudflareの組み合わせで、実質無料で運用可能**
 
-### 対策
-1. 更新頻度を6時間に1回に制限（実装済み）
-2. 記事の重複チェック（既存記事は更新しない）
-3. 差分更新（変更があった記事のみ書き込み）
+従来のFirestore（読み取り5万件/日、書き込み2万件/日）と比較して大幅に緩和。
+
+---
+
+## 11. 環境変数
+
+### Frontend (.env.shared)
+```env
+VITE_SUPABASE_URL=https://<project>.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_WORKER_URL=https://feedown-worker.<username>.workers.dev
+VITE_APP_NAME=FeedOwn
+```
+
+### Backend (Cloudflare Pages secrets)
+```env
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
 
 ---
 
@@ -389,14 +423,15 @@ cd workers && npx wrangler deploy
 
 この設計により:
 - ✅ シンプルで理解しやすい構成
-- ✅ 無料枠で運用可能（小規模）
+- ✅ 無料枠で余裕を持って運用可能
+- ✅ リアルタイム更新でUX向上
+- ✅ PostgreSQLの柔軟なクエリ
 - ✅ WebとMobileのロジック共有
-- ✅ オフライン閲覧対応
-- ✅ セキュアなマルチテナント設計
+- ✅ セキュアなマルチテナント設計（RLS）
 
 実装の優先順位:
-1. Workers (RSS取得プロキシ) - 最小限
-2. Pages Functions (API) - コア機能
-3. Web UI - MVP
-4. packages/shared - API client
+1. Supabase セットアップ（テーブル作成、RLS設定）
+2. Workers (RSS取得プロキシ) - 変更なし
+3. Pages Functions (API) - Supabase移行
+4. Web UI - Supabase Auth移行 + Realtime統合
 5. Mobile - Webの後

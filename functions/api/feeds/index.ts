@@ -4,8 +4,8 @@
  * POST: Add new feed
  */
 
-import { requireAuth, getFirebaseConfig, isTestAccount } from '../../lib/auth';
-import { listDocuments, createDocument } from '../../lib/firebase-rest';
+import { requireAuth, isTestAccount } from '../../lib/auth';
+import { createSupabaseClient } from '../../lib/supabase';
 
 /**
  * GET /api/feeds
@@ -18,29 +18,44 @@ export async function onRequestGet(context: any): Promise<Response> {
     // Require authentication
     const authResult = await requireAuth(request, env);
     if (authResult instanceof Response) {
-      return authResult; // Return error response if not authenticated
+      return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, accessToken } = authResult;
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
-    // Get user's feeds from Firestore
-    const feeds = await listDocuments(
-      `users/${uid}/feeds`,
-      idToken,
-      config,
-      100
-    );
+    // Get user's feeds from database
+    const { data: feeds, error } = await supabase
+      .from('feeds')
+      .select('*')
+      .eq('user_id', uid)
+      .order('order', { ascending: true })
+      .limit(100);
 
-    // Sort by order field (ascending), fallback to addedAt
-    feeds.sort((a, b) => {
-      const aOrder = a.order !== undefined ? a.order : (a.addedAt ? new Date(a.addedAt).getTime() : 0);
-      const bOrder = b.order !== undefined ? b.order : (b.addedAt ? new Date(b.addedAt).getTime() : 0);
-      return aOrder - bOrder;
-    });
+    if (error) {
+      console.error('Get feeds error:', error.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to get feeds' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Transform to match expected format
+    const transformedFeeds = (feeds || []).map(feed => ({
+      id: feed.id,
+      url: feed.url,
+      title: feed.title,
+      description: feed.description,
+      faviconUrl: feed.favicon_url,
+      addedAt: feed.added_at,
+      lastFetchedAt: feed.last_fetched_at,
+      lastSuccessAt: feed.last_success_at,
+      errorCount: feed.error_count,
+      order: feed.order,
+    }));
 
     return new Response(
-      JSON.stringify({ feeds }),
+      JSON.stringify({ feeds: transformedFeeds }),
       {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -68,7 +83,7 @@ export async function onRequestPost(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken, email } = authResult;
+    const { uid, accessToken, email } = authResult;
 
     // Parse request body
     const body = await request.json();
@@ -82,38 +97,28 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
-    // Get existing feeds to check limit and duplicates
-    const existingFeeds = await listDocuments(
-      `users/${uid}/feeds`,
-      idToken,
-      config,
-      100
-    );
+    // Check feed count limit
+    const { count, error: countError } = await supabase
+      .from('feeds')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', uid);
 
-    // Check feed limit
-    // Test accounts (test-*@test.com): max 3 feeds
-    // Regular accounts: max 100 feeds
+    if (countError) {
+      console.error('Count feeds error:', countError.message);
+    }
+
     const isTest = isTestAccount(email);
     const maxFeeds = isTest ? 3 : 100;
 
-    if (existingFeeds.length >= maxFeeds) {
+    if ((count || 0) >= maxFeeds) {
       return new Response(
         JSON.stringify({
           error: isTest
             ? 'Test accounts can only have up to 3 feeds. Please use a regular account for more feeds.'
             : 'Maximum 100 feeds allowed'
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if feed already exists
-    const duplicateFeed = existingFeeds.find(feed => feed.url === url);
-    if (duplicateFeed) {
-      return new Response(
-        JSON.stringify({ error: 'Feed already exists' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -142,43 +147,58 @@ export async function onRequestPost(context: any): Promise<Response> {
         }
       } catch (error) {
         console.error('Failed to fetch feed title:', error);
-        // Continue without title
       }
     }
 
     // Extract favicon URL
     const faviconUrl = extractFaviconUrl(url);
 
-    // Add feed to Firestore
-    const feedData = {
-      url,
-      title: feedTitle,
-      description: feedDescription,
-      faviconUrl,
-      addedAt: new Date(),
-      lastFetchedAt: null,
-      lastSuccessAt: null,
-      errorCount: 0,
-      order: Date.now(), // Use timestamp as default order
-    };
+    // Add feed to database
+    const { data: feed, error } = await supabase
+      .from('feeds')
+      .insert({
+        user_id: uid,
+        url,
+        title: feedTitle,
+        description: feedDescription,
+        favicon_url: faviconUrl,
+        added_at: new Date().toISOString(),
+        last_fetched_at: null,
+        last_success_at: null,
+        error_count: 0,
+        order: Date.now(),
+      })
+      .select()
+      .single();
 
-    const result = await createDocument(
-      `users/${uid}/feeds`,
-      feedData,
-      idToken,
-      config
-    );
+    if (error) {
+      console.error('Add feed error:', error.message);
 
-    if (!result) {
+      if (error.code === '23505') { // Unique violation
+        return new Response(
+          JSON.stringify({ error: 'Feed already exists' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
       return new Response(
         JSON.stringify({ error: 'Failed to add feed' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
+    // Transform to match expected format
     const newFeed = {
-      id: result.id,
-      ...feedData,
+      id: feed.id,
+      url: feed.url,
+      title: feed.title,
+      description: feed.description,
+      faviconUrl: feed.favicon_url,
+      addedAt: feed.added_at,
+      lastFetchedAt: feed.last_fetched_at,
+      lastSuccessAt: feed.last_success_at,
+      errorCount: feed.error_count,
+      order: feed.order,
     };
 
     return new Response(
@@ -207,7 +227,6 @@ async function parseFeedBasicInfo(xmlText: string): Promise<{ title: string; des
   };
 
   try {
-    // Check if it's an Atom feed
     const isAtom = xmlText.includes('<feed') && xmlText.includes('xmlns="http://www.w3.org/2005/Atom"');
 
     if (isAtom) {
@@ -216,7 +235,6 @@ async function parseFeedBasicInfo(xmlText: string): Promise<{ title: string; des
       result.title = titleMatch ? stripHtmlTags(titleMatch[1]) : '';
       result.description = subtitleMatch ? stripHtmlTags(subtitleMatch[1]) : '';
     } else {
-      // RSS 2.0
       const channelMatch = xmlText.match(/<channel[^>]*>([\s\S]*?)<\/channel>/);
       if (channelMatch) {
         const channelXml = channelMatch[1];
@@ -233,9 +251,6 @@ async function parseFeedBasicInfo(xmlText: string): Promise<{ title: string; des
   return result;
 }
 
-/**
- * Strip HTML tags and decode entities
- */
 function stripHtmlTags(html: string): string {
   return html
     .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
@@ -249,14 +264,10 @@ function stripHtmlTags(html: string): string {
     .trim();
 }
 
-/**
- * Extract favicon URL from feed URL
- */
 function extractFaviconUrl(feedUrl: string): string {
   try {
     const url = new URL(feedUrl);
     const domain = url.hostname;
-    // Use Google's favicon service
     return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
   } catch (error) {
     console.error('Error extracting favicon URL:', error);

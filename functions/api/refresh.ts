@@ -1,11 +1,11 @@
 /**
  * POST /api/refresh
  * Refresh all feeds for authenticated user
- * Fetches RSS feeds via Workers, parses, and stores articles in Firestore
+ * Fetches RSS feeds via Workers, parses, and stores articles in PostgreSQL
  */
 
-import { requireAuth, getFirebaseConfig } from '../lib/auth';
-import { listDocuments, updateDocument, setDocument, getDocument, batchSetDocuments } from '../lib/firebase-rest';
+import { requireAuth } from '../lib/auth';
+import { createSupabaseClient } from '../lib/supabase';
 
 interface RefreshStats {
   totalFeeds: number;
@@ -33,19 +33,26 @@ export async function onRequestPost(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, accessToken } = authResult;
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
     // Get all user's feeds
-    const feeds = await listDocuments(
-      `users/${uid}/feeds`,
-      idToken,
-      config,
-      100
-    );
+    const { data: feeds, error: feedsError } = await supabase
+      .from('feeds')
+      .select('*')
+      .eq('user_id', uid)
+      .limit(100);
 
-    if (feeds.length === 0) {
+    if (feedsError) {
+      console.error('Get feeds error:', feedsError.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to get feeds' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!feeds || feeds.length === 0) {
       return new Response(
         JSON.stringify({
           message: 'No feeds to refresh',
@@ -72,7 +79,6 @@ export async function onRequestPost(context: any): Promise<Response> {
     };
 
     console.log(`[Refresh] Starting refresh for ${feeds.length} feeds`);
-    console.log(`[Refresh] Feed list:`, feeds.map(f => ({ id: f.id, title: f.title, url: f.url })));
 
     // Get Worker URL from environment
     const workerUrl = env.WORKER_URL || env.VITE_WORKER_URL;
@@ -83,15 +89,17 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
-    // Get all existing articles once to reduce subrequests
-    console.log(`[Refresh] Fetching existing articles for user ${uid}`);
-    const existingArticles = await listDocuments(
-      `users/${uid}/articles`,
-      idToken,
-      config,
-      1000
-    );
-    const existingArticleIds = new Set(existingArticles.map(a => a.id));
+    // Get all existing article IDs once
+    const { data: existingArticles, error: articlesError } = await supabase
+      .from('articles')
+      .select('id')
+      .eq('user_id', uid);
+
+    if (articlesError) {
+      console.error('Get existing articles error:', articlesError.message);
+    }
+
+    const existingArticleIds = new Set((existingArticles || []).map(a => a.id));
     console.log(`[Refresh] Found ${existingArticleIds.size} existing articles`);
 
     // Process each feed sequentially
@@ -113,8 +121,7 @@ export async function onRequestPost(context: any): Promise<Response> {
         if (!rssResponse.ok) {
           const errorText = await rssResponse.text();
           const errorMsg = `HTTP ${rssResponse.status}: ${errorText.substring(0, 200)}`;
-          console.error(`[Refresh] Failed to fetch feed ${feedId} (${feed.title || feedUrl})`);
-          console.error(`[Refresh] ${errorMsg}`);
+          console.error(`[Refresh] Failed to fetch feed ${feedId}`);
           stats.failedFeeds++;
           stats.failedFeedDetails?.push({
             feedId,
@@ -122,7 +129,7 @@ export async function onRequestPost(context: any): Promise<Response> {
             feedUrl,
             error: errorMsg
           });
-          await updateFeedError(uid, feedId, idToken, config);
+          await updateFeedError(supabase, feedId, uid);
           continue;
         }
 
@@ -132,53 +139,48 @@ export async function onRequestPost(context: any): Promise<Response> {
         const parsedFeed = await parseRssXml(xmlText);
         console.log(`[Refresh] Feed ${feedId}: Parsed ${parsedFeed.items.length} items from RSS`);
 
-        // Store articles in Firestore
+        // Store articles in database
         const storeResult = await storeArticles(
+          supabase,
           uid,
           feedId,
           parsedFeed.items,
           feed.title || parsedFeed.title,
-          idToken,
-          config,
           existingArticleIds
         );
 
-        console.log(`[Refresh] Feed ${feedId}: ${storeResult.count} new articles (out of ${parsedFeed.items.length} total)`);
+        console.log(`[Refresh] Feed ${feedId}: ${storeResult.count} new articles`);
 
         stats.newArticles += storeResult.count;
         stats.successfulFeeds++;
 
         // Extract favicon if not already set
-        let faviconUrl = feed.faviconUrl || null;
+        let faviconUrl = feed.favicon_url || null;
         if (!faviconUrl) {
           faviconUrl = extractFaviconUrl(feedUrl);
         }
 
         // Update feed metadata
-        await updateDocument(
-          `users/${uid}/feeds/${feedId}`,
-          {
-            lastFetchedAt: new Date(),
-            lastSuccessAt: new Date(),
-            errorCount: 0,
+        const { error: updateError } = await supabase
+          .from('feeds')
+          .update({
+            last_fetched_at: new Date().toISOString(),
+            last_success_at: new Date().toISOString(),
+            error_count: 0,
             title: feed.title || parsedFeed.title,
             description: feed.description || parsedFeed.description || '',
-            faviconUrl,
-          },
-          idToken,
-          config
-        );
+            favicon_url: faviconUrl,
+          })
+          .eq('id', feedId)
+          .eq('user_id', uid);
+
+        if (updateError) {
+          console.error(`[Refresh] Failed to update feed ${feedId}:`, updateError.message);
+        }
 
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
-        console.error(`[Refresh] Error refreshing feed ${feedId} (${feed.title || feedUrl}):`, error);
-        console.error(`[Refresh] Error details:`, {
-          feedId,
-          feedUrl,
-          feedTitle: feed.title,
-          errorMessage: errorMsg,
-          errorStack: error instanceof Error ? error.stack : undefined
-        });
+        console.error(`[Refresh] Error refreshing feed ${feedId}:`, error);
         stats.failedFeeds++;
         stats.failedFeedDetails?.push({
           feedId,
@@ -186,19 +188,32 @@ export async function onRequestPost(context: any): Promise<Response> {
           feedUrl,
           error: errorMsg.substring(0, 200)
         });
-        await updateFeedError(uid, feedId, idToken, config);
+        await updateFeedError(supabase, feedId, uid);
       }
     }
 
     console.log(`[Refresh] Complete: ${stats.successfulFeeds}/${stats.totalFeeds} feeds successful, ${stats.newArticles} new articles`);
 
-    // OPTIMIZATION: Return updated feed information to avoid client re-fetching
+    // Transform feeds to API format for response
+    const transformedFeeds = feeds.map(feed => ({
+      id: feed.id,
+      url: feed.url,
+      title: feed.title,
+      description: feed.description,
+      faviconUrl: feed.favicon_url,
+      addedAt: feed.added_at,
+      lastFetchedAt: feed.last_fetched_at,
+      lastSuccessAt: feed.last_success_at,
+      errorCount: feed.error_count,
+      order: feed.order,
+    }));
+
     return new Response(
       JSON.stringify({
         message: 'Refresh complete',
         stats,
-        feeds: feeds, // Return updated feed information
-        shouldRefreshArticles: stats.newArticles > 0, // Tell client if article list needs refresh
+        feeds: transformedFeeds,
+        shouldRefreshArticles: stats.newArticles > 0,
       }),
       {
         status: 200,
@@ -216,7 +231,6 @@ export async function onRequestPost(context: any): Promise<Response> {
 
 /**
  * Parse RSS XML string
- * Simple regex-based parser for RSS 2.0 and Atom feeds
  */
 async function parseRssXml(xmlText: string): Promise<any> {
   const result: any = {
@@ -225,18 +239,15 @@ async function parseRssXml(xmlText: string): Promise<any> {
     items: [],
   };
 
-  // Check if it's an Atom feed
   const isAtom = xmlText.includes('<feed') && xmlText.includes('xmlns="http://www.w3.org/2005/Atom"');
 
   if (isAtom) {
-    // Parse Atom feed
     const titleMatch = xmlText.match(/<title[^>]*>(.*?)<\/title>/);
     const subtitleMatch = xmlText.match(/<subtitle[^>]*>(.*?)<\/subtitle>/);
 
     result.title = titleMatch ? stripHtml(titleMatch[1]) : 'Untitled Feed';
     result.description = subtitleMatch ? stripHtml(subtitleMatch[1]) : '';
 
-    // Extract entries
     const entryRegex = /<entry[^>]*>([\s\S]*?)<\/entry>/g;
     let entryMatch;
 
@@ -252,7 +263,6 @@ async function parseRssXml(xmlText: string): Promise<any> {
                              entryXml.match(/<updated[^>]*>(.*?)<\/updated>/)?.[1] || new Date().toISOString();
       const entryAuthor = entryXml.match(/<author[^>]*>[\s\S]*?<name[^>]*>(.*?)<\/name>/)?.[1] || '';
 
-      // Extract image URL from Atom entry
       const imageUrl = extractImageUrl(entryXml, entryContent);
 
       result.items.push({
@@ -266,7 +276,6 @@ async function parseRssXml(xmlText: string): Promise<any> {
       });
     }
   } else {
-    // Parse RSS 2.0 feed
     const channelMatch = xmlText.match(/<channel[^>]*>([\s\S]*)<\/channel>/);
     if (!channelMatch) {
       throw new Error('Invalid RSS feed: no channel element found');
@@ -279,7 +288,6 @@ async function parseRssXml(xmlText: string): Promise<any> {
     result.title = titleMatch ? stripHtml(titleMatch[1]) : 'Untitled Feed';
     result.description = descMatch ? stripHtml(descMatch[1]) : '';
 
-    // Extract items
     const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/g;
     let itemMatch;
 
@@ -295,7 +303,6 @@ async function parseRssXml(xmlText: string): Promise<any> {
       const itemAuthor = itemXml.match(/<(?:dc:)?creator[^>]*>(.*?)<\/(?:dc:)?creator>/)?.[1] ||
                          itemXml.match(/<author[^>]*>(.*?)<\/author>/)?.[1] || '';
 
-      // Extract image URL from RSS item
       const imageUrl = extractImageUrl(itemXml, itemContent);
 
       result.items.push({
@@ -315,96 +322,41 @@ async function parseRssXml(xmlText: string): Promise<any> {
 
 /**
  * Extract image URL from RSS/Atom entry
- * Tries multiple common image sources in order of preference
  */
 function extractImageUrl(entryXml: string, content: string): string | null {
   try {
-    // 1. Try media:thumbnail (most common in RSS feeds)
+    // 1. Try media:thumbnail
     let match = entryXml.match(/<media:thumbnail[^>]+url=["']([^"']+)["']/i);
-    if (match) {
-      console.log('Found image via media:thumbnail:', match[1]);
-      return match[1];
-    }
+    if (match) return match[1];
 
     // 2. Try media:content with image type
     match = entryXml.match(/<media:content[^>]+type=["']image\/[^"']+"[^>]+url=["']([^"']+)["']/i);
-    if (match) {
-      console.log('Found image via media:content (1):', match[1]);
-      return match[1];
-    }
+    if (match) return match[1];
     match = entryXml.match(/<media:content[^>]+url=["']([^"']+)["'][^>]+type=["']image\/[^"']+["']/i);
-    if (match) {
-      console.log('Found image via media:content (2):', match[1]);
-      return match[1];
-    }
+    if (match) return match[1];
 
     // 3. Try enclosure with image type
     match = entryXml.match(/<enclosure[^>]+type=["']image\/[^"']+"[^>]+url=["']([^"']+)["']/i);
-    if (match) {
-      console.log('Found image via enclosure (1):', match[1]);
-      return match[1];
-    }
+    if (match) return match[1];
     match = entryXml.match(/<enclosure[^>]+url=["']([^"']+)["'][^>]+type=["']image\/[^"']+["']/i);
-    if (match) {
-      console.log('Found image via enclosure (2):', match[1]);
-      return match[1];
-    }
+    if (match) return match[1];
 
-    // 4. Try Atom link with rel="enclosure" and image type
+    // 4. Try Atom link with rel="enclosure"
     match = entryXml.match(/<link[^>]+rel=["']enclosure["'][^>]+type=["']image\/[^"']+"[^>]+href=["']([^"']+)["']/i);
-    if (match) {
-      console.log('Found image via atom link (1):', match[1]);
-      return match[1];
-    }
-    match = entryXml.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']enclosure["'][^>]+type=["']image\/[^"']+["']/i);
-    if (match) {
-      console.log('Found image via atom link (2):', match[1]);
-      return match[1];
-    }
+    if (match) return match[1];
 
-    // 5. Try to find first <img> tag in content (before stripping HTML)
+    // 5. Try first <img> tag in content
     match = content.match(/<img[^>]+src=["']([^"']+)["']/i);
-    if (match) {
-      console.log('Found image via img tag (1):', match[1]);
-      return match[1];
-    }
+    if (match) return match[1];
 
-    // 6. Try img tag in entryXml as well
+    // 6. Try img tag in entryXml
     match = entryXml.match(/<img[^>]+src=["']([^"']+)["']/i);
-    if (match) {
-      console.log('Found image via img tag (2):', match[1]);
-      return match[1];
-    }
+    if (match) return match[1];
 
-    // 7. Try og:image meta tag in content
-    match = content.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
-    if (match) {
-      console.log('Found image via og:image:', match[1]);
-      return match[1];
-    }
-
-    // 8. Try to find any URL ending with image extensions in description/content
+    // 7. Try URL ending with image extensions
     const imageUrlMatch = content.match(/https?:\/\/[^\s<>"]+\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s<>"]*)?/i);
-    if (imageUrlMatch) {
-      console.log('Found image via URL pattern:', imageUrlMatch[0]);
-      return imageUrlMatch[0];
-    }
+    if (imageUrlMatch) return imageUrlMatch[0];
 
-    // 9. Try description tag with image URL
-    match = entryXml.match(/<description[^>]*>[\s\S]*?(https?:\/\/[^\s<>"]+\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s<>"]*)?)/i);
-    if (match) {
-      console.log('Found image in description:', match[1]);
-      return match[1];
-    }
-
-    // 10. Try content:encoded with image URL
-    match = entryXml.match(/<content:encoded[^>]*>[\s\S]*?(https?:\/\/[^\s<>"]+\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s<>"]*)?)/i);
-    if (match) {
-      console.log('Found image in content:encoded:', match[1]);
-      return match[1];
-    }
-
-    console.log('No image found for entry');
     return null;
   } catch (error) {
     console.error('Error extracting image URL:', error);
@@ -435,10 +387,8 @@ function extractFaviconUrl(feedUrl: string): string {
   try {
     const url = new URL(feedUrl);
     const domain = url.hostname;
-    // Use Google's favicon service
     return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
   } catch (error) {
-    console.error('Error extracting favicon URL:', error);
     return '';
   }
 }
@@ -448,67 +398,69 @@ interface StoreArticlesResult {
 }
 
 /**
- * Store articles in Firestore with TTL
- * Optimized to use batch write (single request for all articles)
+ * Store articles in PostgreSQL
  */
 async function storeArticles(
+  supabase: any,
   uid: string,
   feedId: string,
   articles: any[],
   feedTitle: string,
-  idToken: string,
-  config: any,
   existingArticleIds: Set<string>
 ): Promise<StoreArticlesResult> {
   if (articles.length === 0) return { count: 0 };
 
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days TTL
 
-  // Collect new articles to batch write
-  const newArticles: Array<{ path: string; data: any }> = [];
+  // Collect new articles to insert
+  const newArticles: any[] = [];
 
   for (const article of articles) {
     // Generate article hash (feedId + guid)
     const articleHash = await generateArticleHash(feedId, article.guid);
 
-    // Check if article already exists (in-memory check, no subrequest)
+    // Check if article already exists
     if (existingArticleIds.has(articleHash)) {
-      continue; // Skip existing articles
+      continue;
     }
 
-    // Prepare new article for batch write
+    // Add to existing set to prevent duplicates within this batch
+    existingArticleIds.add(articleHash);
+
     newArticles.push({
-      path: `users/${uid}/articles/${articleHash}`,
-      data: {
-        feedId,
-        feedTitle,
-        title: article.title,
-        url: article.link,
-        description: article.content?.substring(0, 10000) || '', // Truncate to 10k chars
-        publishedAt: article.publishedAt,
-        fetchedAt: now,
-        expiresAt,
-        author: article.author || null,
-        imageUrl: article.imageUrl || null,
-      },
+      id: articleHash,
+      user_id: uid,
+      feed_id: feedId,
+      feed_title: feedTitle,
+      title: article.title,
+      url: article.link,
+      description: article.content?.substring(0, 10000) || '',
+      published_at: article.publishedAt?.toISOString() || null,
+      fetched_at: now.toISOString(),
+      expires_at: expiresAt.toISOString(),
+      author: article.author || null,
+      image_url: article.imageUrl || null,
     });
   }
 
-  console.log(`[storeArticles] newArticles.length = ${newArticles.length} for feed ${feedId}`);
-
   if (newArticles.length === 0) {
-    console.log(`[storeArticles] No new articles to add for feed ${feedId}`);
     return { count: 0 };
   }
 
-  console.log(`[storeArticles] Batch writing ${newArticles.length} new articles for feed ${feedId}`);
+  console.log(`[storeArticles] Inserting ${newArticles.length} new articles for feed ${feedId}`);
 
-  // Use batch write to save all articles in one request
-  const result = await batchSetDocuments(newArticles, idToken, config);
+  // Insert all articles in one batch
+  const { error } = await supabase
+    .from('articles')
+    .insert(newArticles);
 
-  console.log(`[storeArticles] Batch write complete: ${result.success} success, ${result.failed} failed`);
-  return { count: result.success };
+  if (error) {
+    console.error(`[storeArticles] Insert error:`, error.message);
+    return { count: 0 };
+  }
+
+  return { count: newArticles.length };
 }
 
 /**
@@ -528,27 +480,33 @@ async function generateArticleHash(feedId: string, guid: string): Promise<string
  * Update feed error count
  */
 async function updateFeedError(
-  uid: string,
+  supabase: any,
   feedId: string,
-  idToken: string,
-  config: any
+  uid: string
 ): Promise<void> {
-  const feed = await getDocument(
-    `users/${uid}/feeds/${feedId}`,
-    idToken,
-    config
-  );
+  try {
+    // Get current feed
+    const { data: feed, error: fetchError } = await supabase
+      .from('feeds')
+      .select('error_count')
+      .eq('id', feedId)
+      .eq('user_id', uid)
+      .single();
 
-  if (feed) {
-    const errorCount = (feed.errorCount || 0) + 1;
-    await updateDocument(
-      `users/${uid}/feeds/${feedId}`,
-      {
-        lastFetchedAt: new Date(),
-        errorCount,
-      },
-      idToken,
-      config
-    );
+    if (fetchError || !feed) {
+      return;
+    }
+
+    // Update with incremented error count
+    await supabase
+      .from('feeds')
+      .update({
+        last_fetched_at: new Date().toISOString(),
+        error_count: (feed.error_count || 0) + 1,
+      })
+      .eq('id', feedId)
+      .eq('user_id', uid);
+  } catch (error) {
+    console.error('Error updating feed error:', error);
   }
 }

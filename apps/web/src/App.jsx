@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { supabase } from './lib/supabase';
 
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -12,12 +12,11 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { ArticlesProvider } from './contexts/ArticlesContext';
 import { ToastProvider } from './components/ToastContainer';
 
-import './App.css'; // Keep existing CSS
+import './App.css';
 
 // Protected Route wrapper component
 const ProtectedRoute = ({ children, user, authLoading }) => {
   if (authLoading) {
-    // Show loading spinner while checking auth state
     return (
       <div style={{
         display: 'flex',
@@ -50,18 +49,26 @@ const ProtectedRoute = ({ children, user, authLoading }) => {
 function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const auth = getAuth();
 
   useEffect(() => {
-    console.log('Setting up Firebase Auth listener...');
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log('Auth state changed:', currentUser ? `Logged in as ${currentUser.email}` : 'Not logged in');
-      setUser(currentUser);
+    console.log('Setting up Supabase Auth listener...');
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session ? `Logged in as ${session.user.email}` : 'Not logged in');
+      setUser(session?.user ?? null);
       setAuthLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [auth]);
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('Auth state changed:', session ? `Logged in as ${session.user.email}` : 'Not logged in');
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <ThemeProvider>

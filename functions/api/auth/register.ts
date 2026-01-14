@@ -3,8 +3,8 @@
  * User registration endpoint (for mobile app)
  */
 
-import { createUser, setDocument, type FirebaseConfig } from '../../lib/firebase-rest';
-import { getFirebaseConfig } from '../../lib/auth';
+import { createSupabaseAnonClient, createSupabaseClient } from '../../lib/supabase';
+import { isTestAccount } from '../../lib/auth';
 
 interface RegisterRequest {
   email: string;
@@ -34,43 +34,64 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseAnonClient(env);
 
-    // Create user in Firebase Auth
-    const result = await createUser(email, password, config);
+    // Create user in Supabase Auth
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
 
-    if (!result) {
+    if (error) {
+      console.error('Registration failed:', error.message);
+
+      if (error.message.includes('already registered')) {
+        return new Response(
+          JSON.stringify({ error: 'Email already registered' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
       return new Response(
-        JSON.stringify({ error: 'Registration failed. Email may already exist.' }),
+        JSON.stringify({ error: 'Registration failed. ' + error.message }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const { uid, idToken } = result;
+    if (!data.user || !data.session) {
+      return new Response(
+        JSON.stringify({ error: 'Registration failed. Please try again.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Create user profile in Firestore
-    const profileCreated = await setDocument(
-      `users/${uid}/profile/data`,
-      {
-        email,
-        createdAt: new Date(),
-      },
-      idToken,
-      config
-    );
+    const { user, session } = data;
 
-    if (!profileCreated) {
-      console.error('Failed to create user profile');
+    // Create user profile in database
+    const supabaseWithAuth = createSupabaseClient(env, session.access_token);
+
+    const { error: profileError } = await supabaseWithAuth
+      .from('user_profiles')
+      .insert({
+        id: user.id,
+        email: user.email,
+        is_test_account: isTestAccount(email),
+        created_at: new Date().toISOString(),
+      });
+
+    if (profileError) {
+      console.error('Failed to create user profile:', profileError.message);
+      // Don't fail registration if profile creation fails
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         user: {
-          uid,
-          email,
+          uid: user.id,
+          email: user.email,
         },
-        token: idToken,
+        token: session.access_token,
       }),
       {
         status: 201,

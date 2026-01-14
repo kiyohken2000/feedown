@@ -2,17 +2,16 @@
  * POST /api/auth/login
  * User login endpoint (for mobile app)
  *
- * Note: This endpoint verifies credentials and returns an ID token.
- * Web app uses Firebase Client SDK directly for authentication.
+ * Note: Web app uses Supabase Client SDK directly for authentication.
+ * This endpoint is primarily for mobile apps that need server-side auth.
  */
 
-import { verifyIdToken, type FirebaseConfig } from '../../lib/firebase-rest';
-import { getFirebaseConfig } from '../../lib/auth';
+import { createSupabaseAnonClient } from '../../lib/supabase';
 
 interface LoginRequest {
   email?: string;
   password?: string;
-  idToken?: string; // Optional: if client already has Firebase ID token
+  accessToken?: string; // Optional: if client already has Supabase access token
 }
 
 export async function onRequestPost(context: any): Promise<Response> {
@@ -21,15 +20,15 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     // Parse request body
     const body: LoginRequest = await request.json();
-    const { email, password, idToken } = body;
+    const { email, password, accessToken } = body;
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseAnonClient(env);
 
-    // If client provides ID token, verify it and return user info
-    if (idToken) {
-      const user = await verifyIdToken(idToken, config);
+    // If client provides access token, verify it and return user info
+    if (accessToken) {
+      const { data: { user }, error } = await supabase.auth.getUser(accessToken);
 
-      if (!user) {
+      if (error || !user) {
         return new Response(
           JSON.stringify({ error: 'Invalid token' }),
           { status: 401, headers: { 'Content-Type': 'application/json' } }
@@ -40,10 +39,10 @@ export async function onRequestPost(context: any): Promise<Response> {
         JSON.stringify({
           success: true,
           user: {
-            uid: user.uid,
+            uid: user.id,
             email: user.email,
           },
-          token: idToken,
+          token: accessToken,
         }),
         {
           status: 200,
@@ -56,31 +55,22 @@ export async function onRequestPost(context: any): Promise<Response> {
     if (!email || !password) {
       return new Response(
         JSON.stringify({
-          error: 'Email/password or ID token required',
+          error: 'Email/password or access token required',
         }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Sign in with email and password using Firebase Auth REST API
-    const response = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${config.apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          password,
-          returnSecureToken: true,
-        }),
-      }
-    );
+    // Sign in with email and password using Supabase Auth
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    if (!response.ok) {
-      const errorData: any = await response.json();
-      console.error('Login failed:', errorData);
+    if (error) {
+      console.error('Login failed:', error.message);
 
-      if (errorData.error?.message === 'EMAIL_NOT_FOUND' || errorData.error?.message === 'INVALID_PASSWORD') {
+      if (error.message.includes('Invalid login credentials')) {
         return new Response(
           JSON.stringify({ error: 'Invalid email or password' }),
           { status: 401, headers: { 'Content-Type': 'application/json' } }
@@ -93,16 +83,14 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
-    const data: any = await response.json();
-
     return new Response(
       JSON.stringify({
         success: true,
         user: {
-          uid: data.localId,
-          email: data.email,
+          uid: data.user.id,
+          email: data.user.email,
         },
-        token: data.idToken,
+        token: data.session?.access_token,
       }),
       {
         status: 200,

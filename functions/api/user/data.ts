@@ -3,8 +3,8 @@
  * DELETE: Clear all user data (feeds, articles, favorites) but keep account
  */
 
-import { requireAuth, getFirebaseConfig } from '../../lib/auth';
-import { deleteCollection, deleteDocument } from '../../lib/firebase-rest';
+import { requireAuth } from '../../lib/auth';
+import { createSupabaseClient } from '../../lib/supabase';
 
 /**
  * DELETE /api/user/data
@@ -19,39 +19,64 @@ export async function onRequestDelete(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, accessToken } = authResult;
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
     try {
       console.log('Starting data deletion for user:', uid);
 
-      // Delete feeds subcollection
-      console.log('Deleting feeds...');
-      await deleteCollection(`users/${uid}/feeds`, idToken, config);
-      console.log('Feeds deleted');
+      // Delete read_articles
+      console.log('Deleting read_articles...');
+      const { error: readError } = await supabase
+        .from('read_articles')
+        .delete()
+        .eq('user_id', uid);
+      if (readError) console.error('Read articles delete error:', readError.message);
+      console.log('Read articles deleted');
 
-      // Delete articles subcollection
-      console.log('Deleting articles...');
-      await deleteCollection(`users/${uid}/articles`, idToken, config);
-      console.log('Articles deleted');
-
-      // Delete userState document (contains readArticleIds array)
-      console.log('Deleting userState...');
-      await deleteDocument(`users/${uid}/userState/main`, idToken, config);
-      console.log('UserState deleted');
-
-      // Delete favorites subcollection
+      // Delete favorites
       console.log('Deleting favorites...');
-      await deleteCollection(`users/${uid}/favorites`, idToken, config);
+      const { error: favError } = await supabase
+        .from('favorites')
+        .delete()
+        .eq('user_id', uid);
+      if (favError) console.error('Favorites delete error:', favError.message);
       console.log('Favorites deleted');
+
+      // Delete articles
+      console.log('Deleting articles...');
+      const { data: deletedArticles, error: articlesError, count: articlesCount } = await supabase
+        .from('articles')
+        .delete()
+        .eq('user_id', uid)
+        .select();
+      if (articlesError) {
+        console.error('Articles delete error:', articlesError.message, articlesError.code);
+      } else {
+        console.log('Articles deleted, count:', deletedArticles?.length || 0);
+      }
+
+      // Delete feeds
+      console.log('Deleting feeds...');
+      const { error: feedsError } = await supabase
+        .from('feeds')
+        .delete()
+        .eq('user_id', uid);
+      if (feedsError) console.error('Feeds delete error:', feedsError.message);
+      console.log('Feeds deleted');
 
       console.log('All data cleared successfully for user:', uid);
 
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'All data cleared successfully. Your account remains active.'
+          message: 'All data cleared successfully. Your account remains active.',
+          // Debug info (temporary)
+          _debug: {
+            articlesDeleted: deletedArticles?.length || 0,
+            articlesError: articlesError?.message || null,
+          }
         }),
         {
           status: 200,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,35 +10,45 @@ const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
-  const auth = getAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { clearAllData: clearArticlesContext } = useArticles();
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '',
-    async () => auth.currentUser ? auth.currentUser.getIdToken() : null
-  ), [auth]);
+    getAccessToken
+  ), []);
 
   const api = useMemo(() => new FeedOwnAPI(apiClient), [apiClient]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
         navigate('/');
       } else {
-        setUser(currentUser);
+        setUser(session.user);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
-  }, [auth, navigate]);
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        navigate('/');
+      } else {
+        setUser(session.user);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const handleLogout = async () => {
     try {
       // Clear global articles context before logout
       clearArticlesContext();
-      await signOut(auth);
+      await supabase.auth.signOut();
       navigate('/');
     } catch (error) {
       console.error('Logout failed:', error);
@@ -61,12 +71,13 @@ const SettingsPage = () => {
 
     try {
       const response = await api.user.clearAllData();
+      console.log('Clear data response:', response);
       if (response.success) {
         // Clear global articles context
         clearArticlesContext();
         alert('All data has been deleted successfully.');
-        // Redirect to dashboard to see empty state
-        navigate('/dashboard');
+        // Force a full page reload to clear all state and show empty dashboard
+        window.location.href = '/dashboard';
       } else {
         alert('Failed to delete data: ' + (response.error || 'Unknown error'));
       }
@@ -96,25 +107,14 @@ const SettingsPage = () => {
         clearArticlesContext();
         alert('Your account has been deleted successfully.');
         // Sign out and redirect to login
-        await signOut(auth);
+        await supabase.auth.signOut();
         navigate('/');
       } else {
-        // Check if error is related to credential age
-        const errorMessage = response.error || 'Unknown error';
-        if (errorMessage.includes('CREDENTIAL_TOO_OLD_LOGIN_AGAIN') || errorMessage.includes('credential')) {
-          alert('For security reasons, you need to log in again before deleting your account.\n\nPlease log out and log back in, then try again.');
-        } else {
-          alert('Failed to delete account: ' + errorMessage);
-        }
+        alert('Failed to delete account: ' + (response.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Delete account failed:', error);
-      const errorMessage = error.message || error.toString();
-      if (errorMessage.includes('CREDENTIAL_TOO_OLD_LOGIN_AGAIN') || errorMessage.includes('credential')) {
-        alert('For security reasons, you need to log in again before deleting your account.\n\nPlease log out and log back in, then try again.');
-      } else {
-        alert('Failed to delete account: ' + errorMessage);
-      }
+      alert('Failed to delete account: ' + (error.message || error.toString()));
     }
   };
 
@@ -283,7 +283,7 @@ const SettingsPage = () => {
           <div style={styles.infoRow}>
             <span style={styles.label}>Account Created:</span>
             <span style={styles.value}>
-              {user?.metadata?.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'N/A'}
+              {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
             </span>
           </div>
         </div>

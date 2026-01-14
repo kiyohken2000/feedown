@@ -4,8 +4,8 @@
  * Note: This endpoint is kept for backward compatibility, but batch-read is preferred
  */
 
-import { requireAuth, getFirebaseConfig } from '../../../lib/auth';
-import { getDocument, setDocument } from '../../../lib/firebase-rest';
+import { requireAuth } from '../../../lib/auth';
+import { createSupabaseClient } from '../../../lib/supabase';
 
 export async function onRequestPost(context: any): Promise<Response> {
   try {
@@ -16,7 +16,7 @@ export async function onRequestPost(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, accessToken } = authResult;
 
     const articleId = params.id;
     if (!articleId) {
@@ -26,27 +26,23 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
     try {
-      // Get current userState
-      const userState = await getDocument(`users/${uid}/userState/main`, idToken, config);
-      const currentIds: string[] = userState?.readArticleIds || [];
+      // Insert read record (upsert to handle duplicates)
+      const { error } = await supabase
+        .from('read_articles')
+        .upsert({
+          user_id: uid,
+          article_id: articleId,
+          read_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,article_id'
+        });
 
-      // Check if already read
-      if (!currentIds.includes(articleId)) {
-        // Add article ID to array
-        const newIds = [...currentIds, articleId];
-        await setDocument(
-          `users/${uid}/userState/main`,
-          {
-            readArticleIds: newIds,
-            lastUpdated: new Date(),
-          },
-          idToken,
-          config
-        );
-        // Don't check success - read marks are not critical
+      if (error) {
+        console.error(`[read] Error marking article ${articleId} as read:`, error.message);
+        // Return success anyway - read marks are not critical
       }
     } catch (innerError) {
       console.error(`[read] Inner error for user ${uid}, article ${articleId}:`, innerError);

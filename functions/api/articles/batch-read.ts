@@ -1,82 +1,10 @@
 /**
  * POST /api/articles/batch-read
  * Mark multiple articles as read in a single request
- * Uses retry logic to handle race conditions
  */
 
-import { requireAuth, getFirebaseConfig } from '../../lib/auth';
-import { getDocument, setDocument, getLastSetDocumentError } from '../../lib/firebase-rest';
-
-const MAX_RETRIES = 3;
-
-async function updateUserStateWithRetry(
-  uid: string,
-  articleIds: string[],
-  idToken: string,
-  config: any
-): Promise<{ success: boolean; added: number; total: number; debug?: string }> {
-  const debugInfo: string[] = [];
-
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      debugInfo.push(`attempt${attempt + 1}`);
-
-      // Get current userState (fresh read on each attempt)
-      const userState = await getDocument(`users/${uid}/userState/main`, idToken, config);
-      const currentIds: string[] = userState?.readArticleIds || [];
-      const currentSet = new Set(currentIds);
-
-      debugInfo.push(`currentIds:${currentIds.length}`);
-
-      // Filter out already read articles
-      const newIds = articleIds.filter((id: string) => !currentSet.has(id));
-      debugInfo.push(`newIds:${newIds.length}`);
-
-      if (newIds.length === 0) {
-        // All articles already read
-        return { success: true, added: 0, total: currentIds.length, debug: debugInfo.join(',') };
-      }
-
-      // Add new IDs to the array
-      const updatedIds = [...currentIds, ...newIds];
-      debugInfo.push(`updatedIds:${updatedIds.length}`);
-
-      const success = await setDocument(
-        `users/${uid}/userState/main`,
-        {
-          readArticleIds: updatedIds,
-          lastUpdated: new Date(),
-        },
-        idToken,
-        config
-      );
-
-      debugInfo.push(`setDoc:${success}`);
-      if (!success) {
-        debugInfo.push(`err:${getLastSetDocumentError()}`);
-      }
-
-      if (success) {
-        return { success: true, added: newIds.length, total: updatedIds.length, debug: debugInfo.join(',') };
-      }
-
-      // If failed, wait a bit before retrying
-      if (attempt < MAX_RETRIES - 1) {
-        await new Promise(resolve => setTimeout(resolve, 100 * (attempt + 1)));
-      }
-    } catch (error) {
-      debugInfo.push(`error:${error instanceof Error ? error.message : String(error)}`);
-      console.error(`[batch-read] Attempt ${attempt + 1} failed:`, error);
-      if (attempt < MAX_RETRIES - 1) {
-        await new Promise(resolve => setTimeout(resolve, 100 * (attempt + 1)));
-      }
-    }
-  }
-
-  // All retries failed, but return success anyway (read marks are not critical)
-  console.warn(`[batch-read] All retries failed for user ${uid}, returning success anyway`);
-  return { success: true, added: 0, total: 0, debug: debugInfo.join(',') + ',allFailed' };
-}
+import { requireAuth } from '../../lib/auth';
+import { createSupabaseClient } from '../../lib/supabase';
 
 export async function onRequestPost(context: any): Promise<Response> {
   try {
@@ -87,7 +15,7 @@ export async function onRequestPost(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, accessToken } = authResult;
 
     // Parse request body
     const body = await request.json();
@@ -100,13 +28,56 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
-    // Update with retry logic
-    const result = await updateUserStateWithRetry(uid, articleIds, idToken, config);
+    // Get existing read articles to avoid duplicates
+    const { data: existingReads, error: readError } = await supabase
+      .from('read_articles')
+      .select('article_id')
+      .eq('user_id', uid)
+      .in('article_id', articleIds);
+
+    if (readError) {
+      console.error('Get existing reads error:', readError.message);
+    }
+
+    const existingReadIds = new Set((existingReads || []).map(r => r.article_id));
+
+    // Filter out already read articles
+    const newArticleIds = articleIds.filter(id => !existingReadIds.has(id));
+
+    if (newArticleIds.length === 0) {
+      return new Response(
+        JSON.stringify({ success: true, added: 0, total: existingReadIds.size }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Insert new read records
+    const readRecords = newArticleIds.map(articleId => ({
+      user_id: uid,
+      article_id: articleId,
+      read_at: new Date().toISOString(),
+    }));
+
+    const { error: insertError } = await supabase
+      .from('read_articles')
+      .insert(readRecords);
+
+    if (insertError) {
+      console.error('Insert read articles error:', insertError.message);
+      // Return success anyway - read marks are not critical
+    }
 
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({
+        success: true,
+        added: newArticleIds.length,
+        total: existingReadIds.size + newArticleIds.length,
+      }),
       {
         status: 200,
         headers: { 'Content-Type': 'application/json' },

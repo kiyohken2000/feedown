@@ -4,8 +4,8 @@
  * DELETE: Remove from favorites
  */
 
-import { requireAuth, getFirebaseConfig, isTestAccount } from '../../../lib/auth';
-import { setDocument, deleteDocument, listDocuments } from '../../../lib/firebase-rest';
+import { requireAuth, isTestAccount } from '../../../lib/auth';
+import { createSupabaseClient } from '../../../lib/supabase';
 
 /**
  * POST /api/articles/:id/favorite
@@ -20,7 +20,7 @@ export async function onRequestPost(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken, email } = authResult;
+    const { uid, accessToken, email } = authResult;
 
     const articleId = params.id;
     if (!articleId) {
@@ -41,21 +41,21 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
     // Check favorites limit for test accounts
-    // Test accounts (test-*@test.com): max 10 favorites
-    // Regular accounts: unlimited
     const isTest = isTestAccount(email);
     if (isTest) {
-      const existingFavorites = await listDocuments(
-        `users/${uid}/favorites`,
-        idToken,
-        config,
-        100
-      );
+      const { count, error: countError } = await supabase
+        .from('favorites')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', uid);
 
-      if (existingFavorites.length >= 10) {
+      if (countError) {
+        console.error('Count favorites error:', countError.message);
+      }
+
+      if ((count || 0) >= 10) {
         return new Response(
           JSON.stringify({
             error: 'Test accounts can only have up to 10 favorites. Please use a regular account for more favorites.'
@@ -66,21 +66,23 @@ export async function onRequestPost(context: any): Promise<Response> {
     }
 
     // Add to favorites
-    const success = await setDocument(
-      `users/${uid}/favorites/${articleId}`,
-      {
+    const { error } = await supabase
+      .from('favorites')
+      .upsert({
+        id: articleId,
+        user_id: uid,
         title,
         url,
         description: description || '',
-        feedTitle: feedTitle || '',
-        imageUrl: imageUrl || null,
-        savedAt: new Date(),
-      },
-      idToken,
-      config
-    );
+        feed_title: feedTitle || '',
+        image_url: imageUrl || null,
+        saved_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,id'
+      });
 
-    if (!success) {
+    if (error) {
+      console.error('Add favorite error:', error.message);
       return new Response(
         JSON.stringify({ error: 'Failed to add to favorites' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -116,7 +118,7 @@ export async function onRequestDelete(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, accessToken } = authResult;
 
     const articleId = params.id;
     if (!articleId) {
@@ -126,16 +128,17 @@ export async function onRequestDelete(context: any): Promise<Response> {
       );
     }
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
     // Remove from favorites
-    const success = await deleteDocument(
-      `users/${uid}/favorites/${articleId}`,
-      idToken,
-      config
-    );
+    const { error } = await supabase
+      .from('favorites')
+      .delete()
+      .eq('id', articleId)
+      .eq('user_id', uid);
 
-    if (!success) {
+    if (error) {
+      console.error('Remove favorite error:', error.message);
       return new Response(
         JSON.stringify({ error: 'Failed to remove from favorites' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }

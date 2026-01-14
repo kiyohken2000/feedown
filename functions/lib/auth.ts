@@ -1,29 +1,18 @@
 /**
- * Authentication Middleware
- * Verifies Firebase ID tokens from Authorization header using REST API
+ * Authentication Middleware for Supabase
+ * Verifies Supabase JWT tokens from Authorization header
  */
 
-import { verifyIdToken, type FirebaseConfig } from './firebase-rest';
+import { createSupabaseAnonClient } from './supabase';
 
 export interface AuthenticatedRequest {
   uid: string;
   email: string | undefined;
-  idToken: string;
+  accessToken: string;
 }
 
 /**
- * Get Firebase config from environment
- */
-export function getFirebaseConfig(env: any): FirebaseConfig {
-  return {
-    apiKey: env.FIREBASE_API_KEY,
-    projectId: env.FIREBASE_PROJECT_ID,
-    authDomain: env.FIREBASE_AUTH_DOMAIN,
-  };
-}
-
-/**
- * Verify Firebase ID token from Authorization header
+ * Verify Supabase access token from Authorization header
  * Returns user info if valid, null otherwise
  */
 export async function verifyAuthToken(
@@ -37,17 +26,20 @@ export async function verifyAuthToken(
     }
 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
-    const config = getFirebaseConfig(env);
-    const user = await verifyIdToken(token, config);
 
-    if (!user) {
+    // Create Supabase client and verify the token
+    const supabase = createSupabaseAnonClient(env);
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      console.error('Token verification failed:', error?.message);
       return null;
     }
 
     return {
-      uid: user.uid,
+      uid: user.id,
       email: user.email,
-      idToken: token,
+      accessToken: token,
     };
   } catch (error) {
     console.error('Token verification failed:', error);

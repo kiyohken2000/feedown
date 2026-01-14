@@ -3,8 +3,8 @@
  * GET: List articles with smart refresh logic
  */
 
-import { requireAuth, getFirebaseConfig } from '../../lib/auth';
-import { listDocuments, getDocument } from '../../lib/firebase-rest';
+import { requireAuth } from '../../lib/auth';
+import { createSupabaseClient } from '../../lib/supabase';
 
 interface GetArticlesQuery {
   feedId?: string;
@@ -17,7 +17,6 @@ interface GetArticlesQuery {
  * GET /api/articles
  * Get articles for authenticated user
  * Implements smart refresh: triggers refresh if last fetch > 6 hours ago
- * OPTIMIZED: Removed duplicate feed fetching
  */
 export async function onRequestGet(context: any): Promise<Response> {
   try {
@@ -28,7 +27,7 @@ export async function onRequestGet(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, accessToken } = authResult;
 
     // Parse query parameters
     const url = new URL(request.url);
@@ -37,80 +36,102 @@ export async function onRequestGet(context: any): Promise<Response> {
     const offset = parseInt(url.searchParams.get('offset') || '0');
     const unreadOnly = url.searchParams.get('unreadOnly') === 'true';
 
-    const config = getFirebaseConfig(env);
+    const supabase = createSupabaseClient(env, accessToken);
 
-    // Fetch feeds and articles (removed duplicate feed fetch)
-    const [allFeeds, allArticles] = await Promise.all([
-      listDocuments(`users/${uid}/feeds`, idToken, config, 100),
-      listDocuments(`users/${uid}/articles`, idToken, config, 1000),
-    ]);
+    // Fetch feeds to check refresh status and validate article feed IDs
+    const { data: feeds, error: feedsError } = await supabase
+      .from('feeds')
+      .select('id, last_fetched_at')
+      .eq('user_id', uid);
 
-    console.log(`[articles/index] Fetched ${allFeeds.length} feeds, ${allArticles.length} articles`);
-    console.log(`[articles/index] Feed IDs:`, allFeeds.map(f => f.id));
+    if (feedsError) {
+      console.error('Get feeds error:', feedsError.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to get feeds' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Check if should refresh based on feeds
-    const shouldRefresh = checkShouldRefreshFromFeeds(allFeeds);
+    const validFeedIds = new Set((feeds || []).map(feed => feed.id));
+    const shouldRefresh = checkShouldRefreshFromFeeds(feeds || []);
 
-    const validFeedIds = new Set(allFeeds.map(feed => feed.id));
-
-    // Filter non-expired articles and articles from deleted feeds
-    const now = new Date();
-    console.log(`[articles/index] Before filtering: ${allArticles.length} articles`);
-
-    let articles = allArticles.filter(article => {
-      if (!article.expiresAt) {
-        console.log(`[articles/index] Article ${article.id} has no expiresAt`);
-        return false;
-      }
-      const expiresAt = new Date(article.expiresAt);
-      if (expiresAt <= now) {
-        console.log(`[articles/index] Article ${article.id} expired at ${expiresAt}`);
-        return false;
-      }
-      // Exclude articles from deleted feeds
-      if (!validFeedIds.has(article.feedId)) {
-        console.log(`[articles/index] Article ${article.id} from deleted feed ${article.feedId}`);
-        return false;
-      }
-      return true;
-    });
-
-    console.log(`[articles/index] After filtering: ${articles.length} articles`);
-
-    // Group articles by feedId for debugging
-    const articlesByFeed: Record<string, number> = {};
-    articles.forEach(article => {
-      articlesByFeed[article.feedId] = (articlesByFeed[article.feedId] || 0) + 1;
-    });
-    console.log(`[articles/index] Articles by feed:`, articlesByFeed);
+    // Build articles query
+    let articlesQuery = supabase
+      .from('articles')
+      .select(`
+        id,
+        feed_id,
+        feed_title,
+        title,
+        url,
+        description,
+        published_at,
+        fetched_at,
+        expires_at,
+        author,
+        image_url
+      `)
+      .eq('user_id', uid)
+      .gt('expires_at', new Date().toISOString())
+      .order('published_at', { ascending: false, nullsFirst: false });
 
     // Filter by feed if specified
     if (feedId) {
-      articles = articles.filter(article => article.feedId === feedId);
+      articlesQuery = articlesQuery.eq('feed_id', feedId);
     }
 
-    // Sort by publishedAt descending BEFORE pagination
-    articles.sort((a, b) => {
-      const aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
-      const bTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
-      return bTime - aTime;
-    });
+    const { data: articles, error: articlesError } = await articlesQuery;
 
-    // Fetch read articles from userState document (aggregated approach - 1 read instead of 1000)
-    const userState = await getDocument(`users/${uid}/userState/main`, idToken, config);
-    const readArticleIds = new Set<string>(userState?.readArticleIds || []);
-    console.log(`[articles/index] Fetched userState with ${readArticleIds.size} read article IDs`);
+    if (articlesError) {
+      console.error('Get articles error:', articlesError.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to get articles' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Apply pagination to get only the articles we'll display
-    const paginatedArticles = articles.slice(offset, offset + limit);
+    // Filter articles from deleted feeds (in case of orphaned articles)
+    let filteredArticles = (articles || []).filter(article =>
+      validFeedIds.has(article.feed_id)
+    );
 
-    // Add isRead flag to paginated articles
+    // Get read article IDs for this user
+    const { data: readArticles, error: readError } = await supabase
+      .from('read_articles')
+      .select('article_id')
+      .eq('user_id', uid);
+
+    if (readError) {
+      console.error('Get read articles error:', readError.message);
+    }
+
+    const readArticleIds = new Set<string>(
+      (readArticles || []).map(r => r.article_id)
+    );
+
+    // Total count before pagination (for hasMore calculation)
+    const totalCount = filteredArticles.length;
+
+    // Apply pagination
+    const paginatedArticles = filteredArticles.slice(offset, offset + limit);
+
+    // Transform to API format with read status
     let articlesWithReadStatus = paginatedArticles.map(article => ({
-      ...article,
+      id: article.id,
+      feedId: article.feed_id,
+      feedTitle: article.feed_title,
+      title: article.title,
+      url: article.url,
+      description: article.description,
+      publishedAt: article.published_at,
+      fetchedAt: article.fetched_at,
+      expiresAt: article.expires_at,
+      author: article.author,
+      imageUrl: article.image_url,
       isRead: readArticleIds.has(article.id),
     }));
 
-    // Filter by unread if specified (after adding read status)
+    // Filter by unread if specified
     if (unreadOnly) {
       articlesWithReadStatus = articlesWithReadStatus.filter(article => !article.isRead);
     }
@@ -119,13 +140,13 @@ export async function onRequestGet(context: any): Promise<Response> {
       JSON.stringify({
         articles: articlesWithReadStatus,
         shouldRefresh,
-        hasMore: offset + limit < articles.length,
+        hasMore: offset + limit < totalCount,
       }),
       {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'private, max-age=60', // Cache for 60 seconds
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         },
       }
     );
@@ -139,25 +160,23 @@ export async function onRequestGet(context: any): Promise<Response> {
 }
 
 /**
- * Check if feeds should be refreshed based on already-fetched feeds
- * OPTIMIZED: Takes feeds as parameter to avoid duplicate fetch
+ * Check if feeds should be refreshed based on feed data
  */
-function checkShouldRefreshFromFeeds(feeds: any[]): boolean {
+function checkShouldRefreshFromFeeds(feeds: { id: string; last_fetched_at: string | null }[]): boolean {
   try {
     if (feeds.length === 0) {
-      return false; // No feeds to refresh
+      return false;
     }
 
-    // Find the most recently fetched feed
-    const feedsWithFetchTime = feeds.filter(feed => feed.lastFetchedAt);
+    const feedsWithFetchTime = feeds.filter(feed => feed.last_fetched_at);
 
     if (feedsWithFetchTime.length === 0) {
-      return true; // Never fetched, should refresh
+      return true; // Never fetched
     }
 
     // Get the most recent lastFetchedAt
     const mostRecentFetch = feedsWithFetchTime.reduce((latest, feed) => {
-      const fetchTime = new Date(feed.lastFetchedAt).getTime();
+      const fetchTime = new Date(feed.last_fetched_at!).getTime();
       return fetchTime > latest ? fetchTime : latest;
     }, 0);
 
@@ -173,4 +192,3 @@ function checkShouldRefreshFromFeeds(feeds: any[]): boolean {
     return false;
   }
 }
-

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import ArticleModal from '../components/ArticleModal';
@@ -15,13 +15,12 @@ const FavoritesPage = () => {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [feeds, setFeeds] = useState([]);
   const navigate = useNavigate();
-  const auth = getAuth();
   const { isDarkMode } = useTheme();
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '',
-    async () => auth.currentUser ? auth.currentUser.getIdToken() : null
-  ), [auth]);
+    getAccessToken
+  ), []);
 
   const api = useMemo(() => new FeedOwnAPI(apiClient), [apiClient]);
 
@@ -55,19 +54,30 @@ const FavoritesPage = () => {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
         navigate('/');
       } else {
-        setUser(currentUser);
+        setUser(session.user);
         setLoading(false);
         fetchFeeds();
         fetchFavorites();
       }
     });
 
-    return () => unsubscribe();
-  }, [auth, navigate, api]);
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        navigate('/');
+      } else {
+        setUser(session.user);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const handleArticleClick = (favorite) => {
     // Convert favorite format to article format for modal

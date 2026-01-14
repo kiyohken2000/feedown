@@ -1,10 +1,10 @@
 /**
  * /api/user/account
- * DELETE: Delete user account (Firebase Auth + all Firestore data)
+ * DELETE: Delete user account (Supabase Auth + all data)
  */
 
-import { requireAuth, getFirebaseConfig } from '../../lib/auth';
-import { deleteDocument, deleteCollection } from '../../lib/firebase-rest';
+import { requireAuth } from '../../lib/auth';
+import { createSupabaseClient } from '../../lib/supabase';
 
 /**
  * DELETE /api/user/account
@@ -19,80 +19,68 @@ export async function onRequestDelete(context: any): Promise<Response> {
     if (authResult instanceof Response) {
       return authResult;
     }
-    const { uid, idToken } = authResult;
+    const { uid, accessToken } = authResult;
 
-    const config = getFirebaseConfig(env);
     console.log('Starting account deletion for user:', uid);
-    console.log('Firebase Project ID:', config.projectId);
 
-    // Delete all user data from Firestore
+    const supabase = createSupabaseClient(env, accessToken);
+
+    // Delete all user data from database
+    // Due to CASCADE on foreign keys, deleting from parent tables should clean up related data
+    // But we'll be explicit for clarity and to handle any edge cases
     try {
-      console.log('Deleting Firestore data...');
-      // Delete feeds subcollection
-      await deleteCollection(`users/${uid}/feeds`, idToken, config);
+      console.log('Deleting database data...');
 
-      // Delete articles subcollection
-      await deleteCollection(`users/${uid}/articles`, idToken, config);
+      // Delete read_articles
+      await supabase.from('read_articles').delete().eq('user_id', uid);
 
-      // Delete userState document (contains readArticleIds array)
-      await deleteDocument(`users/${uid}/userState/main`, idToken, config);
+      // Delete favorites
+      await supabase.from('favorites').delete().eq('user_id', uid);
 
-      // Delete favorites subcollection
-      await deleteCollection(`users/${uid}/favorites`, idToken, config);
+      // Delete articles (should cascade from feeds, but explicit for safety)
+      await supabase.from('articles').delete().eq('user_id', uid);
 
-      // Delete user document
-      await deleteDocument(`users/${uid}`, idToken, config);
-      console.log('Firestore data deleted successfully');
+      // Delete feeds
+      await supabase.from('feeds').delete().eq('user_id', uid);
+
+      // Delete user profile
+      await supabase.from('user_profiles').delete().eq('id', uid);
+
+      console.log('Database data deleted successfully');
     } catch (error) {
-      console.error('Error deleting Firestore data:', error);
-      // Continue with Auth deletion even if Firestore fails
+      console.error('Error deleting database data:', error);
+      // Continue with Auth deletion even if database fails
     }
 
-    // Delete Firebase Auth user
+    // Try to delete Supabase Auth user using direct API call
+    // Note: This may fail on some Supabase configurations, but data is already deleted
     try {
-      console.log('Deleting Firebase Auth user...');
-      const deleteAuthUrl = `https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${config.apiKey}`;
-      console.log('Delete Auth URL:', deleteAuthUrl);
+      console.log('Attempting to delete Supabase Auth user via REST API...');
 
-      const deleteAuthResponse = await fetch(deleteAuthUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          idToken: idToken,
-        }),
-      });
+      const supabaseUrl = env.SUPABASE_URL;
+      const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
 
-      console.log('Delete Auth Response Status:', deleteAuthResponse.status);
+      if (serviceRoleKey) {
+        const deleteResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users/${uid}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'apikey': serviceRoleKey,
+            'Content-Type': 'application/json',
+          },
+        });
 
-      if (!deleteAuthResponse.ok) {
-        const errorText = await deleteAuthResponse.text();
-        console.error('Failed to delete Firebase Auth user. Status:', deleteAuthResponse.status);
-        console.error('Error response:', errorText);
-
-        let errorMessage = 'Failed to delete account';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.error?.message || errorMessage;
-        } catch (e) {
-          // If parsing fails, use the text as is
-          errorMessage = errorText || errorMessage;
+        if (deleteResponse.ok) {
+          console.log('Supabase Auth user deleted successfully');
+        } else {
+          // Log but don't fail - user data is already deleted
+          const errorText = await deleteResponse.text();
+          console.warn('Could not delete Auth user (data already deleted):', errorText);
         }
-
-        return new Response(
-          JSON.stringify({ error: errorMessage }),
-          { status: 500, headers: { 'Content-Type': 'application/json' } }
-        );
       }
-
-      console.log('Firebase Auth user deleted successfully');
     } catch (error) {
-      console.error('Error deleting Firebase Auth user:', error);
-      return new Response(
-        JSON.stringify({ error: 'Failed to delete account' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      // Log but don't fail - user data is already deleted
+      console.warn('Error deleting Supabase Auth user (data already deleted):', error);
     }
 
     return new Response(

@@ -3,83 +3,106 @@
 ## 現在のステータス
 
 **デプロイURL**: https://feedown.pages.dev
-**最新コミット**: `1d212ea`
-**更新日**: 2026-01-14
+**更新日**: 2026-01-15
+**現在の作業**: Supabase移行（Phase 8）
 
 | Phase | 状態 |
 |-------|------|
 | Phase 5: Web UI | ✅ 完了 |
 | Phase 6: Cloudflare Pages | ✅ 完了 |
 | Phase 7: Firestore最適化 | ✅ 完了 |
+| Phase 8: Supabase移行 | 🟡 進行中 |
 
 ---
 
-## 🔥 未解決の問題
+## 🔥 Supabase移行作業
 
-### Dashboard無限スクロールが動作しない
-- **症状**: 一番下までスクロールしても過去の記事が読み込まれない
-- **調査箇所**:
-  - `apps/web/src/pages/DashboardPage.jsx` - 無限スクロールロジック。新着記事が表示されない
-  - `functions/api/articles/index.ts` - ページネーション処理
-- **優先度**: 高
+### 移行理由
+- Firestore無料枠の制限（読み取り5万件/日、書き込み2万件/日）にすぐ到達
+- Supabaseは帯域制限のみでリクエスト数無制限
+- リアルタイム更新機能を追加したい
 
----
+### 移行計画の詳細
+詳細な計画は `C:\Users\all\.claude\plans\lucky-enchanting-axolotl.md` を参照
 
-## 直近の修正履歴
+### データベーススキーマ（Supabase）
 
-### Firestoreバッチ書き込み権限問題（2026-01-14）
-
-**問題**: Refreshボタンで新規記事が保存されない（`HTTP 403: PERMISSION_DENIED`）
-
-**原因**: Firestore REST API `batchWrite`でセキュリティルールの`request.auth.uid == userId`が正しく評価されない
-
-**修正**: Firestoreセキュリティルールを変更
-```javascript
-// 変更前
-allow read, write: if request.auth != null && request.auth.uid == userId;
-
-// 変更後
-allow read: if request.auth != null && request.auth.uid == userId;
-allow write: if request.auth != null;
+```sql
+-- テーブル: feeds, articles, read_articles, favorites, user_profiles
+-- 詳細は docs/DESIGN.md を参照
 ```
 
 ---
 
-## アーキテクチャ概要
+## アーキテクチャ概要（移行後）
 
 ```
-apps/web/          → React SPA (Vite)
-functions/         → Cloudflare Pages Functions (API)
+apps/web/          → React SPA (Vite) + Supabase Auth
+functions/         → Cloudflare Pages Functions (API) + Supabase Client
 workers/           → Cloudflare Workers (RSSプロキシ + KVキャッシュ)
 packages/shared/   → 共通コード
 ```
 
 ### 主要なデータフロー
 
-1. **RSS取得**: Dashboard → `/api/refresh` → Workers(`/fetch?bypass_cache=1`) → RSS配信元
-2. **記事保存**: `refresh.ts` → `batchSetDocuments()` → Firestore
-3. **既読管理**: `userState/main`ドキュメントに`readArticleIds`配列で一括管理
+1. **認証**: Supabase Auth（フロントエンド直接）
+2. **RSS取得**: Dashboard → `/api/refresh` → Workers → RSS配信元 → Supabase PostgreSQL
+3. **リアルタイム更新**: Supabase Realtime（WebSocket）→ クライアント
 
-### Firestore構造
+### 新しいデータ構造（PostgreSQL）
 
 ```
-users/{uid}/
-  ├── feeds/{feedId}           # 登録フィード
-  ├── articles/{articleHash}   # 記事（SHA-256ハッシュ）
-  ├── favorites/{articleId}    # お気に入り
-  └── userState/main           # 既読ID配列（集計ドキュメント）
+feeds              # 登録フィード
+articles           # 記事（SHA-256ハッシュID、7日TTL）
+read_articles      # 既読（正規化テーブル）
+favorites          # お気に入り
+user_profiles      # ユーザー情報拡張
 ```
 
 ---
 
-## 重要な技術的決定
+## 環境変数（移行後）
 
-| 決定事項 | 理由 |
-|---------|------|
-| 集計ドキュメント方式 | readArticles 1000件読み取り → 1件に削減（99.9%削減） |
-| バッチ書き込み | Too many subrequests問題の回避 |
-| KVキャッシュ bypass | 手動Refresh時は最新データ取得 |
-| 500msデバウンス | 既読マークのAPI呼び出し削減 |
+### Frontend (.env.shared)
+```
+VITE_SUPABASE_URL=https://<project>.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_WORKER_URL=https://feedown-worker.<username>.workers.dev
+```
+
+### Backend (Cloudflare Pages secrets)
+```
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+---
+
+## 移行手順
+
+### Step 1: Supabase準備
+1. Supabaseプロジェクト作成（作成済み）
+2. SQLエディタでテーブル作成（docs/DESIGN.mdのスキーマ）
+3. RLSポリシー設定
+4. articlesテーブルのRealtime有効化
+
+### Step 2: バックエンド移行
+1. `functions/lib/supabase.ts` 新規作成
+2. `functions/lib/auth.ts` 書き換え
+3. 各APIエンドポイント移行（Firestore → PostgreSQL）
+4. `functions/lib/firebase-rest.ts` 削除
+
+### Step 3: フロントエンド移行
+1. `apps/web/src/main.jsx` Supabase初期化
+2. `apps/web/src/App.jsx` 認証状態管理
+3. LoginPage, SettingsPage 認証メソッド変更
+4. APIトークン取得を `supabase.auth.getSession()` に変更
+
+### Step 4: リアルタイム実装
+1. `useRealtimeArticles.js` フック作成
+2. DashboardPageでRealtime購読
+3. 新着記事を即座にUI反映
 
 ---
 
@@ -89,6 +112,9 @@ users/{uid}/
 # ローカル開発
 cd apps/web && npm run dev
 
+# ビルド
+cd apps/web && npm run build
+
 # デプロイ
 npx wrangler pages deploy apps/web/dist --project-name=feedown
 npx wrangler deploy --config workers/wrangler.toml
@@ -96,6 +122,27 @@ npx wrangler deploy --config workers/wrangler.toml
 
 ---
 
-## 低優先度タスク
+## 注意事項
 
-- お気に入りのページネーション実装
+### Cloudflare WorkersでのSupabase使用
+- `@supabase/supabase-js` はCloudflare Workersと互換性あり
+- `autoRefreshToken: false`, `persistSession: false` を設定
+- Service Role Keyはサーバーサイドのみで使用
+
+### RLS（Row Level Security）
+- 全テーブルでRLS有効化必須
+- `auth.uid() = user_id` でユーザーデータを分離
+- Service Role Keyを使う場合はRLSをバイパス可能
+
+### リアルタイム制限
+- Supabase無料枠: 200同時接続
+- articlesテーブルのみRealtime有効化推奨
+
+---
+
+## 参考ドキュメント
+
+- [移行計画](C:\Users\all\.claude\plans\lucky-enchanting-axolotl.md)
+- [設計書](docs/DESIGN.md)
+- [進捗表](docs/PROGRESS.md)
+- [Supabaseセットアップ](docs/SUPABASE_SETUP.md)

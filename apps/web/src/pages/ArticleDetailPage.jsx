@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 
@@ -8,7 +8,6 @@ const ArticleDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const auth = getAuth();
 
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -18,23 +17,34 @@ const ArticleDetailPage = () => {
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '',
-    async () => auth.currentUser ? auth.currentUser.getIdToken() : null
-  ), [auth]);
+    getAccessToken
+  ), []);
 
   const api = useMemo(() => new FeedOwnAPI(apiClient), [apiClient]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
         navigate('/');
       } else {
-        setUser(currentUser);
+        setUser(session.user);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
-  }, [auth, navigate]);
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        navigate('/');
+      } else {
+        setUser(session.user);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const handleMarkAsRead = async () => {
     try {
