@@ -26,11 +26,20 @@
 
 ### 🎯 次のセッションの計画
 
-**Phase 7の残りタスク**: 以下の3つの未実装タスクを実装予定（2タスクは実装済み確認）
+**最優先タスク**: 集計ドキュメント方式の実装（readArticles読み取り99.9%削減）
+
+実装内容:
+1. `functions/api/articles/index.ts` - readArticles取得方法を変更
+2. `functions/api/articles/[id]/read.ts` - 既読マーク時に配列を更新
+3. `functions/api/articles/batch-read.ts` - バッチ既読マーク（新規）
+4. クライアント側の更新
+
+特徴: Firestoreインデックス不要、Security Rules変更不要、VSCode上で完結
+※開発中のためマイグレーション不要（テストアカウント作り直しでOK）
 
 ---
 
-## 🚀 Phase 7 Firestore最適化計画（2026-01-14修正）
+## 🚀 Phase 7 Firestore最適化計画（2026-01-14更新）
 
 ### 📊 現状の分析
 
@@ -51,6 +60,209 @@
 - `listDocuments(readArticles)` - 最大1000件
 
 **合計**: 毎回最大2100件のFirestore読み取り
+
+---
+
+### 🔴 アプローチ0: 集計ドキュメント方式（最優先・最高効果）
+
+**概要**:
+`readArticles`コレクション（1000ドキュメント = 1000読み取り）を、単一ドキュメント内の配列に変更（1読み取り）することで、**99.9%の読み取り削減**を実現する。
+
+#### 現在のデータ構造（非効率）
+
+```
+users/{uid}/readArticles/
+  ├── article123 { readAt: "2026-01-14T..." }
+  ├── article456 { readAt: "2026-01-14T..." }
+  ├── article789 { readAt: "2026-01-14T..." }
+  └── ... (最大1000ドキュメント)
+```
+→ **1000読み取り/リクエスト**
+
+#### 新しいデータ構造（効率的）
+
+```
+users/{uid}/userState (1ドキュメント)
+{
+  readArticleIds: ["article123", "article456", "article789", ...],
+  lastUpdated: "2026-01-14T..."
+}
+```
+→ **1読み取り/リクエスト**
+
+#### 削減効果
+
+| 項目 | Before | After | 削減率 |
+|------|--------|-------|--------|
+| readArticles読み取り | 1000 | 1 | **99.9%** |
+| 毎リクエスト合計 | 2100 | 1101 | **48%** |
+
+#### 実装ファイル
+
+```
+1. functions/api/articles/index.ts
+   - listDocuments('readArticles') → getDocument('userState')
+   - readArticleIds配列からSetを作成
+
+2. functions/api/articles/[id]/read.ts
+   - setDocument('readArticles/{id}') → userState.readArticleIds配列に追加
+   - 配列の重複チェックと追加
+
+3. functions/api/articles/batch-read.ts（新規）
+   - 複数の記事IDをuserState.readArticleIds配列に一括追加
+   - バッチ既読マーク機能も同時に実現
+
+4. functions/api/user/data.ts
+   - deleteCollection('readArticles') → deleteDocument('userState')
+   - データ削除機能の修正
+
+5. functions/api/user/account.ts
+   - deleteCollection('readArticles') → deleteDocument('userState')
+   - アカウント削除機能の修正
+```
+
+#### 変更不要なファイル
+
+```
+- apps/web/src/pages/DashboardPage.jsx
+  → サーバーから返されるarticle.isReadを参照するのみ（変更不要）
+
+- apps/web/src/contexts/ArticlesContext.jsx
+  → ローカルstateのみ（変更不要）
+
+- .jsファイル（read.js, index.js等）
+  → TypeScriptビルド成果物（.tsを編集すればOK）
+```
+
+#### 実装の詳細コード
+
+**ファイル1: `functions/api/articles/index.ts`（修正）**
+
+```typescript
+// 変更前 (99-106行目)
+const readArticles = await listDocuments(
+  `users/${uid}/readArticles`,
+  idToken,
+  config,
+  1000
+);
+const readArticleIds = new Set(readArticles.map(doc => doc.id));
+
+// 変更後
+const userState = await getDocument(`users/${uid}/userState`, idToken, config);
+const readArticleIds = new Set<string>(userState?.readArticleIds || []);
+```
+
+**ファイル2: `functions/api/articles/[id]/read.ts`（修正）**
+
+```typescript
+// 変更前
+await setDocument(
+  `users/${uid}/readArticles/${articleId}`,
+  { readAt: new Date() },
+  idToken,
+  config
+);
+
+// 変更後
+// 1. 現在のuserStateを取得
+const userState = await getDocument(`users/${uid}/userState`, idToken, config);
+const currentIds: string[] = userState?.readArticleIds || [];
+
+// 2. 重複チェックして追加
+if (!currentIds.includes(articleId)) {
+  const newIds = [...currentIds, articleId];
+  await setDocument(
+    `users/${uid}/userState`,
+    { readArticleIds: newIds, lastUpdated: new Date() },
+    idToken,
+    config
+  );
+}
+```
+
+**ファイル3: `functions/api/articles/batch-read.ts`（新規）**
+
+```typescript
+// POST /api/articles/batch-read
+// 複数の記事を一括で既読マーク
+
+export async function onRequestPost(context: any): Promise<Response> {
+  // ... 認証処理 ...
+
+  const { articleIds } = await request.json();
+
+  // 現在のuserStateを取得
+  const userState = await getDocument(`users/${uid}/userState`, idToken, config);
+  const currentIds: string[] = userState?.readArticleIds || [];
+  const currentSet = new Set(currentIds);
+
+  // 新しいIDのみ追加
+  const newIds = articleIds.filter((id: string) => !currentSet.has(id));
+  if (newIds.length > 0) {
+    const updatedIds = [...currentIds, ...newIds];
+    await setDocument(
+      `users/${uid}/userState`,
+      { readArticleIds: updatedIds, lastUpdated: new Date() },
+      idToken,
+      config
+    );
+  }
+
+  return new Response(JSON.stringify({
+    success: true,
+    added: newIds.length,
+    total: currentIds.length + newIds.length
+  }));
+}
+```
+
+**ファイル4: `functions/api/user/data.ts`（修正）**
+
+```typescript
+// 変更前 (39-42行目)
+console.log('Deleting readArticles...');
+await deleteCollection(`users/${uid}/readArticles`, idToken, config);
+console.log('ReadArticles deleted');
+
+// 変更後
+console.log('Deleting userState...');
+await deleteDocument(`users/${uid}/userState`, idToken, config);
+console.log('UserState deleted');
+```
+
+**ファイル5: `functions/api/user/account.ts`（修正）**
+
+```typescript
+// 変更前 (37-38行目)
+// Delete readArticles subcollection
+await deleteCollection(`users/${uid}/readArticles`, idToken, config);
+
+// 変更後
+// Delete userState document
+await deleteDocument(`users/${uid}/userState`, idToken, config);
+```
+
+#### 注意点・制限事項
+
+| 項目 | 値 | 備考 |
+|------|-----|------|
+| Firestoreドキュメントサイズ上限 | 1MB | 約50,000件のIDまで保存可能 |
+| 現在の制限 | 1000件 | 十分な余裕あり |
+| インデックス作成 | 不要 | 単一ドキュメントの読み書きのため |
+| Security Rules変更 | 不要 | 既存ルールでカバー済み |
+| ブラウザ操作 | 不要 | VSCode上で完結 |
+
+#### 実装順序
+
+1. `functions/api/articles/index.ts` を修正
+2. `functions/api/articles/[id]/read.ts` を修正
+3. `functions/api/articles/batch-read.ts` を新規作成
+4. `functions/api/user/data.ts` を修正（データ削除）
+5. `functions/api/user/account.ts` を修正（アカウント削除）
+6. `packages/shared/api/endpoints.ts` にbatchMarkAsRead追加
+7. `apps/web/src/pages/DashboardPage.jsx` でバッチAPI使用
+8. デプロイ・動作確認
 
 ---
 

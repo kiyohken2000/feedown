@@ -310,18 +310,48 @@
 - [x] Task 5.2: フィード取得の重複排除 ✅ **既に実装済み**
   - [x] `apps/web/src/pages/DashboardPage.jsx:137-143` でrefreshレスポンスからfeedsを使用済み
 
-- [ ] Task 5.3: バッチ既読マークAPI
-  - [ ] `functions/api/articles/batch-read.ts` 新規作成
-  - [ ] `packages/shared/api/endpoints.ts` に新APIエンドポイント追加
+### Phase 6: 集計ドキュメント方式（最優先・最高効果）🔴 NEW
+
+**概要**: `readArticles`コレクション（1000ドキュメント = 1000読み取り）を、`userState`ドキュメント内の配列に変更（1読み取り）
+
+**削減効果**:
+- readArticles読み取り: 1000 → 1（**99.9%削減**）
+- 毎リクエスト合計: 2100 → 1101（**48%削減**）
+
+- [ ] Task 6.1: articles/index.ts の修正
+  - [ ] `listDocuments('readArticles')` → `getDocument('userState')`
+  - 削減効果: 1000読み取り → 1読み取り
+
+- [ ] Task 6.2: articles/[id]/read.ts の修正
+  - [ ] `setDocument('readArticles/{id}')` → `userState.readArticleIds`配列に追加
+  - [ ] 配列の重複チェック処理
+
+- [ ] Task 6.3: batch-read.ts の新規作成
+  - [ ] `POST /api/articles/batch-read` エンドポイント
+  - [ ] 複数の記事IDをuserState.readArticleIds配列に一括追加
+  - [ ] バッチ既読マーク機能（旧Task 5.3と統合）
+
+- [ ] Task 6.4: クライアント側の更新
+  - [ ] `packages/shared/api/endpoints.ts` にbatchMarkAsRead追加
   - [ ] `apps/web/src/pages/DashboardPage.jsx` でバッチAPI使用
-  - 削減効果: N回 → 1回（一括既読時）
+  - [ ] 自動既読のデバウンス処理（旧Task 5.4と統合）
 
-- [ ] Task 5.4: 自動既読のデバウンス処理（新規追加）
-  - [ ] `apps/web/src/pages/DashboardPage.jsx` のIntersectionObserverにデバウンス追加
-  - [ ] 保留中の既読記事IDをキューに蓄積し、500ms後にバッチ送信
-  - 削減効果: 連続スクロール時のAPI呼び出し削減
+- [ ] Task 6.5: データ削除・アカウント削除の修正
+  - [ ] `functions/api/user/data.ts` - `deleteCollection('readArticles')` → `deleteDocument('userState')`
+  - [ ] `functions/api/user/account.ts` - `deleteCollection('readArticles')` → `deleteDocument('userState')`
 
-- [ ] Task 5.5: お気に入りのページネーション
+**実装の特徴**:
+- Firestoreインデックス作成: 不要
+- Security Rules変更: 不要
+- ブラウザ操作: 不要（VSCode上で完結）
+
+**詳細な実装計画**: `docs/HANDOFF.md` の「アプローチ0: 集計ドキュメント方式」セクションを参照
+
+---
+
+### Phase 7: その他の最適化（優先度: 低）
+
+- [ ] Task 7.1: お気に入りのページネーション
   - [ ] `functions/api/favorites.ts` にページネーション追加
   - [ ] `apps/web/src/pages/FavoritesPage.jsx` に無限スクロール実装
   - 削減効果: 1000件 → 20件（初回ロード時）
@@ -422,7 +452,7 @@
 | Phase 4: Pages Functions | 18 | 18 | 100% | 🟢 完了 |
 | Phase 5: Web UI（拡張含む） | 39 | 39 | 100% | 🟢 完了 |
 | Phase 6: Cloudflare Pages デプロイ | 6 | 6 | 100% | 🟢 完了 |
-| Phase 7: Firestore最適化 | 14 | 5 | 36% | 🟡 部分完了（2タスク実装済み確認、3タスク残り） |
+| Phase 7: Firestore最適化 | 8 | 2 | 25% | 🟡 部分完了（集計ドキュメント方式が最優先） |
 | Phase 8: Mobile | 13 | 0 | 0% | 🔴 未着手 |
 | Phase 9: テスト & ドキュメント | 12 | 0 | 0% | 🔴 未着手 |
 | Phase 10: App Store リリース | 10 | 0 | 0% | 🔴 未着手 |
@@ -452,31 +482,41 @@
 
 **Phase 5、Phase 6が完了し、Phase 7（Firestore最適化）が部分完了しました！**
 
-### Phase 7の残りタスク（任意）
+### 🔴 最優先: 集計ドキュメント方式の実装
 
-Phase 7の基本的な最適化（重複読み取り削減、リフレッシュロジック最適化）は完了しましたが、さらなる最適化が可能です：
+**概要**: `readArticles`コレクション（1000ドキュメント）を`userState`ドキュメント内の配列に変更
 
-1. **既読記事の最適化（高難度）**
-   - 現状: 全既読記事（1000件）を読み込み
-   - 目標: データ構造を変更し、`articles`コレクションに`isRead`フィールドを統合
-   - 削減効果: 1000件削減（大）
-   - リスク: データ構造の変更が必要、既存データのマイグレーション必要
+**削減効果**:
+- readArticles読み取り: 1000 → 1（**99.9%削減**）
+- 毎リクエスト合計: 2100 → 1101（**48%削減**）
 
-2. **お気に入りのページネーション**
+**実装タスク**:
+1. `functions/api/articles/index.ts` - readArticles取得方法を変更 + 自動マイグレーション
+2. `functions/api/articles/[id]/read.ts` - 既読マーク時に配列を更新
+3. `functions/api/articles/batch-read.ts` - バッチ既読マーク（新規）
+4. クライアント側の更新（endpoints.ts, DashboardPage.jsx）
+
+**特徴**:
+- Firestoreインデックス作成: **不要**
+- Security Rules変更: **不要**
+- ブラウザ操作: **不要**（VSCode上で完結）
+
+**詳細な実装計画**: `docs/HANDOFF.md` の「アプローチ0: 集計ドキュメント方式」セクションを参照
+
+---
+
+### その他の最適化タスク（優先度: 低）
+
+1. **お気に入りのページネーション**
    - 現状: 全お気に入り（1000件）を一度に読み込み
    - 目標: ページネーション実装（20件ずつ）
    - 削減効果: 980件削減（大）
-   - リスク: 低
 
-3. **フィード重複検出の最適化**
-   - 現状: 新規フィード追加時に全フィード（100件）を読み込み
-   - 目標: `queryDocuments`でURLの重複チェック
-   - 削減効果: 98件削減（中）
-   - リスク: 低
+---
 
-### 次は Phase 8: Mobile アプリ（Expo）
+### Phase 8: Mobile アプリ（Expo）
 
-Phase 7の残りタスクは任意です。モバイルアプリ開発に進む場合：
+Firestore最適化完了後、モバイルアプリ開発に進む場合：
 
 - Expo + React Nativeを使用したモバイルアプリケーション開発
 - 共通アプリ型（全ユーザーが同じアプリを使用）
