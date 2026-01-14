@@ -443,6 +443,117 @@ export async function deleteCollection(
 }
 
 /**
+ * Query documents with WHERE clause
+ * Simplified version for common use case: WHERE field = value
+ * Note: Firestore 'in' operator supports max 10 values, so batch accordingly
+ */
+export async function queryDocuments(
+  collectionPath: string,
+  where: { field: string; operator: string; value: any } | Array<{ field: string; operator: string; value: any }>,
+  idToken: string,
+  config: FirebaseConfig,
+  limit?: number
+): Promise<any[]> {
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents:runQuery`;
+
+    // Build WHERE clause
+    const whereConditions = Array.isArray(where) ? where : [where];
+    const compositeFilter: any = {
+      compositeFilter: {
+        op: 'AND',
+        filters: whereConditions.map(condition => {
+          const fieldFilter: any = {
+            fieldFilter: {
+              field: { fieldPath: condition.field },
+              op: mapOperator(condition.operator),
+              value: toFirestoreValue(condition.value),
+            }
+          };
+          return fieldFilter;
+        })
+      }
+    };
+
+    const structuredQuery: any = {
+      from: [{ collectionId: collectionPath.split('/').pop() }],
+      where: whereConditions.length === 1 ? {
+        fieldFilter: {
+          field: { fieldPath: whereConditions[0].field },
+          op: mapOperator(whereConditions[0].operator),
+          value: toFirestoreValue(whereConditions[0].value),
+        }
+      } : compositeFilter,
+    };
+
+    if (limit) {
+      structuredQuery.limit = limit;
+    }
+
+    // Get parent path (everything except the last segment)
+    const pathParts = collectionPath.split('/');
+    const parentPath = pathParts.slice(0, -1).join('/');
+    const parent = parentPath
+      ? `projects/${config.projectId}/databases/(default)/documents/${parentPath}`
+      : `projects/${config.projectId}/databases/(default)/documents`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        structuredQuery,
+        parent,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Query failed:', response.status, errorText);
+      return [];
+    }
+
+    const results: any = await response.json();
+
+    // Handle empty results
+    if (!results || results.length === 0) {
+      return [];
+    }
+
+    return results
+      .filter((result: any) => result.document)
+      .map((result: any) => ({
+        id: result.document.name.split('/').pop(),
+        ...fromFirestoreDocument(result.document),
+      }));
+  } catch (error) {
+    console.error('Error querying documents:', error);
+    return [];
+  }
+}
+
+/**
+ * Map operator string to Firestore operator enum
+ */
+function mapOperator(operator: string): string {
+  const operatorMap: Record<string, string> = {
+    '==': 'EQUAL',
+    '=': 'EQUAL',
+    '!=': 'NOT_EQUAL',
+    '<': 'LESS_THAN',
+    '<=': 'LESS_THAN_OR_EQUAL',
+    '>': 'GREATER_THAN',
+    '>=': 'GREATER_THAN_OR_EQUAL',
+    'in': 'IN',
+    'array-contains': 'ARRAY_CONTAINS',
+    'array-contains-any': 'ARRAY_CONTAINS_ANY',
+  };
+  return operatorMap[operator.toLowerCase()] || 'EQUAL';
+}
+
+/**
  * Run a structured query
  */
 export async function runQuery(

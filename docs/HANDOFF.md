@@ -1,8 +1,8 @@
-# 引継ぎメモ - Phase 5 完全完了、Phase 6 完了
+# 引継ぎメモ - Phase 7 部分完了（Firestore最適化）
 
 ## 概要
 
-**Phase 5（Web UI）とPhase 6（Cloudflare Pages デプロイ）が完全に完了しました。**
+**Phase 5（Web UI）、Phase 6（Cloudflare Pages デプロイ）が完全完了、Phase 7（Firestore最適化）が部分完了しました。**
 
 すべてのコア機能が実装され、以下のような完成度の高いWebアプリケーションが完成しました：
 - Feedly風の洗練されたUI
@@ -14,25 +14,97 @@
 - **ログイン状態の永続化（完全解決）**
 - **Too many subrequests問題の解決**
 - **既読マークのタイミング最適化**
+- **Firestore読み取り最適化（部分実装）**
 
 ### 📊 最新情報
 
-**最新デプロイURL**: `https://b765a42c.feedown.pages.dev` / `https://feedown.pages.dev`
-**最新コミット**: `3acc76d` - "Organize documentation and add Japanese README"
-**プロジェクト進捗**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)、Phase 7（Firestore最適化）準備完了
+**最新デプロイURL**: `https://4d7a6fe0.feedown.pages.dev` / `https://feedown.pages.dev`
+**最新コミット**: (これからコミット)
+**プロジェクト進捗**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)、Phase 7（Firestore最適化）部分完了 (~30%)
 **最終更新日**: 2026-01-14
 **担当**: Claude Sonnet 4.5
 
-### 🎯 次のセッションの計画 - Firestore読み取り最適化（Phase 7）
+### 🎯 次のセッションの計画
 
-**目的**: Firestore読み取り回数を約95%削減し、コストとパフォーマンスを大幅に改善する
+**Phase 7の残りタスク**: より高度なFirestore最適化（既読記事のクエリ最適化など）
+**Phase 8**: Mobile アプリ（Expo）の実装
 
-**現状**: セッションあたり約4500回以上の読み取り
-**目標**: セッションあたり約200回の読み取り（95%削減）
-
-詳細な分析結果と実装計画は以下に記載。
+---
 
 ## ⭐ 最新のセッションで完了した内容
+
+### 🚀 Phase 7: Firestore読み取り最適化（部分実装）（2026-01-14）
+
+このセッションでは、Phase 7の一部（重複読み取りの削減とリフレッシュロジックの最適化）を実装しました。
+
+#### 完了した作業
+
+1. **重複フィード読み取りの削除**
+   - `functions/api/articles/index.ts`の`checkShouldRefresh`関数を廃止
+   - `checkShouldRefreshFromFeeds`関数に変更し、既に取得済みのフィード情報を再利用
+   - **削減効果**: Dashboard表示時に100件削減
+
+2. **リフレッシュロジックの最適化**
+   - `functions/api/refresh.ts`を拡張し、フィード情報をレスポンスに含めるように変更
+   - `shouldRefreshArticles`フラグを追加（新規記事があるかを通知）
+   - `apps/web/src/pages/DashboardPage.jsx`を最適化
+     - Refresh API のレスポンスからフィード情報を取得（重複フェッチを回避）
+     - 新規記事がない場合は記事再取得をスキップ（初回ロードを除く）
+   - **削減効果**: Refresh時に100-150件削減（条件付き）
+
+3. **Cache-Controlヘッダーの追加**
+   - `functions/api/articles/index.ts`に60秒のキャッシュヘッダーを追加
+   - ブラウザキャッシュの活用による読み取り削減
+
+4. **queryDocuments関数の実装（使用保留）**
+   - `functions/lib/firebase-rest.ts`に`queryDocuments`関数を追加
+   - Firestore REST APIの`:runQuery`エンドポイントを使用
+   - **Note**: 既読記事の最適化で使用を試みたが、`__name__`フィールドのクエリが技術的に困難だったため保留
+
+#### 実装を試みたが保留した内容
+
+- **既読記事のクエリ最適化**: `in`クエリで表示中の記事のみ既読状態を取得する実装を試みたが、Firestoreの`__name__`フィールドを使ったクエリの構文が複雑で動作しなかったため、元の`listDocuments`方式に戻しました。
+
+#### 最適化の効果
+
+**セッションあたりの読み取り回数**:
+- **最適化前**: 約4500回
+- **最適化後**: 約4200回
+- **削減率**: 約7-10%（300件削減）
+
+**Note**: 当初計画の95%削減は達成できませんでしたが、重複読み取りの削除とリフレッシュロジックの最適化により一定の効果を得ています。
+
+#### 変更ファイル一覧
+
+**バックエンド**:
+- `functions/lib/firebase-rest.ts` - `queryDocuments()`関数追加、`mapOperator()`関数追加
+- `functions/api/articles/index.ts` - 重複フィード読み取り削除、Cache-Controlヘッダー追加
+- `functions/api/refresh.ts` - レスポンスに`feeds`と`shouldRefreshArticles`を追加
+
+**フロントエンド**:
+- `apps/web/src/pages/DashboardPage.jsx` - リフレッシュロジック最適化
+
+#### Gitコミット履歴（予定）
+
+1. `Implement Phase 7 partial: Firestore read optimization`
+
+#### 今後の改善案
+
+1. **既読記事の最適化（高難度）**
+   - Firestore REST APIの制約により、`in`クエリでの最適化が困難
+   - 代替案: `articles`コレクションに`isRead`フィールドを統合（構造変更が必要）
+
+2. **お気に入りのページネーション**
+   - `functions/api/favorites.ts`にページネーション実装
+   - `apps/web/src/pages/FavoritesPage.jsx`に無限スクロール実装
+
+3. **フィード重複検出の最適化**
+   - `functions/api/feeds/index.ts`で`queryDocuments`を使用
+   - 100件読み取り → 1-2件読み取りに削減
+
+---
+
+## ⭐ 過去のセッション
 
 ### 📚 ドキュメント整理とFirestore分析（2026-01-14）
 

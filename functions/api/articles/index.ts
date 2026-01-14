@@ -17,6 +17,7 @@ interface GetArticlesQuery {
  * GET /api/articles
  * Get articles for authenticated user
  * Implements smart refresh: triggers refresh if last fetch > 6 hours ago
+ * OPTIMIZED: Removed duplicate feed fetching
  */
 export async function onRequestGet(context: any): Promise<Response> {
   try {
@@ -32,25 +33,25 @@ export async function onRequestGet(context: any): Promise<Response> {
     // Parse query parameters
     const url = new URL(request.url);
     const feedId = url.searchParams.get('feedId');
-    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
     const offset = parseInt(url.searchParams.get('offset') || '0');
     const unreadOnly = url.searchParams.get('unreadOnly') === 'true';
 
     const config = getFirebaseConfig(env);
 
-    // Fetch feeds, articles, and read articles in parallel for better performance
-    const [shouldRefresh, allFeeds, allArticles, readArticles] = await Promise.all([
-      checkShouldRefresh(uid, idToken, config),
+    // Fetch feeds and articles (removed duplicate feed fetch)
+    const [allFeeds, allArticles] = await Promise.all([
       listDocuments(`users/${uid}/feeds`, idToken, config, 100),
       listDocuments(`users/${uid}/articles`, idToken, config, 1000),
-      listDocuments(`users/${uid}/readArticles`, idToken, config, 1000),
     ]);
 
-    console.log(`[articles/index] Fetched ${allFeeds.length} feeds, ${allArticles.length} articles, ${readArticles.length} read articles`);
+    console.log(`[articles/index] Fetched ${allFeeds.length} feeds, ${allArticles.length} articles`);
     console.log(`[articles/index] Feed IDs:`, allFeeds.map(f => f.id));
 
+    // Check if should refresh based on feeds
+    const shouldRefresh = checkShouldRefreshFromFeeds(allFeeds);
+
     const validFeedIds = new Set(allFeeds.map(feed => feed.id));
-    const readArticleIds = new Set(readArticles.map(doc => doc.id));
 
     // Filter non-expired articles and articles from deleted feeds
     const now = new Date();
@@ -88,36 +89,49 @@ export async function onRequestGet(context: any): Promise<Response> {
       articles = articles.filter(article => article.feedId === feedId);
     }
 
-    // Add isRead flag to all articles
-    articles = articles.map(article => ({
-      ...article,
-      isRead: readArticleIds.has(article.id),
-    }));
-
-    // Filter by unread if specified
-    if (unreadOnly) {
-      articles = articles.filter(article => !article.isRead);
-    }
-
-    // Sort by publishedAt descending
+    // Sort by publishedAt descending BEFORE pagination
     articles.sort((a, b) => {
       const aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
       const bTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
       return bTime - aTime;
     });
 
-    // Apply pagination
+    // Fetch read articles to add isRead flag
+    const readArticles = await listDocuments(
+      `users/${uid}/readArticles`,
+      idToken,
+      config,
+      1000
+    );
+    const readArticleIds = new Set(readArticles.map(doc => doc.id));
+    console.log(`[articles/index] Fetched ${readArticles.length} read articles`);
+
+    // Apply pagination to get only the articles we'll display
     const paginatedArticles = articles.slice(offset, offset + limit);
+
+    // Add isRead flag to paginated articles
+    let articlesWithReadStatus = paginatedArticles.map(article => ({
+      ...article,
+      isRead: readArticleIds.has(article.id),
+    }));
+
+    // Filter by unread if specified (after adding read status)
+    if (unreadOnly) {
+      articlesWithReadStatus = articlesWithReadStatus.filter(article => !article.isRead);
+    }
 
     return new Response(
       JSON.stringify({
-        articles: paginatedArticles,
+        articles: articlesWithReadStatus,
         shouldRefresh,
-        hasMore: articles.length > offset + limit,
+        hasMore: offset + limit < articles.length,
       }),
       {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'private, max-age=60', // Cache for 60 seconds
+        },
       }
     );
   } catch (error) {
@@ -130,21 +144,11 @@ export async function onRequestGet(context: any): Promise<Response> {
 }
 
 /**
- * Check if feeds should be refreshed (last fetch > 6 hours ago)
+ * Check if feeds should be refreshed based on already-fetched feeds
+ * OPTIMIZED: Takes feeds as parameter to avoid duplicate fetch
  */
-async function checkShouldRefresh(
-  uid: string,
-  idToken: string,
-  config: any
-): Promise<boolean> {
+function checkShouldRefreshFromFeeds(feeds: any[]): boolean {
   try {
-    const feeds = await listDocuments(
-      `users/${uid}/feeds`,
-      idToken,
-      config,
-      100
-    );
-
     if (feeds.length === 0) {
       return false; // No feeds to refresh
     }
@@ -174,3 +178,4 @@ async function checkShouldRefresh(
     return false;
   }
 }
+

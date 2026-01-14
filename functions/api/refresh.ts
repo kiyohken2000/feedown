@@ -192,10 +192,13 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     console.log(`[Refresh] Complete: ${stats.successfulFeeds}/${stats.totalFeeds} feeds successful, ${stats.newArticles} new articles`);
 
+    // OPTIMIZATION: Return updated feed information to avoid client re-fetching
     return new Response(
       JSON.stringify({
         message: 'Refresh complete',
         stats,
+        feeds: feeds, // Return updated feed information
+        shouldRefreshArticles: stats.newArticles > 0, // Tell client if article list needs refresh
       }),
       {
         status: 200,

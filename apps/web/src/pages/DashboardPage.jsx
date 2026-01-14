@@ -132,16 +132,42 @@ const DashboardPage = () => {
             console.error(`    Error: ${failed.error}`);
           });
         }
+
+        // OPTIMIZATION: Use feeds returned by refresh API instead of fetching again
+        if (refreshResponse.data.feeds) {
+          console.log('📊 Using feeds from refresh response (optimization)');
+          setFeeds(refreshResponse.data.feeds);
+        } else {
+          // Fallback: fetch feeds if not included in response
+          await fetchFeeds();
+        }
+
+        // Fetch articles if:
+        // 1. There were new articles, OR
+        // 2. This is the first load (no articles yet)
+        const isFirstLoad = articles.length === 0;
+        if (refreshResponse.data.shouldRefreshArticles || isFirstLoad) {
+          if (isFirstLoad) {
+            console.log('📥 First load, fetching all articles');
+          } else {
+            console.log('🔄 New articles detected, refreshing article list');
+          }
+          await fetchArticles(true); // reset=true for full reload
+        } else {
+          console.log('✓ No new articles, skipping article refresh');
+          setArticlesLoading(false);
+        }
+      } else {
+        // On error, fetch both feeds and articles
+        await fetchFeeds();
+        await fetchArticles(true);
       }
-      // その後、フィードと記事一覧を再取得
-      await fetchFeeds();
-      await fetchArticles(true); // reset=true for full reload
     } catch (error) {
       console.error('Failed to refresh:', error);
       setArticlesError('Failed to refresh feeds.');
       setArticlesLoading(false);
     }
-  }, [api, fetchFeeds, fetchArticles]);
+  }, [api, fetchFeeds, fetchArticles, setFeeds, articles.length]);
 
   // Auto-refresh on initial load
   useEffect(() => {
