@@ -167,8 +167,8 @@ Cloudflare Pagesダッシュボードで「Settings」→「Environment variable
 
 1. Supabaseダッシュボードで「Authentication」→「Providers」を開く
 2. 「Email」が有効になっていることを確認
-3. 必要に応じて設定を調整:
-   - **Confirm email**: 開発時はオフ推奨
+3. 設定を調整:
+   - **Confirm email**: オフ推奨
    - **Secure password**: オン推奨
 
 ## 7. 動作確認
