@@ -4,7 +4,7 @@
  */
 
 import { requireAuth, getFirebaseConfig } from '../../lib/auth';
-import { deleteCollection } from '../../lib/firebase-rest';
+import { deleteCollection, deleteDocument } from '../../lib/firebase-rest';
 
 /**
  * DELETE /api/user/data
@@ -36,10 +36,10 @@ export async function onRequestDelete(context: any): Promise<Response> {
       await deleteCollection(`users/${uid}/articles`, idToken, config);
       console.log('Articles deleted');
 
-      // Delete readArticles subcollection
-      console.log('Deleting readArticles...');
-      await deleteCollection(`users/${uid}/readArticles`, idToken, config);
-      console.log('ReadArticles deleted');
+      // Delete userState document (contains readArticleIds array)
+      console.log('Deleting userState...');
+      await deleteDocument(`users/${uid}/userState/main`, idToken, config);
+      console.log('UserState deleted');
 
       // Delete favorites subcollection
       console.log('Deleting favorites...');

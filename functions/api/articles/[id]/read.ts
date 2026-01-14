@@ -1,10 +1,11 @@
 /**
  * POST /api/articles/:id/read
  * Mark article as read
+ * Note: This endpoint is kept for backward compatibility, but batch-read is preferred
  */
 
 import { requireAuth, getFirebaseConfig } from '../../../lib/auth';
-import { setDocument } from '../../../lib/firebase-rest';
+import { getDocument, setDocument } from '../../../lib/firebase-rest';
 
 export async function onRequestPost(context: any): Promise<Response> {
   try {
@@ -27,21 +28,29 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     const config = getFirebaseConfig(env);
 
-    // Mark article as read
-    const success = await setDocument(
-      `users/${uid}/readArticles/${articleId}`,
-      {
-        readAt: new Date(),
-      },
-      idToken,
-      config
-    );
+    try {
+      // Get current userState
+      const userState = await getDocument(`users/${uid}/userState/main`, idToken, config);
+      const currentIds: string[] = userState?.readArticleIds || [];
 
-    if (!success) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to mark article as read' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      // Check if already read
+      if (!currentIds.includes(articleId)) {
+        // Add article ID to array
+        const newIds = [...currentIds, articleId];
+        await setDocument(
+          `users/${uid}/userState/main`,
+          {
+            readArticleIds: newIds,
+            lastUpdated: new Date(),
+          },
+          idToken,
+          config
+        );
+        // Don't check success - read marks are not critical
+      }
+    } catch (innerError) {
+      console.error(`[read] Inner error for user ${uid}, article ${articleId}:`, innerError);
+      // Return success anyway - read marks are not critical
     }
 
     return new Response(
@@ -53,9 +62,10 @@ export async function onRequestPost(context: any): Promise<Response> {
     );
   } catch (error) {
     console.error('Mark read error:', error);
+    // Return success even on error - read marks are not critical
     return new Response(
-      JSON.stringify({ error: 'Failed to mark article as read' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }

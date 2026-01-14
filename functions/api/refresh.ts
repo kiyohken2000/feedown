@@ -5,7 +5,7 @@
  */
 
 import { requireAuth, getFirebaseConfig } from '../lib/auth';
-import { listDocuments, updateDocument, setDocument, getDocument } from '../lib/firebase-rest';
+import { listDocuments, updateDocument, setDocument, getDocument, batchSetDocuments } from '../lib/firebase-rest';
 
 interface RefreshStats {
   totalFeeds: number;
@@ -449,7 +449,7 @@ function extractFaviconUrl(feedUrl: string): string {
 
 /**
  * Store articles in Firestore with TTL
- * Optimized to reduce subrequests by using pre-fetched existing articles
+ * Optimized to use batch write (single request for all articles)
  */
 async function storeArticles(
   uid: string,
@@ -462,31 +462,25 @@ async function storeArticles(
 ): Promise<number> {
   if (articles.length === 0) return 0;
 
-  let newArticleCount = 0;
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+
+  // Collect new articles to batch write
+  const newArticles: Array<{ path: string; data: any }> = [];
 
   for (const article of articles) {
     // Generate article hash (feedId + guid)
     const articleHash = await generateArticleHash(feedId, article.guid);
 
-    // DEBUG: Log article details
-    console.log(`[storeArticles] Article: "${article.title}"`);
-    console.log(`[storeArticles]   - GUID: ${article.guid}`);
-    console.log(`[storeArticles]   - Hash: ${articleHash}`);
-    console.log(`[storeArticles]   - Exists: ${existingArticleIds.has(articleHash)}`);
-
     // Check if article already exists (in-memory check, no subrequest)
     if (existingArticleIds.has(articleHash)) {
-      console.log(`[storeArticles]   - SKIPPED (already exists)`);
       continue; // Skip existing articles
     }
 
-    // Add new article
-    console.log(`[storeArticles]   - ADDING NEW ARTICLE`);
-    const success = await setDocument(
-      `users/${uid}/articles/${articleHash}`,
-      {
+    // Prepare new article for batch write
+    newArticles.push({
+      path: `users/${uid}/articles/${articleHash}`,
+      data: {
         feedId,
         feedTitle,
         title: article.title,
@@ -498,19 +492,21 @@ async function storeArticles(
         author: article.author || null,
         imageUrl: article.imageUrl || null,
       },
-      idToken,
-      config
-    );
-
-    if (success) {
-      console.log(`[storeArticles]   - SUCCESS`);
-      newArticleCount++;
-    } else {
-      console.log(`[storeArticles]   - FAILED`);
-    }
+    });
   }
 
-  return newArticleCount;
+  if (newArticles.length === 0) {
+    console.log(`[storeArticles] No new articles to add for feed ${feedId}`);
+    return 0;
+  }
+
+  console.log(`[storeArticles] Batch writing ${newArticles.length} new articles for feed ${feedId}`);
+
+  // Use batch write to save all articles in one request
+  const result = await batchSetDocuments(newArticles, idToken, config);
+
+  console.log(`[storeArticles] Batch write complete: ${result.success} success, ${result.failed} failed`);
+  return result.success;
 }
 
 /**

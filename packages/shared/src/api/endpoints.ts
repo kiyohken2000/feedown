@@ -84,6 +84,10 @@ export class ArticlesAPI {
     return this.client.post<void>(`/api/articles/${articleId}/read`);
   }
 
+  async batchMarkAsRead(articleIds: string[]) {
+    return this.client.post<{ added: number; total: number }>('/api/articles/batch-read', { articleIds });
+  }
+
   async addToFavorites(articleId: string, articleData: { title: string; url: string; description?: string; feedTitle?: string }) {
     return this.client.post<void>(`/api/articles/${articleId}/favorite`, articleData);
   }

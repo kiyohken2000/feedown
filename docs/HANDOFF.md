@@ -1,8 +1,8 @@
-# 引継ぎメモ - Phase 7 部分完了（Firestore最適化）
+# 引継ぎメモ - Phase 7 ほぼ完了（Firestore最適化）
 
 ## 概要
 
-**Phase 5（Web UI）、Phase 6（Cloudflare Pages デプロイ）が完全完了、Phase 7（Firestore最適化）が部分完了しました。**
+**Phase 5（Web UI）、Phase 6（Cloudflare Pages デプロイ）、Phase 7（Firestore最適化）がほぼ完了しました。**
 
 すべてのコア機能が実装され、以下のような完成度の高いWebアプリケーションが完成しました：
 - Feedly風の洗練されたUI
@@ -14,61 +14,75 @@
 - **ログイン状態の永続化（完全解決）**
 - **Too many subrequests問題の解決**
 - **既読マークのタイミング最適化**
-- **Firestore読み取り最適化（部分実装）**
+- **Firestore読み取り最適化（集計ドキュメント方式実装完了）**
 
 ### 📊 最新情報
 
-**最新デプロイURL**: `https://4d7a6fe0.feedown.pages.dev` / `https://feedown.pages.dev`
+**最新デプロイURL**: `https://b9cf3f5d.feedown.pages.dev` / `https://feedown.pages.dev`
 **最新コミット**: (これからコミット)
-**プロジェクト進捗**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)、Phase 7（Firestore最適化）部分完了 (~30%)
+**プロジェクト進捗**: Phase 5 完全完了 (100%)、Phase 6 完了 (100%)、Phase 7（Firestore最適化）ほぼ完了 (~90%)
 **最終更新日**: 2026-01-14
-**担当**: Claude Sonnet 4.5
+**担当**: Claude Opus 4.5
 
-### 🎯 次のセッションの計画
+### ✅ 今回のセッションで完了した実装
 
-**最優先タスク**: 集計ドキュメント方式の実装（readArticles読み取り99.9%削減）
+**集計ドキュメント方式の実装が完了しました（readArticles読み取り99.9%削減）**
 
-実装内容:
-1. `functions/api/articles/index.ts` - readArticles取得方法を変更
-2. `functions/api/articles/[id]/read.ts` - 既読マーク時に配列を更新
-3. `functions/api/articles/batch-read.ts` - バッチ既読マーク（新規）
-4. クライアント側の更新
+実装した内容:
+1. `functions/api/articles/index.ts` - `listDocuments('readArticles')` → `getDocument('userState/main')`
+2. `functions/api/articles/[id]/read.ts` - 既読マーク時にuserState配列を更新
+3. `functions/api/articles/batch-read.ts` - バッチ既読マークAPI（新規作成）
+4. `functions/api/user/data.ts` - データ削除でuserStateを削除
+5. `functions/api/user/account.ts` - アカウント削除でuserStateを削除
+6. `packages/shared/src/api/endpoints.ts` - batchMarkAsReadメソッド追加
+7. `apps/web/src/pages/DashboardPage.jsx` - デバウンス処理＋バッチAPI使用
+8. `functions/lib/firebase-rest.ts` - batchSetDocuments関数追加
+9. `functions/api/refresh.ts` - 記事保存をバッチ書き込みに変更
 
-特徴: Firestoreインデックス不要、Security Rules変更不要、VSCode上で完結
-※開発中のためマイグレーション不要（テストアカウント作り直しでOK）
+**重要な修正点**:
+- Firestoreパス: `users/{uid}/userState` → `users/{uid}/userState/main`（コレクション/ドキュメント形式が必要）
+- refresh.tsでバッチ書き込みを使用（Too many subrequests対策）
+- batch-read.tsにリトライロジック追加（Race Condition対策）
+
+### 🎯 残りのタスク（優先度: 低）
+
+**お気に入りのページネーション** - 必要に応じて実装
+- 現状: 全お気に入り（最大1000件）を一度に読み込み
+- 改善: 20件ずつページネーション + 無限スクロール
+- 対象ファイル: `functions/api/favorites.ts`, `apps/web/src/pages/FavoritesPage.jsx`
 
 ---
 
-## 🚀 Phase 7 Firestore最適化計画（2026-01-14更新）
+## 🚀 Phase 7 Firestore最適化計画（2026-01-14実装完了）
 
-### 📊 現状の分析
-
-コードレビューの結果、以下が判明：
+### 📊 最終ステータス
 
 | 項目 | ステータス | 詳細 |
 |------|-----------|------|
-| readArticles統合 | ✅ **実装済み** | `articles/index.ts:99-116` で既にisReadフィールドを付与 |
+| readArticles統合 | ✅ **実装済み** | `articles/index.ts:99-102` でuserState/mainから取得 |
 | フィード重複排除 | ✅ **実装済み** | `DashboardPage.jsx:137-143` でrefreshレスポンスからfeedsを使用 |
-| バッチ既読マーク | ❌ **未実装** | 一括既読でN回のAPI呼び出しが発生 |
-| 自動既読デバウンス | ❌ **未実装** | スクロール時に個別API呼び出しが発生 |
+| バッチ既読マーク | ✅ **実装済み** | `batch-read.ts`で一括既読、1回のAPI呼び出し |
+| 自動既読デバウンス | ✅ **実装済み** | `DashboardPage.jsx`で500msデバウンス |
+| 集計ドキュメント方式 | ✅ **実装済み** | readArticles 1000件 → userState/main 1件 |
+| お気に入りページネーション | 🔵 **未実装** | 優先度低、必要に応じて実装 |
 
-### 🔍 真のボトルネック
+### 🔍 最適化後のFirestore読み取り
 
 `functions/api/articles/index.ts` での読み取り（毎リクエスト）:
 - `listDocuments(feeds)` - 最大100件
 - `listDocuments(articles)` - 最大1000件
-- `listDocuments(readArticles)` - 最大1000件
+- `getDocument(userState/main)` - **1件**（以前は1000件）
 
-**合計**: 毎回最大2100件のFirestore読み取り
+**合計**: 毎回最大1101件のFirestore読み取り（以前は2100件 → **48%削減**）
 
 ---
 
-### 🔴 アプローチ0: 集計ドキュメント方式（最優先・最高効果）
+### ✅ アプローチ0: 集計ドキュメント方式（実装完了）
 
 **概要**:
-`readArticles`コレクション（1000ドキュメント = 1000読み取り）を、単一ドキュメント内の配列に変更（1読み取り）することで、**99.9%の読み取り削減**を実現する。
+`readArticles`コレクション（1000ドキュメント = 1000読み取り）を、単一ドキュメント内の配列に変更（1読み取り）することで、**99.9%の読み取り削減**を実現。
 
-#### 現在のデータ構造（非効率）
+#### 旧データ構造（非効率・廃止）
 
 ```
 users/{uid}/readArticles/
@@ -2494,7 +2508,7 @@ apps/mobile/
 - **Details.js**: 詳細画面（サンプル）
 - その他のサンプル画面（Post, Read, Write, Print, Modal, Menu, Loading）
 
-#### Phase 7 実装時の推奨手順
+#### Phase 8 実装時の推奨手順
 
 **1. 既存のボイラープレートを理解する**
    - `src/App.js` でアプリ初期化フローを確認

@@ -174,6 +174,8 @@ export async function getDocument(
   try {
     const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/${path}`;
 
+    console.log(`[getDocument] Fetching: ${path}`);
+
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${idToken}`,
@@ -182,14 +184,18 @@ export async function getDocument(
 
     if (!response.ok) {
       if (response.status === 404) {
+        console.log(`[getDocument] Not found: ${path}`);
         return null;
       }
-      console.error('Get document failed:', response.status);
+      const errorText = await response.text();
+      console.error(`[getDocument] Failed for ${path}: ${response.status}`, errorText);
       return null;
     }
 
     const doc: any = await response.json();
-    return fromFirestoreDocument(doc);
+    const result = fromFirestoreDocument(doc);
+    console.log(`[getDocument] Success for ${path}:`, JSON.stringify(result).substring(0, 200));
+    return result;
   } catch (error) {
     console.error('Error getting document:', error);
     return null;
@@ -241,6 +247,13 @@ export async function createDocument(
   }
 }
 
+// Store last error for debugging
+let lastSetDocumentError: string = '';
+
+export function getLastSetDocumentError(): string {
+  return lastSetDocumentError;
+}
+
 /**
  * Set a Firestore document (create or overwrite)
  */
@@ -250,6 +263,7 @@ export async function setDocument(
   idToken: string,
   config: FirebaseConfig
 ): Promise<boolean> {
+  lastSetDocumentError = '';
   try {
     const fields: Record<string, any> = {};
     for (const [key, value] of Object.entries(data)) {
@@ -267,8 +281,16 @@ export async function setDocument(
       body: JSON.stringify({ fields }),
     });
 
-    return response.ok;
+    if (!response.ok) {
+      const errorText = await response.text();
+      lastSetDocumentError = `${response.status}:${errorText.substring(0, 200)}`;
+      console.error(`[setDocument] Failed for ${path}: ${response.status}`, errorText);
+      return false;
+    }
+
+    return true;
   } catch (error) {
+    lastSetDocumentError = `exception:${error instanceof Error ? error.message : String(error)}`;
     console.error('Error setting document:', error);
     return false;
   }
@@ -610,4 +632,81 @@ export async function runQuery(
     console.error('Error running query:', error);
     return [];
   }
+}
+
+/**
+ * Batch write multiple documents in a single request
+ * Firestore allows up to 500 writes per batch
+ */
+export async function batchSetDocuments(
+  documents: Array<{ path: string; data: any }>,
+  idToken: string,
+  config: FirebaseConfig
+): Promise<{ success: number; failed: number }> {
+  if (documents.length === 0) {
+    return { success: 0, failed: 0 };
+  }
+
+  const results = { success: 0, failed: 0 };
+  const batchSize = 500; // Firestore batch limit
+
+  // Process in batches of 500
+  for (let i = 0; i < documents.length; i += batchSize) {
+    const batch = documents.slice(i, i + batchSize);
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents:batchWrite`;
+
+      const writes = batch.map(doc => {
+        const fields: Record<string, any> = {};
+        for (const [key, value] of Object.entries(doc.data)) {
+          fields[key] = toFirestoreValue(value);
+        }
+
+        return {
+          update: {
+            name: `projects/${config.projectId}/databases/(default)/documents/${doc.path}`,
+            fields,
+          },
+        };
+      });
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ writes }),
+      });
+
+      if (response.ok) {
+        const responseData: any = await response.json();
+        // Count successes and failures from response
+        const writeResults = responseData.writeResults || [];
+        writeResults.forEach((result: any, index: number) => {
+          if (result.updateTime) {
+            results.success++;
+          } else {
+            results.failed++;
+            console.error(`[batchSetDocuments] Failed to write: ${batch[index].path}`);
+          }
+        });
+        // If writeResults is empty but response was OK, count all as success
+        if (writeResults.length === 0) {
+          results.success += batch.length;
+        }
+      } else {
+        const errorText = await response.text();
+        console.error(`[batchSetDocuments] Batch write failed: ${response.status}`, errorText);
+        results.failed += batch.length;
+      }
+    } catch (error) {
+      console.error('[batchSetDocuments] Error:', error);
+      results.failed += batch.length;
+    }
+  }
+
+  console.log(`[batchSetDocuments] Complete: ${results.success} success, ${results.failed} failed`);
+  return results;
 }

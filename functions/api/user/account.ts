@@ -34,8 +34,8 @@ export async function onRequestDelete(context: any): Promise<Response> {
       // Delete articles subcollection
       await deleteCollection(`users/${uid}/articles`, idToken, config);
 
-      // Delete readArticles subcollection
-      await deleteCollection(`users/${uid}/readArticles`, idToken, config);
+      // Delete userState document (contains readArticleIds array)
+      await deleteDocument(`users/${uid}/userState/main`, idToken, config);
 
       // Delete favorites subcollection
       await deleteCollection(`users/${uid}/favorites`, idToken, config);

@@ -235,13 +235,13 @@
 
 ---
 
-## Phase 7: Firestore読み取り最適化 🟡
+## Phase 7: Firestore読み取り最適化 🟢
 
 ### 目的
 - Firestore読み取り回数を削減し、コストとパフォーマンスを改善
 - 現状: セッションあたり約4500回以上の読み取り
 - 目標: セッションあたり約200回の読み取り（95%削減）
-- **実績**: セッションあたり約4200回（約7-10%削減）
+- **実績**: 毎リクエスト2100件 → 1101件（**48%削減**）、readArticles 1000件 → 1件（**99.9%削減**）
 
 ### Phase 1: クイックウィン（約1時間、低リスク）
 - [x] Task 1.1: 重複フィード読み取り修正
@@ -310,40 +310,49 @@
 - [x] Task 5.2: フィード取得の重複排除 ✅ **既に実装済み**
   - [x] `apps/web/src/pages/DashboardPage.jsx:137-143` でrefreshレスポンスからfeedsを使用済み
 
-### Phase 6: 集計ドキュメント方式（最優先・最高効果）🔴 NEW
+### Phase 6: 集計ドキュメント方式（最優先・最高効果）✅ 完了
 
-**概要**: `readArticles`コレクション（1000ドキュメント = 1000読み取り）を、`userState`ドキュメント内の配列に変更（1読み取り）
+**概要**: `readArticles`コレクション（1000ドキュメント = 1000読み取り）を、`userState/main`ドキュメント内の配列に変更（1読み取り）
 
 **削減効果**:
 - readArticles読み取り: 1000 → 1（**99.9%削減**）
 - 毎リクエスト合計: 2100 → 1101（**48%削減**）
 
-- [ ] Task 6.1: articles/index.ts の修正
-  - [ ] `listDocuments('readArticles')` → `getDocument('userState')`
+- [x] Task 6.1: articles/index.ts の修正
+  - [x] `listDocuments('readArticles')` → `getDocument('userState/main')`
   - 削減効果: 1000読み取り → 1読み取り
 
-- [ ] Task 6.2: articles/[id]/read.ts の修正
-  - [ ] `setDocument('readArticles/{id}')` → `userState.readArticleIds`配列に追加
-  - [ ] 配列の重複チェック処理
+- [x] Task 6.2: articles/[id]/read.ts の修正
+  - [x] `setDocument('readArticles/{id}')` → `userState/main.readArticleIds`配列に追加
+  - [x] 配列の重複チェック処理
 
-- [ ] Task 6.3: batch-read.ts の新規作成
-  - [ ] `POST /api/articles/batch-read` エンドポイント
-  - [ ] 複数の記事IDをuserState.readArticleIds配列に一括追加
-  - [ ] バッチ既読マーク機能（旧Task 5.3と統合）
+- [x] Task 6.3: batch-read.ts の新規作成
+  - [x] `POST /api/articles/batch-read` エンドポイント
+  - [x] 複数の記事IDをuserState/main.readArticleIds配列に一括追加
+  - [x] バッチ既読マーク機能（旧Task 5.3と統合）
+  - [x] リトライロジック追加（Race Condition対策）
 
-- [ ] Task 6.4: クライアント側の更新
-  - [ ] `packages/shared/api/endpoints.ts` にbatchMarkAsRead追加
-  - [ ] `apps/web/src/pages/DashboardPage.jsx` でバッチAPI使用
-  - [ ] 自動既読のデバウンス処理（旧Task 5.4と統合）
+- [x] Task 6.4: クライアント側の更新
+  - [x] `packages/shared/src/api/endpoints.ts` にbatchMarkAsRead追加
+  - [x] `apps/web/src/pages/DashboardPage.jsx` でバッチAPI使用
+  - [x] 自動既読のデバウンス処理（500ms待機後に一括送信）
 
-- [ ] Task 6.5: データ削除・アカウント削除の修正
-  - [ ] `functions/api/user/data.ts` - `deleteCollection('readArticles')` → `deleteDocument('userState')`
-  - [ ] `functions/api/user/account.ts` - `deleteCollection('readArticles')` → `deleteDocument('userState')`
+- [x] Task 6.5: データ削除・アカウント削除の修正
+  - [x] `functions/api/user/data.ts` - `deleteCollection('readArticles')` → `deleteDocument('userState/main')`
+  - [x] `functions/api/user/account.ts` - `deleteCollection('readArticles')` → `deleteDocument('userState/main')`
+
+- [x] Task 6.6: refresh.tsのバッチ書き込み最適化
+  - [x] `functions/lib/firebase-rest.ts` にbatchSetDocuments関数追加
+  - [x] `functions/api/refresh.ts` で記事保存をバッチ書き込みに変更
+  - [x] Too many subrequests問題の解決
 
 **実装の特徴**:
 - Firestoreインデックス作成: 不要
 - Security Rules変更: 不要
 - ブラウザ操作: 不要（VSCode上で完結）
+
+**重要な修正点**:
+- Firestoreパス: `users/{uid}/userState` → `users/{uid}/userState/main`（コレクション/ドキュメント形式が必要）
 
 **詳細な実装計画**: `docs/HANDOFF.md` の「アプローチ0: 集計ドキュメント方式」セクションを参照
 
@@ -452,7 +461,7 @@
 | Phase 4: Pages Functions | 18 | 18 | 100% | 🟢 完了 |
 | Phase 5: Web UI（拡張含む） | 39 | 39 | 100% | 🟢 完了 |
 | Phase 6: Cloudflare Pages デプロイ | 6 | 6 | 100% | 🟢 完了 |
-| Phase 7: Firestore最適化 | 8 | 2 | 25% | 🟡 部分完了（集計ドキュメント方式が最優先） |
+| Phase 7: Firestore最適化 | 8 | 7 | 90% | 🟢 ほぼ完了（お気に入りページネーションのみ未実装） |
 | Phase 8: Mobile | 13 | 0 | 0% | 🔴 未着手 |
 | Phase 9: テスト & ドキュメント | 12 | 0 | 0% | 🔴 未着手 |
 | Phase 10: App Store リリース | 10 | 0 | 0% | 🔴 未着手 |

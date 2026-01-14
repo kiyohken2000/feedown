@@ -35,6 +35,8 @@ const DashboardPage = () => {
   const loadMoreRef = useRef(null);
   const loadMoreObserverRef = useRef(null);
   const fullyViewedArticles = useRef(new Set()); // Track articles that were 100% visible
+  const pendingReadQueue = useRef(new Set()); // Queue for batch read marks
+  const debounceTimerRef = useRef(null); // Debounce timer for batch API
 
   const apiClient = useMemo(() => createApiClient(
     import.meta.env.VITE_API_BASE_URL || '',
@@ -42,6 +44,55 @@ const DashboardPage = () => {
   ), [auth]);
 
   const api = useMemo(() => new FeedOwnAPI(apiClient), [apiClient]);
+
+  // Debounced batch mark as read
+  const flushReadQueue = useCallback(async () => {
+    if (pendingReadQueue.current.size === 0) return;
+
+    const articleIds = Array.from(pendingReadQueue.current);
+    pendingReadQueue.current.clear();
+
+    try {
+      await api.articles.batchMarkAsRead(articleIds);
+      // Update local state
+      setReadArticles(prev => {
+        const newSet = new Set(prev);
+        articleIds.forEach(id => newSet.add(id));
+        return newSet;
+      });
+    } catch (error) {
+      console.error('Failed to batch mark as read:', error);
+      // Re-add failed IDs to queue for retry
+      articleIds.forEach(id => pendingReadQueue.current.add(id));
+    }
+  }, [api, setReadArticles]);
+
+  const queueMarkAsRead = useCallback((articleId) => {
+    pendingReadQueue.current.add(articleId);
+    // Update UI immediately (optimistic)
+    setReadArticles(prev => new Set([...prev, articleId]));
+
+    // Debounce: flush queue after 500ms of no new additions
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      flushReadQueue();
+    }, 500);
+  }, [flushReadQueue, setReadArticles]);
+
+  // Cleanup debounce timer and flush on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      // Flush any remaining items
+      if (pendingReadQueue.current.size > 0) {
+        flushReadQueue();
+      }
+    };
+  }, [flushReadQueue]);
 
   const fetchFeeds = useCallback(async () => {
     try {
@@ -234,30 +285,14 @@ const DashboardPage = () => {
 
           // Mark as read when scrolled past (50% or less visible) after being fully viewed
           if (entry.isIntersecting && entry.intersectionRatio <= 0.5 && fullyViewedArticles.current.has(articleId)) {
-            // console.log('Article scrolled past 50%, marking as read:', articleId);
             fullyViewedArticles.current.delete(articleId);
-
-            api.articles.markAsRead(articleId)
-              .then(() => {
-                setReadArticles(prev => new Set([...prev, articleId]));
-              })
-              .catch(error => {
-                console.error('Failed to mark as read:', error);
-              });
+            queueMarkAsRead(articleId);
           }
 
           // Also mark as read when completely leaving viewport after being fully viewed
           if (!entry.isIntersecting && fullyViewedArticles.current.has(articleId)) {
-            // console.log('Article left viewport, marking as read:', articleId);
             fullyViewedArticles.current.delete(articleId);
-
-            api.articles.markAsRead(articleId)
-              .then(() => {
-                setReadArticles(prev => new Set([...prev, articleId]));
-              })
-              .catch(error => {
-                console.error('Failed to mark as read:', error);
-              });
+            queueMarkAsRead(articleId);
           }
         });
       },
@@ -276,7 +311,7 @@ const DashboardPage = () => {
         observerRef.current.disconnect();
       }
     };
-  }, [filteredArticles, readArticles, api, filter]);
+  }, [filteredArticles, readArticles, queueMarkAsRead, filter]);
 
   // Setup Intersection Observer for infinite scroll
   useEffect(() => {
@@ -320,11 +355,9 @@ const DashboardPage = () => {
       return newSet;
     });
 
-    // Mark all as read in background
+    // Mark all as read using batch API (single request instead of N requests)
     try {
-      await Promise.all(
-        unreadArticleIds.map(articleId => api.articles.markAsRead(articleId))
-      );
+      await api.articles.batchMarkAsRead(unreadArticleIds);
       // Refresh articles after marking all as read
       await fetchArticles(true);
     } catch (error) {
@@ -338,26 +371,12 @@ const DashboardPage = () => {
     }
   };
 
-  const handleArticleClick = async (article) => {
+  const handleArticleClick = (article) => {
     setSelectedArticle(article);
 
-    // Mark as read when opening modal
+    // Mark as read when opening modal (uses debounced batch API)
     if (!readArticles.has(article.id)) {
-      try {
-        // Optimistically update UI
-        setReadArticles(prev => new Set([...prev, article.id]));
-        // Call API in background
-        await api.articles.markAsRead(article.id);
-        // console.log('Article marked as read on modal open:', article.id); // Disabled to reduce console noise
-      } catch (error) {
-        console.error('Failed to mark as read on modal open:', error);
-        // Rollback on error
-        setReadArticles(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(article.id);
-          return newSet;
-        });
-      }
+      queueMarkAsRead(article.id);
     }
   };
 
@@ -365,15 +384,9 @@ const DashboardPage = () => {
     setSelectedArticle(null);
   };
 
-  const handleMarkAsRead = async () => {
+  const handleMarkAsRead = () => {
     if (!selectedArticle) return;
-
-    try {
-      await api.articles.markAsRead(selectedArticle.id);
-      setReadArticles(prev => new Set([...prev, selectedArticle.id]));
-    } catch (error) {
-      console.error('Failed to mark as read:', error);
-    }
+    queueMarkAsRead(selectedArticle.id);
   };
 
   const handleToggleFavorite = async () => {

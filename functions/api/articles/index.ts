@@ -4,7 +4,7 @@
  */
 
 import { requireAuth, getFirebaseConfig } from '../../lib/auth';
-import { listDocuments } from '../../lib/firebase-rest';
+import { listDocuments, getDocument } from '../../lib/firebase-rest';
 
 interface GetArticlesQuery {
   feedId?: string;
@@ -96,15 +96,10 @@ export async function onRequestGet(context: any): Promise<Response> {
       return bTime - aTime;
     });
 
-    // Fetch read articles to add isRead flag
-    const readArticles = await listDocuments(
-      `users/${uid}/readArticles`,
-      idToken,
-      config,
-      1000
-    );
-    const readArticleIds = new Set(readArticles.map(doc => doc.id));
-    console.log(`[articles/index] Fetched ${readArticles.length} read articles`);
+    // Fetch read articles from userState document (aggregated approach - 1 read instead of 1000)
+    const userState = await getDocument(`users/${uid}/userState/main`, idToken, config);
+    const readArticleIds = new Set<string>(userState?.readArticleIds || []);
+    console.log(`[articles/index] Fetched userState with ${readArticleIds.size} read article IDs`);
 
     // Apply pagination to get only the articles we'll display
     const paginatedArticles = articles.slice(offset, offset + limit);
