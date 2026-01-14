@@ -174,15 +174,15 @@ const DashboardPage = () => {
     handleRefresh();
   }, []);
 
-  // Auto-refresh RSS feeds every 10 minutes
+  // Auto-refresh RSS feeds every 15 minutes
   useEffect(() => {
     const checkInterval = setInterval(() => {
       if (lastArticleFetchTime) {
         const now = Date.now();
-        const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
+        const fifteenMinutes = 15 * 60 * 1000; // 15 minutes in milliseconds
 
-        if (now - lastArticleFetchTime >= tenMinutes) {
-          console.log('🔄 Auto-refresh triggered (10 minutes elapsed) - fetching new articles from RSS feeds');
+        if (now - lastArticleFetchTime >= fifteenMinutes) {
+          console.log('🔄 Auto-refresh triggered (15 minutes elapsed) - fetching new articles from RSS feeds');
           handleRefresh(); // Fetch new articles from RSS feeds and update article list
         }
       }

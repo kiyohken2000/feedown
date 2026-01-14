@@ -26,199 +26,119 @@
 
 ### 🎯 次のセッションの計画
 
-**Phase 7の残りタスク**: 以下の3つの最適化アプローチを実装予定
+**Phase 7の残りタスク**: 以下の3つの未実装タスクを実装予定（2タスクは実装済み確認）
 
 ---
 
-## 🚀 Phase 7 追加最適化計画（2026-01-14策定）
+## 🚀 Phase 7 Firestore最適化計画（2026-01-14修正）
 
-### 📊 期待される効果
+### 📊 現状の分析
 
-| 状態 | 初回ロード読み取り数 |
-|------|---------------------|
-| 現状 | 15-50回 |
-| 改善後 | 4-8回 |
-| **削減率** | **75-84%** |
+コードレビューの結果、以下が判明：
+
+| 項目 | ステータス | 詳細 |
+|------|-----------|------|
+| readArticles統合 | ✅ **実装済み** | `articles/index.ts:99-116` で既にisReadフィールドを付与 |
+| フィード重複排除 | ✅ **実装済み** | `DashboardPage.jsx:137-143` でrefreshレスポンスからfeedsを使用 |
+| バッチ既読マーク | ❌ **未実装** | 一括既読でN回のAPI呼び出しが発生 |
+| 自動既読デバウンス | ❌ **未実装** | スクロール時に個別API呼び出しが発生 |
+
+### 🔍 真のボトルネック
+
+`functions/api/articles/index.ts` での読み取り（毎リクエスト）:
+- `listDocuments(feeds)` - 最大100件
+- `listDocuments(articles)` - 最大1000件
+- `listDocuments(readArticles)` - 最大1000件
+
+**合計**: 毎回最大2100件のFirestore読み取り
 
 ---
 
-### 🔴 アプローチ1: readArticles統合（最優先）
+### 🟢 アプローチ1: バッチ既読マークAPI（優先度: 高）
 
 **現状の問題**:
-- `articles`と`readArticles`を別々のAPIで取得している
-- `articles/index.ts`で1000件の記事を取得した後、さらに1000件の既読記事を取得
-- 合計で8-20回のFirestore読み取りが発生
-
-**改善内容**:
-- `articles`コレクションに`isRead`フィールドを追加（構造変更）
-- または、`articles/index.ts`で既読状態を含めたレスポンスを返す
-
-**実装方法A: articlesに既読状態を統合（推奨）**
-
-```
-変更ファイル:
-- functions/api/articles/index.ts
-  - readArticlesの取得をそのまま使用
-  - レスポンスに既読状態を含める（isReadフィールド）
-
-- apps/web/src/pages/DashboardPage.jsx
-  - 記事オブジェクトから直接isReadを参照
-  - 別途readArticlesを管理する必要なし
-```
-
-**コード変更**:
-
-```typescript
-// functions/api/articles/index.ts
-// 現在:
-return new Response(JSON.stringify({
-  articles: paginatedArticles,
-  ...
-}));
-
-// 変更後:
-const readArticleIds = new Set(readArticles.map(r => r.id));
-const articlesWithReadStatus = paginatedArticles.map(article => ({
-  ...article,
-  isRead: readArticleIds.has(article.id)
-}));
-
-return new Response(JSON.stringify({
-  articles: articlesWithReadStatus,
-  ...
-}));
-```
-
-**フロントエンド変更**:
-
-```javascript
-// apps/web/src/pages/DashboardPage.jsx
-// 現在:
-const [readArticles, setReadArticles] = useState(new Set());
-// ... readArticlesをAPIから別途取得
-
-// 変更後:
-// readArticlesの状態管理を削除
-// article.isReadを直接参照
-```
-
-**削減効果**: 4-10回削減（readArticles取得が不要に）
-
----
-
-### 🟡 アプローチ2: フィード取得の重複排除
-
-**現状の問題**:
-DashboardPageで以下の順序でAPIを呼び出している：
-1. `api.refresh.refreshAll()` → feeds + articlesを読み取り
-2. `api.feeds.list()` → feedsを再度読み取り
-3. `api.articles.list()` → articlesを再度読み取り（+ feeds）
-
-**改善内容**:
-- `refresh.ts`のレスポンスに`feeds`を含める（完了済み）
-- DashboardPageで重複取得を排除
-
-**実装方法**:
-
-```javascript
-// apps/web/src/pages/DashboardPage.jsx
-const handleRefresh = useCallback(async () => {
-  setLoading(true);
-  try {
-    const response = await api.refresh.refreshAll();
-
-    // refreshレスポンスからfeedsを取得（重複排除）
-    if (response.data.feeds) {
-      setFeeds(response.data.feeds);
-    }
-
-    // 新規記事がある場合のみ記事を再取得
-    if (response.data.shouldRefreshArticles) {
-      await fetchArticles(true);
-    }
-  } finally {
-    setLoading(false);
-  }
-}, [api, setFeeds, fetchArticles]);
-```
-
-**変更ファイル**:
-- `apps/web/src/pages/DashboardPage.jsx` - handleRefreshの最適化
-
-**削減効果**: 5-8回削減
-
----
-
-### 🟢 アプローチ3: バッチ既読マークAPI
-
-**現状の問題**:
-- 一括既読ボタンで各記事ごとにAPIを呼び出し
+- 一括既読ボタンで各記事ごとにAPIを呼び出し（`DashboardPage.jsx:325-327`）
 - 50件の記事を既読にすると50回のAPI呼び出し
 
 **改善内容**:
-- 一括既読用のAPIエンドポイントを追加
-- `POST /api/articles/batch-read` で複数記事を一括処理
+- `POST /api/articles/batch-read` エンドポイントを追加
+- Firestore REST APIの`batchWrite`を使用
 
-**実装方法**:
-
-```typescript
-// functions/api/articles/batch-read.ts（新規作成）
-export async function onRequestPost(context: any): Promise<Response> {
-  const { articleIds } = await request.json();
-
-  // バッチ処理で複数記事を既読に
-  const batch = articleIds.map(id => ({
-    updateMask: { fieldPaths: ['isRead'] },
-    currentDocument: { exists: true },
-    update: {
-      name: `projects/.../documents/users/${uid}/readArticles/${id}`,
-      fields: { articleId: { stringValue: id } }
-    }
-  }));
-
-  await batchWrite(batch, idToken, config);
-
-  return new Response(JSON.stringify({
-    success: true,
-    count: articleIds.length
-  }));
-}
+**実装ファイル**:
 ```
-
-**フロントエンド変更**:
-
-```javascript
-// apps/web/src/pages/DashboardPage.jsx
-const handleMarkAllAsRead = async () => {
-  const unreadIds = articles
-    .filter(a => !a.isRead)
-    .map(a => a.id);
-
-  // 現在: N回のAPI呼び出し
-  // await Promise.all(unreadIds.map(id => api.articles.markAsRead(id)));
-
-  // 変更後: 1回のAPI呼び出し
-  await api.articles.batchMarkAsRead(unreadIds);
-  await fetchArticles(true);
-};
+functions/api/articles/batch-read.ts（新規）
+packages/shared/api/endpoints.ts（エンドポイント追加）
+apps/web/src/pages/DashboardPage.jsx（バッチAPI使用）
 ```
-
-**変更ファイル**:
-- `functions/api/articles/batch-read.ts`（新規）
-- `packages/shared/api/endpoints.ts` - 新APIエンドポイント追加
-- `apps/web/src/pages/DashboardPage.jsx` - バッチAPI使用
 
 **削減効果**: N回 → 1回（一括既読時）
 
 ---
 
+### 🟡 アプローチ2: 自動既読のデバウンス処理（優先度: 中）
+
+**現状の問題**:
+- スクロール時に個別にAPI呼び出し（`DashboardPage.jsx:240-260`）
+- 高速スクロールで大量のAPI呼び出しが発生
+
+**改善内容**:
+- デバウンス処理を追加（500ms待機）
+- 複数の既読記事をまとめてバッチ送信
+
+**実装ファイル**:
+```
+apps/web/src/pages/DashboardPage.jsx
+- IntersectionObserverのコールバックにデバウンス追加
+- 保留中の既読記事IDをキューに蓄積
+- 500ms後にバッチAPIで一括送信
+```
+
+**削減効果**: 連続スクロール時のAPI呼び出しを大幅削減
+
+---
+
+### 🔵 アプローチ3: お気に入りのページネーション（優先度: 低）
+
+**現状の問題**:
+- 全お気に入り（最大1000件）を一度に読み込み
+
+**改善内容**:
+- ページネーション実装（20件ずつ）
+- 無限スクロール対応
+
+**実装ファイル**:
+```
+functions/api/favorites.ts（ページネーション追加）
+apps/web/src/pages/FavoritesPage.jsx（無限スクロール実装）
+```
+
+**削減効果**: 1000件 → 20件（初回ロード時）
+
+---
+
 ### 📋 実装順序
 
-| 順序 | アプローチ | リスク | 工数 |
-|------|-----------|--------|------|
-| 1 | フィード取得の重複排除 | 低 | 小 |
-| 2 | バッチ既読マークAPI | 低 | 中 |
-| 3 | readArticles統合 | 中 | 中 |
+| 順序 | アプローチ | リスク | 工数 | 効果 |
+|------|-----------|--------|------|------|
+| 1 | バッチ既読マークAPI | 低 | 中 | 高（一括既読時） |
+| 2 | 自動既読デバウンス | 低 | 小 | 中（スクロール時） |
+| 3 | お気に入りページネーション | 低 | 中 | 低（お気に入り多い場合のみ） |
+
+---
+
+### ✅ 既に完了している最適化
+
+1. **readArticles統合** (`articles/index.ts:99-116`)
+   - サーバー側で`readArticles`を取得し、各記事に`isRead`フィールドを付与
+   - クライアント側は`article.isRead`を直接参照可能
+
+2. **フィード重複排除** (`DashboardPage.jsx:137-143`)
+   - `refresh`APIのレスポンスに`feeds`を含める
+   - 重複した`feeds.list()`呼び出しを回避
+
+3. **HTTPキャッシュ** (`articles/index.ts:133`)
+   - `Cache-Control: private, max-age=60` を設定
+   - 60秒間はブラウザキャッシュを使用
 
 ---
 

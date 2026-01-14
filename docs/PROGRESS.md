@@ -299,19 +299,16 @@
 - お気に入りのページネーション実装
 - フィード重複検出の最適化
 
-### Phase 5: 追加最適化（2026-01-14策定）
+### Phase 5: 追加最適化（2026-01-14修正）
 
-期待される効果: 初回ロード15-50回 → 4-8回（75-84%削減）
+**コードレビューによる実態確認結果**:
 
-- [ ] Task 5.1: readArticles統合（最優先）
-  - [ ] `functions/api/articles/index.ts` でisReadフィールドを含めたレスポンスを返す
-  - [ ] `apps/web/src/pages/DashboardPage.jsx` でarticle.isReadを直接参照
-  - 削減効果: 4-10回削減
+- [x] Task 5.1: readArticles統合 ✅ **既に実装済み**
+  - [x] `functions/api/articles/index.ts:99-116` でisReadフィールドを付与済み
+  - [x] `apps/web/src/pages/DashboardPage.jsx:91-96` でarticle.isReadを参照済み
 
-- [ ] Task 5.2: フィード取得の重複排除
-  - [ ] `apps/web/src/pages/DashboardPage.jsx` のhandleRefreshを最適化
-  - [ ] refreshレスポンスからfeedsを取得（重複フェッチ回避）
-  - 削減効果: 5-8回削減
+- [x] Task 5.2: フィード取得の重複排除 ✅ **既に実装済み**
+  - [x] `apps/web/src/pages/DashboardPage.jsx:137-143` でrefreshレスポンスからfeedsを使用済み
 
 - [ ] Task 5.3: バッチ既読マークAPI
   - [ ] `functions/api/articles/batch-read.ts` 新規作成
@@ -319,7 +316,17 @@
   - [ ] `apps/web/src/pages/DashboardPage.jsx` でバッチAPI使用
   - 削減効果: N回 → 1回（一括既読時）
 
-**詳細な実装計画**: `docs/HANDOFF.md` の「Phase 7 追加最適化計画」セクションを参照
+- [ ] Task 5.4: 自動既読のデバウンス処理（新規追加）
+  - [ ] `apps/web/src/pages/DashboardPage.jsx` のIntersectionObserverにデバウンス追加
+  - [ ] 保留中の既読記事IDをキューに蓄積し、500ms後にバッチ送信
+  - 削減効果: 連続スクロール時のAPI呼び出し削減
+
+- [ ] Task 5.5: お気に入りのページネーション
+  - [ ] `functions/api/favorites.ts` にページネーション追加
+  - [ ] `apps/web/src/pages/FavoritesPage.jsx` に無限スクロール実装
+  - 削減効果: 1000件 → 20件（初回ロード時）
+
+**詳細な実装計画**: `docs/HANDOFF.md` の「Phase 7 Firestore最適化計画」セクションを参照
 
 ---
 
@@ -415,11 +422,11 @@
 | Phase 4: Pages Functions | 18 | 18 | 100% | 🟢 完了 |
 | Phase 5: Web UI（拡張含む） | 39 | 39 | 100% | 🟢 完了 |
 | Phase 6: Cloudflare Pages デプロイ | 6 | 6 | 100% | 🟢 完了 |
-| Phase 7: Firestore最適化 | 14 | 3 | 21% | 🟡 部分完了（+3タスク追加） |
+| Phase 7: Firestore最適化 | 14 | 5 | 36% | 🟡 部分完了（2タスク実装済み確認、3タスク残り） |
 | Phase 8: Mobile | 13 | 0 | 0% | 🔴 未着手 |
 | Phase 9: テスト & ドキュメント | 12 | 0 | 0% | 🔴 未着手 |
 | Phase 10: App Store リリース | 10 | 0 | 0% | 🔴 未着手 |
-| **合計** | **152** | **106** | **70%** | 🟡 進行中 |
+| **合計** | **152** | **108** | **71%** | 🟡 進行中 |
 
 **ステータス凡例**:
 - 🔴 未着手
