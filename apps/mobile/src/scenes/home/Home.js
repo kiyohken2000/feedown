@@ -10,15 +10,18 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { useNavigation, useFocusEffect } from '@react-navigation/native'
-import { colors, fontSize } from '../../theme'
+import { colors, fontSize, getThemeColors } from '../../theme'
 import { FeedsContext } from '../../contexts/FeedsContext'
 import { UserContext } from '../../contexts/UserContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 
 export default function Home() {
   const navigation = useNavigation()
   const { user } = useContext(UserContext)
+  const { isDarkMode } = useTheme()
+  const theme = getThemeColors(isDarkMode)
   const {
     articles,
     readArticles,
@@ -163,7 +166,7 @@ export default function Home() {
 
     return (
       <TouchableOpacity
-        style={[styles.articleCard, isRead && styles.articleCardRead]}
+        style={[styles.articleCard, { backgroundColor: theme.card }, isRead && styles.articleCardRead]}
         onPress={() => handleArticlePress(article)}
         activeOpacity={0.7}
       >
@@ -174,8 +177,8 @@ export default function Home() {
             resizeMode="cover"
           />
         ) : (
-          <View style={styles.noThumbnail}>
-            <Text style={styles.noThumbnailText}>No image</Text>
+          <View style={[styles.noThumbnail, { backgroundColor: theme.border }]}>
+            <Text style={[styles.noThumbnailText, { color: theme.textMuted }]}>No image</Text>
           </View>
         )}
         <View style={styles.articleContent}>
@@ -189,25 +192,25 @@ export default function Home() {
             <Text style={styles.feedTitle} numberOfLines={1}>
               {article.feedTitle || 'Unknown Feed'}
             </Text>
-            <Text style={styles.dot}>-</Text>
-            <Text style={styles.time}>{getRelativeTime(article.publishedAt)}</Text>
+            <Text style={[styles.dot, { color: theme.textMuted }]}>-</Text>
+            <Text style={[styles.time, { color: theme.textMuted }]}>{getRelativeTime(article.publishedAt)}</Text>
           </View>
-          <Text style={styles.articleTitle} numberOfLines={2}>
+          <Text style={[styles.articleTitle, { color: theme.text }]} numberOfLines={2}>
             {article.title}
           </Text>
-          <Text style={styles.articleDescription} numberOfLines={2}>
+          <Text style={[styles.articleDescription, { color: theme.textSecondary }]} numberOfLines={2}>
             {article.description || ''}
           </Text>
           {!isRead && (
             <TouchableOpacity
-              style={styles.markReadButton}
+              style={[styles.markReadButton, { backgroundColor: theme.border }]}
               onPress={(e) => {
                 e.stopPropagation()
                 markAsRead(article.id)
               }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={styles.markReadButtonText}>Mark as Read</Text>
+              <Text style={[styles.markReadButtonText, { color: theme.textMuted }]}>Mark as Read</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -220,7 +223,7 @@ export default function Home() {
     if (!hasMore) {
       return filteredArticles.length > 0 ? (
         <View style={styles.footer}>
-          <Text style={styles.footerText}>No more articles</Text>
+          <Text style={[styles.footerText, { color: theme.textMuted }]}>No more articles</Text>
         </View>
       ) : null
     }
@@ -243,8 +246,8 @@ export default function Home() {
     if (filter === 'unread' && articles.length > 0) {
       return (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>All caught up!</Text>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>All caught up!</Text>
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
             No unread articles. Pull to refresh for new content.
           </Text>
         </View>
@@ -254,8 +257,8 @@ export default function Home() {
     if (filter === 'read' && articles.length > 0) {
       return (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>No read articles</Text>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>No read articles</Text>
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
             Articles you've read will appear here.
           </Text>
         </View>
@@ -264,8 +267,8 @@ export default function Home() {
 
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyTitle}>No articles yet</Text>
-        <Text style={styles.emptyText}>
+        <Text style={[styles.emptyTitle, { color: theme.text }]}>No articles yet</Text>
+        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
           Add some feeds in the Feeds tab to get started
         </Text>
       </View>
@@ -274,7 +277,7 @@ export default function Home() {
 
   return (
     <ScreenTemplate>
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <Text style={styles.headerTitle}>FeedOwn</Text>
         {unreadCount > 0 && (
           <View style={styles.unreadBadge}>
@@ -284,10 +287,10 @@ export default function Home() {
       </View>
 
       {/* Filter and Actions Bar */}
-      <View style={styles.filterBar}>
+      <View style={[styles.filterBar, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <View style={styles.filterButtons}>
           <TouchableOpacity
-            style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}
+            style={[styles.filterButton, { backgroundColor: theme.card }, filter === 'all' && styles.filterButtonActive]}
             onPress={() => setFilter('all')}
           >
             <Text style={[styles.filterButtonText, filter === 'all' && styles.filterButtonTextActive]}>
@@ -295,7 +298,7 @@ export default function Home() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.filterButton, filter === 'unread' && styles.filterButtonActive]}
+            style={[styles.filterButton, { backgroundColor: theme.card }, filter === 'unread' && styles.filterButtonActive]}
             onPress={() => setFilter('unread')}
           >
             <Text style={[styles.filterButtonText, filter === 'unread' && styles.filterButtonTextActive]}>
@@ -303,7 +306,7 @@ export default function Home() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.filterButton, filter === 'read' && styles.filterButtonActive]}
+            style={[styles.filterButton, { backgroundColor: theme.card }, filter === 'read' && styles.filterButtonActive]}
             onPress={() => setFilter('read')}
           >
             <Text style={[styles.filterButtonText, filter === 'read' && styles.filterButtonTextActive]}>
@@ -346,9 +349,9 @@ export default function Home() {
       />
 
       {isLoading && articles.length === 0 && (
-        <View style={styles.loadingOverlay}>
+        <View style={[styles.loadingOverlay, { backgroundColor: isDarkMode ? 'rgba(18, 18, 18, 0.9)' : 'rgba(255, 255, 255, 0.9)' }]}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading articles...</Text>
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading articles...</Text>
         </View>
       )}
     </ScreenTemplate>

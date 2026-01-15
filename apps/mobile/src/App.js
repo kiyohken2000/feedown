@@ -6,6 +6,7 @@ import store from 'utils/store'
 import 'utils/ignore'
 import { UserContextProvider } from './contexts/UserContext'
 import { FeedsContextProvider } from './contexts/FeedsContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 
 // assets
 import { imageAssets } from 'theme/images'
@@ -33,11 +34,13 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <Provider store={store}>
-        <UserContextProvider>
-          <FeedsContextProvider>
-            <Router />
-          </FeedsContextProvider>
-        </UserContextProvider>
+        <ThemeProvider>
+          <UserContextProvider>
+            <FeedsContextProvider>
+              <Router />
+            </FeedsContextProvider>
+          </UserContextProvider>
+        </ThemeProvider>
       </Provider>
     </SafeAreaProvider>
   )

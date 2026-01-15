@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  Switch,
 } from 'react-native'
-import { colors, fontSize } from '../../theme'
+import { colors, fontSize, getThemeColors } from '../../theme'
 import { UserContext } from '../../contexts/UserContext'
 import { FeedsContext } from '../../contexts/FeedsContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import { createApiClient } from '../../utils/api'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
@@ -18,6 +20,8 @@ import Spinner from 'react-native-loading-spinner-overlay'
 export default function Profile() {
   const { user, signOut, getAccessToken } = useContext(UserContext)
   const { feeds, articles, getUnreadCount, resetAll } = useContext(FeedsContext)
+  const { isDarkMode, toggleDarkMode } = useTheme()
+  const theme = getThemeColors(isDarkMode)
   const [isLoading, setIsLoading] = useState(false)
 
   // Handle sign out
@@ -117,61 +121,82 @@ export default function Profile() {
   return (
     <ScreenTemplate>
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: theme.border }]}>
           <Text style={styles.headerTitle}>Settings</Text>
         </View>
 
         {/* User Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <View style={styles.card}>
-            <Text style={styles.label}>Email</Text>
-            <Text style={styles.value}>{user?.email || 'Not signed in'}</Text>
-            <Text style={styles.passwordHint}>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Account</Text>
+          <View style={[styles.card, { backgroundColor: theme.card }]}>
+            <Text style={[styles.label, { color: theme.textMuted }]}>Email</Text>
+            <Text style={[styles.value, { color: theme.text }]}>{user?.email || 'Not signed in'}</Text>
+            <Text style={[styles.passwordHint, { color: theme.textMuted }]}>
               If you didn't set a custom password, the default password is 111111
             </Text>
           </View>
         </View>
 
+        {/* Appearance */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Appearance</Text>
+          <View style={[styles.card, { backgroundColor: theme.card }]}>
+            <View style={styles.toggleRow}>
+              <View>
+                <Text style={[styles.toggleLabel, { color: theme.text }]}>Dark Mode</Text>
+                <Text style={[styles.toggleDescription, { color: theme.textMuted }]}>
+                  Use dark theme for the app
+                </Text>
+              </View>
+              <Switch
+                value={isDarkMode}
+                onValueChange={toggleDarkMode}
+                trackColor={{ false: '#767577', true: colors.primary }}
+                thumbColor={isDarkMode ? colors.white : '#f4f3f4'}
+              />
+            </View>
+          </View>
+        </View>
+
         {/* Stats */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Statistics</Text>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Statistics</Text>
           <View style={styles.statsRow}>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, { backgroundColor: theme.card }]}>
               <Text style={styles.statValue}>{feeds.length}</Text>
-              <Text style={styles.statLabel}>Feeds</Text>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Feeds</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, { backgroundColor: theme.card }]}>
               <Text style={styles.statValue}>{articles.length}</Text>
-              <Text style={styles.statLabel}>Articles</Text>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Articles</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, { backgroundColor: theme.card }]}>
               <Text style={styles.statValue}>{unreadCount}</Text>
-              <Text style={styles.statLabel}>Unread</Text>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Unread</Text>
             </View>
           </View>
         </View>
 
         {/* Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Actions</Text>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Actions</Text>
 
           <TouchableOpacity
-            style={styles.actionButton}
+            style={[styles.actionButton, { backgroundColor: theme.card }]}
             onPress={handleSignOut}
           >
             <Text style={styles.actionButtonText}>Sign Out</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonWarning]}
+            style={[styles.actionButton, styles.actionButtonWarning, { backgroundColor: theme.card }]}
             onPress={handleClearData}
           >
             <Text style={styles.actionButtonTextWarning}>Clear All Data</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonDanger]}
+            style={[styles.actionButton, styles.actionButtonDanger, { backgroundColor: theme.card }]}
             onPress={handleDeleteAccount}
           >
             <Text style={styles.actionButtonTextDanger}>Delete Account</Text>
@@ -180,11 +205,11 @@ export default function Profile() {
 
         {/* App Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <View style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>About</Text>
+          <View style={[styles.card, { backgroundColor: theme.card }]}>
             <Text style={styles.appName}>FeedOwn</Text>
-            <Text style={styles.appVersion}>Version 1.0.0</Text>
-            <Text style={styles.appDescription}>
+            <Text style={[styles.appVersion, { color: theme.textMuted }]}>Version 1.0.0</Text>
+            <Text style={[styles.appDescription, { color: theme.textSecondary }]}>
               Your personal RSS feed reader
             </Text>
           </View>
@@ -335,5 +360,20 @@ const styles = StyleSheet.create({
     color: colors.gray,
     textAlign: 'center',
     marginTop: 8,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  toggleLabel: {
+    fontSize: fontSize.normal,
+    fontWeight: '600',
+    color: colors.black,
+  },
+  toggleDescription: {
+    fontSize: fontSize.small,
+    color: colors.gray,
+    marginTop: 4,
   },
 })

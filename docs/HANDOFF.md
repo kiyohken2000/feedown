@@ -16,6 +16,7 @@
 - **Expoモバイルアプリ: Supabase認証実装完了**（サインイン、サインアップ、サインアウト、自動ログイン）
 - **Expoモバイルアプリ: 全画面実装完了**（Articles、Favorites、Feeds、Settings）
 - **Recommended Feeds: DB管理に移行**（ハードコードからSupabaseテーブルへ）
+- **Expoモバイルアプリ: ダークモード実装完了**（全画面・コンポーネント対応、AsyncStorage永続化）
 
 ### デプロイ情報
 - **本番URL（Web）**: https://feedown.pages.dev
@@ -53,7 +54,30 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ## 本日の作業内容（2026-01-15）
 
-### モバイルアプリ機能追加
+### ダークモード実装
+
+1. **ThemeContext** (`contexts/ThemeContext.js`) - 新規作成
+   - ダークモードの状態管理
+   - AsyncStorageへの永続化（`@feedown_theme`キー）
+   - `useTheme`フック提供（`isDarkMode`, `toggleDarkMode`）
+
+2. **テーマカラー** (`theme/colors.js`)
+   - `lightTheme` / `darkTheme` オブジェクト追加
+   - `getThemeColors(isDarkMode)` ヘルパー関数追加
+   - 背景、カード、テキスト、ボーダー、入力欄の色を定義
+
+3. **対応した画面・コンポーネント**
+   - `ScreenTemplate.js` - 背景色、StatusBar
+   - `TextInputBox.js` - 入力欄の色
+   - `Navigation.js` - トーストのダークモード対応
+   - `Tabs.js` - ボトムタブナビゲーター
+   - `Home.js`, `Favorites.js`, `Read.js`, `Profile.js`, `ArticleDetail.js`
+
+4. **Settings画面** (`scenes/profile/Profile.js`)
+   - Dark Modeトグルスイッチ追加
+   - Appearanceセクション追加
+
+### 以前の作業
 
 1. **記事詳細画面** (`scenes/article/ArticleDetail.js`)
    - 記事タップで詳細画面に遷移
@@ -140,7 +164,8 @@ eas build --profile preview --platform android
 apps/mobile/src/
 ├── contexts/
 │   ├── FeedsContext.js      # フィード・記事状態管理
-│   └── UserContext.js       # 認証状態管理
+│   ├── UserContext.js       # 認証状態管理
+│   └── ThemeContext.js      # ダークモード状態管理
 ├── scenes/
 │   ├── home/Home.js         # 記事一覧（フィルター、Mark All Read）
 │   ├── article/ArticleDetail.js  # 記事詳細
@@ -162,9 +187,6 @@ apps/mobile/src/
 
 ## 次のタスク候補
 
-### 優先度高（UX改善）
-- [ ] **Articlesタブにフォーカス時の自動リフレッシュ実装** (`useFocusEffect`使用)
-
 ### 優先度高（Phase 9 継続）
 - [ ] モバイルアプリ: Expo Goでテスト
 - [ ] モバイルアプリ: EAS Build（iOS/Android）
@@ -178,6 +200,7 @@ apps/mobile/src/
 - [ ] パフォーマンス最適化
 - [ ] 多言語対応
 - [ ] Androidビルド確認
+- [ ] オフライン対応（AsyncStorageキャッシュ）
 
 ---
 

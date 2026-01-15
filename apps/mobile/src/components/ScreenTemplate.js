@@ -1,13 +1,16 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React from "react";
 import { StyleSheet, StatusBar, View } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from "../theme";
+import { colors, getThemeColors } from "../theme";
+import { useTheme } from "../contexts/ThemeContext";
 import LoadingScreen from "./LoadingScreen";
 import ErrorScreen from "./ErrorScreen";
 import EmptyScreen from "./EmptyScreen";
 
 export default function ScreenTemplate(props) {
   const { isLoading, isError, color, isEmpty } = props
+  const { isDarkMode } = useTheme()
+  const theme = getThemeColors(isDarkMode)
 
   if(isLoading) {
     return <LoadingScreen />
@@ -23,10 +26,10 @@ export default function ScreenTemplate(props) {
 
   return (
     <SafeAreaView
-      style={styles.container}
-      edges={['top', 'right', 'bottom', 'left']}
+      style={[styles.container, { backgroundColor: theme.background }]}
+      edges={['top', 'right', 'left']}
     >
-      <StatusBar barStyle='dark-content' />
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.main}>
         {props.children}
       </View>
@@ -37,7 +40,6 @@ export default function ScreenTemplate(props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.white
   },
   main: {
     flex: 1,

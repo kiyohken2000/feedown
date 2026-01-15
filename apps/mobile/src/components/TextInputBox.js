@@ -1,9 +1,10 @@
-import React, { useState, useContext, useEffect } from 'react'
+import React from 'react'
 import { TextInput, StyleSheet } from 'react-native'
-import { colors } from '../theme'
+import { colors, getThemeColors } from '../theme'
+import { useTheme } from '../contexts/ThemeContext'
 
 export default function TextInputBox(props) {
-  const { 
+  const {
     secureTextEntry,
     placeholder,
     onChangeText,
@@ -12,11 +13,20 @@ export default function TextInputBox(props) {
     keyboardType,
     maxLength,
   } = props
+  const { isDarkMode } = useTheme()
+  const theme = getThemeColors(isDarkMode)
 
   return (
     <TextInput
-      style={styles.input}
-      placeholderTextColor={colors.grayPrimary}
+      style={[
+        styles.input,
+        {
+          backgroundColor: theme.inputBackground,
+          borderColor: theme.inputBorder,
+          color: theme.text,
+        }
+      ]}
+      placeholderTextColor={theme.textMuted}
       secureTextEntry={secureTextEntry}
       placeholder={placeholder}
       onChangeText={onChangeText}

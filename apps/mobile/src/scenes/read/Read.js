@@ -12,13 +12,16 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
-import { colors, fontSize } from '../../theme'
+import { colors, fontSize, getThemeColors } from '../../theme'
 import { FeedsContext } from '../../contexts/FeedsContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import { API_BASE_URL } from '../../utils/supabase'
 
 export default function Read() {
+  const { isDarkMode } = useTheme()
+  const theme = getThemeColors(isDarkMode)
   const {
     feeds,
     fetchFeeds,
@@ -137,7 +140,7 @@ export default function Read() {
 
   // Render feed item
   const renderFeed = ({ item: feed }) => (
-    <View style={styles.feedCard}>
+    <View style={[styles.feedCard, { backgroundColor: theme.card }]}>
       <View style={styles.feedInfo}>
         {feed.faviconUrl ? (
           <Image
@@ -152,10 +155,10 @@ export default function Read() {
           </View>
         )}
         <View style={styles.feedDetails}>
-          <Text style={styles.feedTitle} numberOfLines={1}>
+          <Text style={[styles.feedTitle, { color: theme.text }]} numberOfLines={1}>
             {feed.title || 'Untitled Feed'}
           </Text>
-          <Text style={styles.feedUrl} numberOfLines={1}>
+          <Text style={[styles.feedUrl, { color: theme.textMuted }]} numberOfLines={1}>
             {feed.url}
           </Text>
         </View>
@@ -176,7 +179,7 @@ export default function Read() {
     return (
       <TouchableOpacity
         key={recommendedFeed.url}
-        style={styles.recommendedCard}
+        style={[styles.recommendedCard, { backgroundColor: theme.card, borderColor: theme.border }]}
         onPress={() => handleAddRecommendedFeed(recommendedFeed)}
         disabled={isAddingThis}
         activeOpacity={0.7}
@@ -187,7 +190,7 @@ export default function Read() {
               {recommendedFeed.name.charAt(0)}
             </Text>
           </View>
-          <Text style={styles.recommendedName}>{recommendedFeed.name}</Text>
+          <Text style={[styles.recommendedName, { color: theme.text }]}>{recommendedFeed.name}</Text>
         </View>
         {isAddingThis ? (
           <ActivityIndicator size="small" color={colors.primary} />
@@ -204,12 +207,12 @@ export default function Read() {
     if (recommendedLoading) {
       return (
         <View style={styles.recommendedSection}>
-          <Text style={styles.sectionTitle}>Recommended Feeds</Text>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Recommended Feeds</Text>
           <View style={{ padding: 20, alignItems: 'center' }}>
             <ActivityIndicator size="small" color={colors.primary} />
           </View>
           {feeds.length > 0 && (
-            <Text style={styles.sectionTitle}>Your Feeds</Text>
+            <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Your Feeds</Text>
           )}
         </View>
       )
@@ -220,7 +223,7 @@ export default function Read() {
       if (feeds.length > 0) {
         return (
           <View style={styles.recommendedSection}>
-            <Text style={styles.sectionTitle}>Your Feeds</Text>
+            <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Your Feeds</Text>
           </View>
         )
       }
@@ -229,12 +232,12 @@ export default function Read() {
 
     return (
       <View style={styles.recommendedSection}>
-        <Text style={styles.sectionTitle}>Recommended Feeds</Text>
+        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Recommended Feeds</Text>
         <View style={styles.recommendedGrid}>
           {availableRecommendedFeeds.map(renderRecommendedFeed)}
         </View>
         {feeds.length > 0 && (
-          <Text style={styles.sectionTitle}>Your Feeds</Text>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Your Feeds</Text>
         )}
       </View>
     )
@@ -247,8 +250,8 @@ export default function Read() {
 
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyTitle}>All feeds added!</Text>
-        <Text style={styles.emptyText}>
+        <Text style={[styles.emptyTitle, { color: theme.text }]}>All feeds added!</Text>
+        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
           You've added all recommended feeds. Enter a custom RSS URL to add more.
         </Text>
       </View>
@@ -261,17 +264,17 @@ export default function Read() {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: theme.border }]}>
           <Text style={styles.headerTitle}>Manage Feeds</Text>
-          <Text style={styles.feedCount}>{feeds.length} feeds</Text>
+          <Text style={[styles.feedCount, { color: theme.textMuted }]}>{feeds.length} feeds</Text>
         </View>
 
         {/* Add feed form */}
         <View style={styles.addFeedContainer}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text }]}
             placeholder="Enter RSS feed URL..."
-            placeholderTextColor={colors.gray}
+            placeholderTextColor={theme.textMuted}
             value={newFeedUrl}
             onChangeText={setNewFeedUrl}
             autoCapitalize="none"
@@ -305,7 +308,7 @@ export default function Read() {
         />
 
         {isLoading && feeds.length === 0 && (
-          <View style={styles.loadingOverlay}>
+          <View style={[styles.loadingOverlay, { backgroundColor: isDarkMode ? 'rgba(18, 18, 18, 0.9)' : 'rgba(255, 255, 255, 0.9)' }]}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
         )}

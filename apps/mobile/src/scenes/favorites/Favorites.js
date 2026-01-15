@@ -11,13 +11,16 @@ import {
   Alert,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import { colors, fontSize } from '../../theme'
+import { colors, fontSize, getThemeColors } from '../../theme'
 import { FeedsContext } from '../../contexts/FeedsContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 
 export default function Favorites() {
   const navigation = useNavigation()
+  const { isDarkMode } = useTheme()
+  const theme = getThemeColors(isDarkMode)
   const {
     favorites,
     fetchFavorites,
@@ -114,7 +117,7 @@ export default function Favorites() {
 
     return (
       <TouchableOpacity
-        style={styles.favoriteCard}
+        style={[styles.favoriteCard, { backgroundColor: theme.card }]}
         onPress={() => handleArticlePress(favorite)}
         activeOpacity={0.7}
         disabled={isRemoving}
@@ -126,8 +129,8 @@ export default function Favorites() {
             resizeMode="cover"
           />
         ) : (
-          <View style={styles.noThumbnail}>
-            <Text style={styles.noThumbnailText}>No image</Text>
+          <View style={[styles.noThumbnail, { backgroundColor: theme.border }]}>
+            <Text style={[styles.noThumbnailText, { color: theme.textMuted }]}>No image</Text>
           </View>
         )}
         <View style={styles.favoriteContent}>
@@ -135,14 +138,14 @@ export default function Favorites() {
             <Text style={styles.feedTitle} numberOfLines={1}>
               {favorite.feedTitle || 'Unknown Feed'}
             </Text>
-            <Text style={styles.dot}>-</Text>
-            <Text style={styles.time}>{getRelativeTime(favorite.createdAt)}</Text>
+            <Text style={[styles.dot, { color: theme.textMuted }]}>-</Text>
+            <Text style={[styles.time, { color: theme.textMuted }]}>{getRelativeTime(favorite.createdAt)}</Text>
           </View>
-          <Text style={styles.favoriteTitle} numberOfLines={2}>
+          <Text style={[styles.favoriteTitle, { color: theme.text }]} numberOfLines={2}>
             {favorite.title}
           </Text>
           {favorite.description && (
-            <Text style={styles.favoriteDescription} numberOfLines={2}>
+            <Text style={[styles.favoriteDescription, { color: theme.textSecondary }]} numberOfLines={2}>
               {favorite.description}
             </Text>
           )}
@@ -169,8 +172,8 @@ export default function Favorites() {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyIcon}>★</Text>
-        <Text style={styles.emptyTitle}>No favorites yet</Text>
-        <Text style={styles.emptyText}>
+        <Text style={[styles.emptyTitle, { color: theme.text }]}>No favorites yet</Text>
+        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
           Articles you favorite will appear here. Tap the star on any article to save it.
         </Text>
       </View>
@@ -179,7 +182,7 @@ export default function Favorites() {
 
   return (
     <ScreenTemplate>
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <Text style={styles.headerTitle}>Favorites</Text>
         <View style={styles.countBadge}>
           <Text style={styles.countText}>{favorites.length} saved</Text>
@@ -204,9 +207,9 @@ export default function Favorites() {
       />
 
       {isLoading && favorites.length === 0 && (
-        <View style={styles.loadingOverlay}>
+        <View style={[styles.loadingOverlay, { backgroundColor: isDarkMode ? 'rgba(18, 18, 18, 0.9)' : 'rgba(255, 255, 255, 0.9)' }]}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading favorites...</Text>
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading favorites...</Text>
         </View>
       )}
     </ScreenTemplate>

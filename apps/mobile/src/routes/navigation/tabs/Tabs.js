@@ -1,7 +1,8 @@
 import React from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import FontIcon from 'react-native-vector-icons/FontAwesome'
-import { colors } from 'theme'
+import { colors, getThemeColors } from 'theme'
+import { useTheme } from '../../../contexts/ThemeContext'
 
 // stack navigators
 import { HomeStacks } from '../stacks/HomeStacks'
@@ -12,15 +13,18 @@ import { ReadWriteStacks } from '../stacks/ReadWriteStacks'
 const Tab = createBottomTabNavigator()
 
 export default function TabNavigator() {
+  const { isDarkMode } = useTheme()
+  const theme = getThemeColors(isDarkMode)
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.gray,
+        tabBarInactiveTintColor: theme.textMuted,
         tabBarStyle: {
-          backgroundColor: colors.white,
-          borderTopColor: colors.grayLight,
+          backgroundColor: theme.tabBarBackground,
+          borderTopColor: theme.tabBarBorder,
           borderTopWidth: 1,
           paddingBottom: 5,
           paddingTop: 5,

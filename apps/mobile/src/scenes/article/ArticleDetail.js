@@ -10,8 +10,9 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import { colors, fontSize } from '../../theme'
+import { colors, fontSize, getThemeColors } from '../../theme'
 import { FeedsContext } from '../../contexts/FeedsContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 
@@ -19,6 +20,8 @@ export default function ArticleDetail() {
   const navigation = useNavigation()
   const route = useRoute()
   const { article } = route.params
+  const { isDarkMode } = useTheme()
+  const theme = getThemeColors(isDarkMode)
 
   const {
     readArticles,
@@ -91,13 +94,13 @@ export default function ArticleDetail() {
   return (
     <ScreenTemplate>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={styles.contentContainer}>
         {/* Article Image */}
         {article.imageUrl && (
           <Image
@@ -110,15 +113,15 @@ export default function ArticleDetail() {
         {/* Article Meta */}
         <View style={styles.metaContainer}>
           <Text style={styles.feedTitle}>{article.feedTitle || 'Unknown Feed'}</Text>
-          <Text style={styles.publishDate}>{getRelativeTime(article.publishedAt)}</Text>
+          <Text style={[styles.publishDate, { color: theme.textMuted }]}>{getRelativeTime(article.publishedAt)}</Text>
         </View>
 
         {/* Article Title */}
-        <Text style={styles.title}>{article.title}</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{article.title}</Text>
 
         {/* Article Description */}
         {article.description && (
-          <Text style={styles.description}>{article.description}</Text>
+          <Text style={[styles.description, { color: theme.textSecondary }]}>{article.description}</Text>
         )}
 
         {/* Action Buttons */}
@@ -127,6 +130,7 @@ export default function ArticleDetail() {
             style={[
               styles.actionButton,
               styles.favoriteButton,
+              { backgroundColor: isDarkMode ? theme.card : colors.white },
               isFavorited && styles.favoriteButtonActive,
             ]}
             onPress={handleToggleFavorite}
@@ -155,9 +159,9 @@ export default function ArticleDetail() {
         </View>
 
         {/* URL Info */}
-        <View style={styles.urlContainer}>
-          <Text style={styles.urlLabel}>Source</Text>
-          <Text style={styles.urlText} numberOfLines={2}>{article.url}</Text>
+        <View style={[styles.urlContainer, { backgroundColor: theme.surface }]}>
+          <Text style={[styles.urlLabel, { color: theme.textMuted }]}>Source</Text>
+          <Text style={[styles.urlText, { color: theme.textMuted }]} numberOfLines={2}>{article.url}</Text>
         </View>
       </ScrollView>
     </ScreenTemplate>

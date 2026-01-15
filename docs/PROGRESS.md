@@ -210,6 +210,14 @@
 ### Step 7: バグ修正 ✅
 - [x] Clear All Data後の表示問題を修正（useFocusEffect / visibilitychange）
 
+### Step 8: ダークモード実装 ✅
+- [x] ThemeContext作成（AsyncStorage永続化）
+- [x] テーマカラー定義（lightTheme / darkTheme）
+- [x] 全画面のダークモード対応（Home, Favorites, Read, Profile, ArticleDetail）
+- [x] コンポーネントのダークモード対応（ScreenTemplate, TextInputBox, Toast）
+- [x] ボトムタブナビゲーターのダークモード対応
+- [x] Settings画面にダークモードトグル追加
+
 **完了条件**: iOS/Androidで全機能が動作
 
 ---

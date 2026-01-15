@@ -27,4 +27,43 @@ const colors = {
   loadingSpinnerColor: 'rgba(0,0,0,0.5)',
 }
 
-export { colors }
+// Light theme colors
+const lightTheme = {
+  background: '#f5f5f5',
+  surface: '#ffffff',
+  text: '#333333',
+  textSecondary: '#666666',
+  textMuted: '#999999',
+  border: '#e0e0e0',
+  card: '#ffffff',
+  cardBorder: '#e0e0e0',
+  inputBackground: '#ffffff',
+  inputBorder: '#e0e0e0',
+  headerBackground: '#ffffff',
+  tabBarBackground: '#ffffff',
+  tabBarBorder: '#e0e0e0',
+}
+
+// Dark theme colors
+const darkTheme = {
+  background: '#121212',
+  surface: '#1e1e1e',
+  text: '#e0e0e0',
+  textSecondary: '#b0b0b0',
+  textMuted: '#808080',
+  border: '#333333',
+  card: '#2d2d2d',
+  cardBorder: '#444444',
+  inputBackground: '#1a1a1a',
+  inputBorder: '#444444',
+  headerBackground: '#1e1e1e',
+  tabBarBackground: '#1e1e1e',
+  tabBarBorder: '#333333',
+}
+
+// Helper function to get theme colors
+const getThemeColors = (isDarkMode) => {
+  return isDarkMode ? darkTheme : lightTheme
+}
+
+export { colors, lightTheme, darkTheme, getThemeColors }
