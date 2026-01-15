@@ -5,6 +5,7 @@ import { colors } from 'theme'
 
 // stack navigators
 import { HomeStacks } from '../stacks/HomeStacks'
+import { FavoritesStacks } from '../stacks/FavoritesStacks'
 import { ProfileStacks } from '../stacks/ProfileStacks'
 import { ReadWriteStacks } from '../stacks/ReadWriteStacks'
 
@@ -13,35 +14,28 @@ const Tab = createBottomTabNavigator()
 export default function TabNavigator() {
   return (
     <Tab.Navigator
-      options={{
-        tabBarActiveTintColor: colors.lightPurple,
-        tabBarInactiveTintColor: colors.gray,
-        tabBarStyle: {
-          // backgroundColor: 'white',
-          // borderTopColor: 'gray',
-          // borderTopWidth: 1,
-          // paddingBottom: 5,
-          // paddingTop: 5,
-        }
-      }}
-      defaultScreenOptions={{
-        headerShown:false,
-        headerTransparent:true
-      }}
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.gray,
+        tabBarStyle: {
+          backgroundColor: colors.white,
+          borderTopColor: colors.grayLight,
+          borderTopWidth: 1,
+          paddingBottom: 5,
+          paddingTop: 5,
+        },
       })}
       initialRouteName="HomeTab"
-      swipeEnabled={false}
     >
       <Tab.Screen
         name="HomeTab"
         component={HomeStacks}
         options={{
-          tabBarLabel: 'Home',
+          tabBarLabel: 'Articles',
           tabBarIcon: ({ color, size }) => (
             <FontIcon
-              name="home"
+              name="newspaper-o"
               color={color}
               size={size}
             />
@@ -49,13 +43,13 @@ export default function TabNavigator() {
         }}
       />
       <Tab.Screen
-        name="ProfileTab"
-        component={ProfileStacks}
+        name="FavoritesTab"
+        component={FavoritesStacks}
         options={{
-          tabBarLabel: 'Profile',
+          tabBarLabel: 'Favorites',
           tabBarIcon: ({ color, size }) => (
             <FontIcon
-              name="user"
+              name="star"
               color={color}
               size={size}
             />
@@ -66,10 +60,24 @@ export default function TabNavigator() {
         name="ReadWriteTab"
         component={ReadWriteStacks}
         options={{
-          tabBarLabel: 'R/W',
+          tabBarLabel: 'Feeds',
           tabBarIcon: ({ color, size }) => (
             <FontIcon
-              name="address-card"
+              name="rss"
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="ProfileTab"
+        component={ProfileStacks}
+        options={{
+          tabBarLabel: 'Settings',
+          tabBarIcon: ({ color, size }) => (
+            <FontIcon
+              name="cog"
               color={color}
               size={size}
             />

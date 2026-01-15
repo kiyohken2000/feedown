@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import store from 'utils/store'
 import 'utils/ignore'
 import { UserContextProvider } from './contexts/UserContext'
+import { FeedsContextProvider } from './contexts/FeedsContext'
 
 // assets
 import { imageAssets } from 'theme/images'
@@ -33,7 +34,9 @@ export default function App() {
     <SafeAreaProvider>
       <Provider store={store}>
         <UserContextProvider>
-          <Router />
+          <FeedsContextProvider>
+            <Router />
+          </FeedsContextProvider>
         </UserContextProvider>
       </Provider>
     </SafeAreaProvider>

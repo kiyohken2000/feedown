@@ -241,6 +241,12 @@ const SettingsPage = () => {
       backgroundColor: '#c82333',
       flexShrink: 0,
     },
+    passwordHint: {
+      fontSize: '0.85rem',
+      color: isDarkMode ? '#888' : '#888',
+      marginTop: '1rem',
+      fontStyle: 'italic',
+    },
   };
 
   if (loading) {
@@ -286,6 +292,9 @@ const SettingsPage = () => {
               {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
             </span>
           </div>
+          <p style={styles.passwordHint}>
+            If you didn't set a custom password, the default password is 111111
+          </p>
         </div>
 
         <div style={styles.card}>

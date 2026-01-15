@@ -1,4 +1,9 @@
 const colors = {
+  // FeedOwn primary colors
+  primary: '#FF6B35',
+  primaryDark: '#E55A25',
+  grayLight: '#f0f0f0',
+  // Original colors
   darkPurple: '#231d54',
   purple: '#8100ff',
   lightPurple: '#9388db',

@@ -2,29 +2,29 @@ import React from 'react'
 import { createStackNavigator } from '@react-navigation/stack'
 import { navigationProps } from './navigationProps/navigationProps'
 
-import Home from '../../../scenes/home/Home'
+import Favorites from '../../../scenes/favorites/Favorites'
 import ArticleDetail from '../../../scenes/article/ArticleDetail'
 
 const Stack = createStackNavigator()
 
-export const HomeStacks = () => {
+export const FavoritesStacks = () => {
   return (
     <Stack.Navigator
-      initialRouteName="Home"
+      initialRouteName="Favorites"
       screenOptions={{
         ...navigationProps,
         headerShown: false,
       }}
     >
       <Stack.Screen
-        name="Home"
-        component={Home}
+        name="Favorites"
+        component={Favorites}
         options={{
-          title: 'Articles',
+          title: 'Favorites',
         }}
       />
       <Stack.Screen
-        name="ArticleDetail"
+        name="FavoriteDetail"
         component={ArticleDetail}
         options={{
           title: 'Article',

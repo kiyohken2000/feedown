@@ -14,6 +14,7 @@
 - Web UIが本番環境で稼働中
 - **Expoモバイルアプリ: ボイラープレート起動・EASビルド成功**
 - **Expoモバイルアプリ: Supabase認証実装完了**（サインイン、サインアップ、サインアウト、自動ログイン）
+- **Expoモバイルアプリ: 全画面実装完了**（Articles、Favorites、Feeds、Settings）
 
 ### デプロイ情報
 - **本番URL（Web）**: https://feedown.pages.dev
@@ -21,49 +22,83 @@
 - **Supabase Project**: feedown（ダッシュボードで確認）
 - **EAS Project ID**: 09e91d3a-0014-4831-b35f-9962d05db0e3
 
+### デプロイ手順
+
+```bash
+# Web版デプロイ（ルートディレクトリから実行すること！）
+cd /path/to/feedown
+npm run build --workspace=apps/web
+npx wrangler pages deploy apps/web/dist --project-name=feedown
+```
+
+**重要**: `apps/web`ディレクトリからではなく、**ルートディレクトリから**デプロイすること。
+そうしないとfunctionsフォルダが含まれず、APIが405エラーになる。
+
 ---
 
-## 最近修正した問題
+## 既知のバグ・未解決問題
 
-### 1. 記事がすぐに表示されない問題（2026-01-15）
+### 1. Clear All Data 後に記事が表示されたままになる問題 🟡 対処方針決定
 
-**症状**: フィードを追加してDashboardに戻っても記事が表示されない。1-2分後にRefreshすると表示される。
+**症状**: Settings画面で「Clear All Data」を実行すると、FavoritesとFeedsは削除されるが、Articlesタブに記事が表示されたままになる。
 
-**原因**: `GET /api/articles` のレスポンスに `Cache-Control: private, max-age=60` が設定されていた。
+**原因**: フロントエンドのキャッシュ（React state）が残っている。プルトゥリフレッシュをすると記事が消える。APIは正常に動作している。
 
-**修正**: `functions/api/articles/index.ts` で `Cache-Control: no-cache, no-store, must-revalidate` に変更。
+**対処方針**: Articlesタブにフォーカスが当たったら自動でリフレッシュするようにする。
 
-### 2. React stale closure問題（2026-01-15）
+**実装方法**:
+- `apps/mobile/src/scenes/home/Home.js` で `useFocusEffect` を使用
+- `apps/web/src/pages/DashboardPage.jsx` でも同様の対応が必要
 
-**症状**: ナビゲーション後に古い関数が呼ばれる。
+```javascript
+// React Navigation の useFocusEffect を使用
+import { useFocusEffect } from '@react-navigation/native'
 
-**修正**: `DashboardPage.jsx` で `handleRefreshRef` を使用して常に最新の関数を参照するように変更。
+useFocusEffect(
+  useCallback(() => {
+    // タブにフォーカスが当たったらリフレッシュ
+    fetchArticles(true)
+  }, [])
+)
+```
 
-### 3. Delete Account エラー（以前）
+---
 
-**症状**: "User not allowed" エラーでアカウント削除失敗。
+## 本日の作業内容（2026-01-15）
 
-**原因**: Supabase Admin APIの権限問題。
+### モバイルアプリ機能追加
 
-**修正**: `functions/api/user/account.ts` でAuth削除をオプショナルに（データは削除、Auth recordは残る可能性あり）。
+1. **記事詳細画面** (`scenes/article/ArticleDetail.js`)
+   - 記事タップで詳細画面に遷移
+   - 詳細画面を開いたときに既読マーク
+   - Add to Favorites / In Favoritesボタン
+   - Visit Originalボタン（外部ブラウザで開く）
 
-### 4. Expoモノレポビルドエラー（2026-01-15）
+2. **お気に入り画面** (`scenes/favorites/Favorites.js`)
+   - Favoritesタブ追加（星アイコン）
+   - お気に入り一覧表示
+   - 記事タップで詳細画面に遷移
+   - 削除機能（確認ダイアログ付き）
 
-**症状**: EAS Buildで複数のエラーが発生。
+3. **記事一覧画面の改善** (`scenes/home/Home.js`)
+   - All/Unread/Readフィルター
+   - Mark All Readボタン
+   - 各記事に「Mark as Read」ボタン追加
 
-**原因と修正**:
-1. **エントリポイント問題**: `package.json`の`main`が`../../node_modules/expo/AppEntry.js`でモノレポのパスが解決できなかった
-   - → `App.js`でカスタムエントリポイント作成（`registerRootComponent`使用）
-   - → `main`を`./App.js`に変更
+4. **Settings画面** (`scenes/profile/Profile.js`, `apps/web/src/pages/SettingsPage.jsx`)
+   - パスワードヒント追加: "If you didn't set a custom password, the default password is 111111"
 
-2. **module-resolverエイリアス未設定**: `utils/store`等のインポートが解決できなかった
-   - → `babel.config.js`にエイリアス設定追加
+5. **FeedsContext更新** (`contexts/FeedsContext.js`)
+   - toggleFavoriteでfavorites配列も同時更新（オプティミスティック更新）
+   - batchMarkAsRead関数追加
 
-3. **expo-updatesバージョン不整合**: `reactNativeFactory`が見つからないエラー
-   - → `npx expo install expo-updates --fix`で正しいバージョンに更新
+### ナビゲーション構成
 
-4. **react-native-workletsバージョン不整合**: Reanimated 4.xが0.5.x以上を要求
-   - → worklets 0.5.1に更新、babelプラグインの重複削除
+ボトムタブ4つ:
+- **Articles** (newspaper-o) - 記事一覧 → 記事詳細
+- **Favorites** (star) - お気に入り一覧 → 記事詳細
+- **Feeds** (rss) - フィード管理
+- **Settings** (cog) - 設定
 
 ---
 
@@ -73,8 +108,10 @@
 - ✅ Expo Go起動成功
 - ✅ EAS Build（iOS preview）成功
 - ✅ Supabase認証実装完了
-- 🔴 API連携は未実装（フィード・記事取得）
-- 🔴 画面実装は未完了（Dashboard等）
+- ✅ API連携実装完了（フィード・記事取得）
+- ✅ 画面実装完了（Dashboard、フィード管理、設定、記事詳細、お気に入り）
+- ✅ UX改善（フィルター、Mark All Read、おすすめフィード）
+- ✅ ボトムタブ4つ（Articles / Favorites / Feeds / Settings）
 
 ### 主要バージョン
 ```json
@@ -110,26 +147,50 @@ eas build --profile preview --platform android
 2. **babel.config.js**: module-resolverでエイリアス設定済み（`utils`, `theme`, `components`等）
 3. **reanimated/plugin**: 必ずプラグインリストの**最後**に配置
 
-### 認証実装の詳細（Step 2 完了）
+### 主要ファイル一覧（モバイル）
 
-**変更したファイル**:
-- `src/utils/supabase.js` - Supabaseクライアント設定（新規作成）
-- `src/contexts/UserContext.js` - Supabase Auth対応（signIn, signUp, signOut, getAccessToken）
-- `src/scenes/signin/SignIn.js` - Supabase signInWithPassword使用
-- `src/scenes/signup/SingUp.js` - Supabase signUp使用
-- `src/scenes/loading/Loading.js` - 自動ログイン対応（セッション復元）
-- `src/scenes/home/Home.js` - Supabase signOut使用
-- `src/utils/showToast.js` - エラートースト追加
+```
+apps/mobile/src/
+├── contexts/
+│   ├── FeedsContext.js      # フィード・記事状態管理
+│   └── UserContext.js       # 認証状態管理
+├── scenes/
+│   ├── home/Home.js         # 記事一覧（フィルター、Mark All Read）
+│   ├── article/ArticleDetail.js  # 記事詳細
+│   ├── favorites/Favorites.js    # お気に入り一覧
+│   ├── read/Read.js         # フィード管理
+│   └── profile/Profile.js   # 設定
+├── routes/navigation/
+│   ├── tabs/Tabs.js         # ボトムタブ設定
+│   └── stacks/
+│       ├── HomeStacks.js    # Articles + ArticleDetail
+│       ├── FavoritesStacks.js # Favorites + FavoriteDetail
+│       └── ...
+└── utils/
+    ├── api.js               # APIクライアント
+    └── supabase.js          # Supabase設定
+```
 
-**認証フロー**:
-1. アプリ起動時にLoading画面でSupabaseセッションを確認
-2. セッションがあれば自動ログイン、なければSignIn画面へ
-3. UserContextでauth state changeをリッスンし、状態変更時に自動遷移
+---
 
-### 次のステップ
-1. ~~SignIn/SignUpをSupabase Auth対応に変更~~ ✅ 完了
-2. APIクライアント作成（Cloudflare Pages Functions呼び出し）
-3. 画面実装（Dashboard、フィード管理、お気に入り等）
+## 次のタスク候補
+
+### 優先度高（UX改善）
+- [ ] **Articlesタブにフォーカス時の自動リフレッシュ実装** (`useFocusEffect`使用)
+
+### 優先度高（Phase 9 継続）
+- [ ] モバイルアプリ: Expo Goでテスト
+- [ ] モバイルアプリ: EAS Build（iOS/Android）
+
+### 優先度中
+- [ ] リアルタイム更新機能（Supabase Realtime）
+- [ ] E2Eテスト（Playwright）
+- [ ] API仕様書作成
+
+### 優先度低
+- [ ] パフォーマンス最適化
+- [ ] 多言語対応
+- [ ] Androidビルド確認
 
 ---
 
@@ -184,10 +245,10 @@ VITE_API_BASE_URL=
 │   (React/Vite)  │     │  Functions (API)    │
 └─────────────────┘     └──────────┬──────────┘
                                    │
-                        ┌──────────▼──────────┐
-                        │     Supabase        │
-                        │  - PostgreSQL       │
-                        │  - Auth             │
+┌─────────────────┐     ┌──────────▼──────────┐
+│   Mobile App    │────▶│     Supabase        │
+│   (Expo)        │     │  - PostgreSQL       │
+└─────────────────┘     │  - Auth             │
                         └─────────────────────┘
 
 ┌─────────────────┐     ┌─────────────────────┐
@@ -217,25 +278,7 @@ VITE_API_BASE_URL=
 1. **Delete Account**: Supabase Auth recordが残る可能性あり（データは削除される）
 2. **記事の有効期限**: 7日後に自動削除される設計
 3. **リアルタイム更新**: 未実装（Phase 8 Step 4）
-
----
-
-## 次のタスク候補
-
-### 優先度高（Phase 9 継続）
-- [x] モバイルアプリ: Supabase認証実装 ✅ 完了
-- [ ] モバイルアプリ: API連携（フィード・記事取得）
-- [ ] モバイルアプリ: 主要画面実装（Dashboard、フィード管理、お気に入り）
-
-### 優先度中
-- [ ] リアルタイム更新機能（Supabase Realtime）
-- [ ] E2Eテスト（Playwright）
-- [ ] API仕様書作成
-
-### 優先度低
-- [ ] パフォーマンス最適化
-- [ ] 多言語対応
-- [ ] Androidビルド確認
+4. **Clear All Data後の表示**: タブ切り替え時の自動リフレッシュ未実装（useFocusEffectで対応予定）
 
 ---
 
@@ -250,6 +293,10 @@ VITE_API_BASE_URL=
 1. wranglerターミナルでエラーログ確認
 2. Supabase Dashboardでログ確認
 3. 環境変数が正しく設定されているか確認
+
+### API 405エラー
+1. **ルートディレクトリからデプロイしているか確認**
+2. `apps/web`からデプロイするとfunctionsが含まれない
 
 ### 認証エラー
 1. Supabase DashboardでAuthenticationログ確認

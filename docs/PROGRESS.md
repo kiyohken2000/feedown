@@ -164,29 +164,41 @@
 - [x] EAS Build（iOS preview）成功
 - [x] 依存関係バージョン調整（expo, expo-updates, react-native-worklets）
 
-### Step 2: Supabase認証実装 🔴 未着手
-- [ ] SignIn画面をSupabase Auth対応に変更
-- [ ] SignUp画面をSupabase Auth対応に変更
-- [ ] AsyncStorageでセッション永続化
-- [ ] 自動ログイン機能
+### Step 2: Supabase認証実装 ✅
+- [x] SignIn画面をSupabase Auth対応に変更
+- [x] SignUp画面をSupabase Auth対応に変更
+- [x] AsyncStorageでセッション永続化
+- [x] 自動ログイン機能
 
-### Step 3: API連携 🔴 未着手
-- [ ] APIクライアント作成（Cloudflare Pages Functions呼び出し）
-- [ ] フィード一覧取得
-- [ ] 記事一覧取得
-- [ ] リフレッシュ機能
+### Step 3: API連携 ✅
+- [x] APIクライアント作成（`src/utils/api.js`）
+- [x] FeedsContext状態管理（`src/contexts/FeedsContext.js`）
+- [x] フィード一覧取得
+- [x] 記事一覧取得
+- [x] リフレッシュ機能
 
-### Step 4: 画面実装 🔴 未着手
-- [ ] Dashboard画面（記事一覧）
-- [ ] フィード管理画面
-- [ ] お気に入り画面
-- [ ] 設定画面（ログアウト、アカウント削除）
-- [ ] 記事詳細画面（WebView）
+### Step 4: 画面実装 ✅
+- [x] Dashboard画面（記事一覧）- `scenes/home/Home.js`
+- [x] フィード管理画面 - `scenes/read/Read.js`
+- [x] 設定画面（サインアウト、アカウント削除）- `scenes/profile/Profile.js`
+- [x] ボトムタブ更新（Articles / Feeds / Settings）
+- [x] 記事詳細画面 - `scenes/article/ArticleDetail.js`
+  - 記事タップ時に詳細画面に遷移
+  - 詳細画面を開いたときに既読マーク
+  - お気に入り追加/削除ボタン
+  - Visit Originalボタン（外部ブラウザで開く）
+- [x] お気に入り画面 - `scenes/favorites/Favorites.js`
+  - お気に入り記事一覧表示
+  - 記事タップで詳細画面に遷移
+  - 削除機能付き
 
-### Step 5: UX改善 🔴 未着手
-- [ ] プルトゥリフレッシュ
-- [ ] 無限スクロール
-- [ ] オフライン対応（キャッシュ）
+### Step 5: UX改善 ✅
+- [x] プルトゥリフレッシュ
+- [x] 無限スクロール
+- [x] All/Unread/Readフィルター
+- [x] Mark All Readボタン
+- [x] おすすめフィード（2列グリッド表示）
+- [ ] オフライン対応（キャッシュ）（オプション）
 
 **完了条件**: iOS/Androidで全機能が動作
 
@@ -226,7 +238,7 @@
 | Phase 6: Cloudflare Pages デプロイ | 4 | 4 | 100% | 🟢 完了 |
 | Phase 7: Firestore最適化 | 3 | 3 | 100% | 🟢 完了 |
 | Phase 8: Supabase移行 | 20 | 18 | 90% | 🟢 完了 |
-| Phase 9: Mobile | 18 | 5 | 28% | 🟡 進行中 |
+| Phase 9: Mobile | 18 | 17 | 94% | 🟡 進行中 |
 | Phase 10: テスト & ドキュメント | 5 | 0 | 0% | 🔴 未着手 |
 | Phase 11: App Store リリース | 4 | 0 | 0% | 🔴 未着手 |
 
@@ -248,7 +260,8 @@
 
 ## 次のアクション
 
-1. **モバイルアプリ: Supabase認証実装**（Phase 9 Step 2）
-2. **モバイルアプリ: API連携**（Phase 9 Step 3）
-3. **モバイルアプリ: 画面実装**（Phase 9 Step 4）
+1. **モバイルアプリ: Expo Goでテスト**（動作確認）
+2. **モバイルアプリ: EAS Build**（iOS/Android preview ビルド）
+3. **お気に入り画面実装**（オプション）
 4. **リアルタイム更新機能**（オプション: Supabase Realtime）
+5. **オフライン対応**（オプション: AsyncStorageキャッシュ）
