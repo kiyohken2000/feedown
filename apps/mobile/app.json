@@ -9,7 +9,7 @@
     ],
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo-sm.png",
+    "icon": "./assets/images/AppIcon.png",
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
