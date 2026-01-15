@@ -83,11 +83,11 @@ const FavoritesPage = () => {
     // Convert favorite format to article format for modal
     const article = {
       id: favorite.articleId,
-      title: favorite.articleTitle,
-      url: favorite.articleLink,
-      description: favorite.articleDescription,
+      title: favorite.title,
+      url: favorite.url,
+      description: favorite.description,
       feedTitle: favorite.feedTitle || 'Unknown Feed',
-      publishedAt: favorite.savedAt,
+      publishedAt: favorite.createdAt,
       imageUrl: favorite.imageUrl || null,
     };
     setSelectedArticle(article);
@@ -314,7 +314,7 @@ const FavoritesPage = () => {
                   {favorite.imageUrl ? (
                     <img
                       src={favorite.imageUrl}
-                      alt={favorite.articleTitle}
+                      alt={favorite.title}
                       style={styles.articleImage}
                     />
                   ) : (
@@ -334,11 +334,11 @@ const FavoritesPage = () => {
                         {favorite.feedTitle || 'Unknown Feed'}
                       </span>
                       <span>•</span>
-                      <span>{getRelativeTime(favorite.savedAt)}</span>
+                      <span>{getRelativeTime(favorite.createdAt)}</span>
                     </div>
-                    <h3 style={styles.articleTitle}>{favorite.articleTitle}</h3>
+                    <h3 style={styles.articleTitle}>{favorite.title}</h3>
                     <p style={styles.articleDescription}>
-                      {favorite.articleDescription || 'No description available'}
+                      {favorite.description || 'No description available'}
                     </p>
                   </div>
                 </div>

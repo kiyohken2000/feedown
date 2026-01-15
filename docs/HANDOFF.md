@@ -53,6 +53,25 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 - **Mobile**: `useFocusEffect` で対応（`apps/mobile/src/scenes/home/Home.js`）
 - **Web**: `location.pathname` 監視 + `visibilitychange` で対応（`apps/web/src/pages/DashboardPage.jsx`）
 
+### 2. Favorites リロード後にデータが消える問題 🟢 解決済み
+
+**症状**: Favoritesに追加した記事が、アプリをリロードするとサムネイル画像とフィード名以外が消える（タイトル、説明文、URLが表示されない）。
+
+**原因**: APIレスポンスとフロントエンドの期待するフィールド名が不一致だった。
+
+| API返却値（旧） | フロントエンド期待値 |
+|----------------|---------------------|
+| `articleTitle` | `title` |
+| `articleDescription` | `description` |
+| `articleLink` | `url` |
+| `savedAt` | `createdAt` |
+
+初回追加時はオプティミスティック更新で正しい形式が使われるため表示されるが、リロード後はAPIから取得したデータがそのまま使われるため不一致が発生。
+
+**解決方法**:
+- `functions/api/favorites.ts`: APIレスポンスのフィールド名を修正
+- `apps/web/src/pages/FavoritesPage.jsx`: 新しいフィールド名に対応
+
 ---
 
 ## 本日の作業内容（2026-01-16）

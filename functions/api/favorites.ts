@@ -39,15 +39,15 @@ export async function onRequestGet(context: any): Promise<Response> {
       );
     }
 
-    // Transform to expected format
+    // Transform to expected format (matching FeedsContext optimistic update format)
     const formattedFavorites = (favorites || []).map(fav => ({
       articleId: fav.id,
-      articleTitle: fav.title,
-      articleDescription: fav.description || '',
-      articleLink: fav.url,
+      title: fav.title,
+      description: fav.description || '',
+      url: fav.url,
       feedTitle: fav.feed_title || '',
       imageUrl: fav.image_url || null,
-      savedAt: fav.saved_at,
+      createdAt: fav.saved_at,
     }));
 
     return new Response(
