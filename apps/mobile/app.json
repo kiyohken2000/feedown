@@ -30,7 +30,8 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Use the photo library to change your avatar.",
-        "CFBundleDevelopmentRegion": "ja_JP"
+        "CFBundleDevelopmentRegion": "ja_JP",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "userInterfaceStyle": "automatic"
     },
