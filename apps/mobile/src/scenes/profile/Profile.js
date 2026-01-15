@@ -26,7 +26,7 @@ const isTestAccount = (email) => {
 }
 
 export default function Profile() {
-  const { user, signOut, getAccessToken } = useContext(UserContext)
+  const { user, signOut, getAccessToken, serverUrl } = useContext(UserContext)
   const { feeds, articles, getUnreadCount, resetAll } = useContext(FeedsContext)
   const { isDarkMode, toggleDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
@@ -140,6 +140,14 @@ export default function Profile() {
           <View style={[styles.card, { backgroundColor: theme.card }]}>
             <Text style={[styles.label, { color: theme.textMuted }]}>Email</Text>
             <Text style={[styles.value, { color: theme.text }]}>{user?.email || 'Not signed in'}</Text>
+
+            <Text style={[styles.label, styles.serverLabel, { color: theme.textMuted }]}>Server</Text>
+            <TouchableOpacity onPress={() => serverUrl && Linking.openURL(serverUrl)}>
+              <Text style={[styles.serverUrl, { color: colors.bluePrimary }]}>
+                {serverUrl || 'No server connected'}
+              </Text>
+            </TouchableOpacity>
+
             <Text style={[styles.passwordHint, { color: theme.textMuted }]}>
               If you didn't set a custom password, the default password is 111111
             </Text>
@@ -305,6 +313,13 @@ const styles = StyleSheet.create({
     color: colors.gray,
     marginTop: 12,
     fontStyle: 'italic',
+  },
+  serverLabel: {
+    marginTop: 16,
+  },
+  serverUrl: {
+    fontSize: fontSize.normal,
+    textDecorationLine: 'underline',
   },
   testAccountNotice: {
     marginTop: 12,
