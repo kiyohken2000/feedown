@@ -199,8 +199,10 @@ python scripts/sync_recommended_feeds.py
 1. Supabaseダッシュボードで「Authentication」→「Providers」を開く
 2. 「Email」が有効になっていることを確認
 3. 設定を調整:
-   - **Confirm email**: オフ推奨
-   - **Secure password**: オン推奨
+   - **Allow new users to sign up**: オン
+   - **Allow manual linking**: オフ
+   - **Allow anonymous sign-ins**: オフ
+   - **Confirm email**: オフ
 
 ## 8. 動作確認
 
