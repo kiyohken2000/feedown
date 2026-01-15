@@ -50,7 +50,7 @@ RECOMMENDED_FEEDS = [
     { "name": "EE Times Japan", "url": "https://rss.itmedia.co.jp/rss/2.0/eetimes.xml" },
     { "name": "PC Watch", "url": "https://pc.watch.impress.co.jp/data/rss/1.0/pcw/feed.rdf" },
     { "name": "ITmedia PC USER", "url": "https://rss.itmedia.co.jp/rss/2.0/pcupdate.xml" },
-    { "name": "LabaQ", "url": "http://feeds.feedburner.com/labaq/Mmqd" },
+    { "name": "朝日新聞速報", "url": "https://www.asahi.com/rss/asahi/newsheadlines.rdf" },
     { "name": "The Verge", "url": "https://www.theverge.com/rss/index.xml" },
 ]
 # =============================================================================
