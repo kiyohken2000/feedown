@@ -417,7 +417,7 @@ function ArticleReader({ articleContent }) {
 ## 開発環境セットアップ
 
 ### 必要なもの
-- Node.js 18+
+- Node.js 22.19.0+
 - npm
 - Cloudflare アカウント（wrangler CLI）
 - Supabase プロジェクト
