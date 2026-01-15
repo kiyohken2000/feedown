@@ -4,6 +4,7 @@ module.exports = (api) => {
     presets: ['babel-preset-expo'],
     plugins: [
       '@babel/plugin-proposal-export-namespace-from',
+      'react-native-worklets/plugin',
       [
         'module-resolver',
         {
@@ -19,6 +20,7 @@ module.exports = (api) => {
           },
         },
       ],
+      'react-native-reanimated/plugin',
     ],
   }
 }

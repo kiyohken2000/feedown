@@ -48,6 +48,7 @@
     "react-native-toast-message": "^2.1.5",
     "react-native-vector-icons": "^10.1.0",
     "react-native-web": "^0.21.0",
+    "react-native-worklets": "0.4.0",
     "react-redux": "^7.1.1",
     "redux": "^4.0.4",
     "redux-logger": "^3.0.6"
