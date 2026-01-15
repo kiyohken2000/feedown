@@ -308,6 +308,17 @@ export const FeedsContextProvider = ({ children }) => {
     return articles.filter(article => !readArticles.has(article.id)).length
   }, [articles, readArticles])
 
+  // Reset all state (used after Clear All Data)
+  const resetAll = useCallback(() => {
+    setFeeds([])
+    setArticles([])
+    setReadArticles(new Set())
+    setFavoritedArticles(new Set())
+    setFavorites([])
+    setHasMore(true)
+    setError(null)
+  }, [])
+
   return (
     <FeedsContext.Provider
       value={{
@@ -332,6 +343,7 @@ export const FeedsContextProvider = ({ children }) => {
         addFeed,
         deleteFeed,
         getUnreadCount,
+        resetAll,
         // Setters (for direct manipulation if needed)
         setArticles,
         setFeeds,

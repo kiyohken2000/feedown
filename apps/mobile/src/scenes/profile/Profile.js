@@ -17,7 +17,7 @@ import Spinner from 'react-native-loading-spinner-overlay'
 
 export default function Profile() {
   const { user, signOut, getAccessToken } = useContext(UserContext)
-  const { feeds, articles, getUnreadCount } = useContext(FeedsContext)
+  const { feeds, articles, getUnreadCount, resetAll } = useContext(FeedsContext)
   const [isLoading, setIsLoading] = useState(false)
 
   // Handle sign out
@@ -95,8 +95,9 @@ export default function Profile() {
               const response = await api.user.clearAllData()
 
               if (response.success) {
+                // Reset local state
+                resetAll()
                 showToast({ title: 'Data Cleared', body: 'All your data has been deleted' })
-                // TODO: refresh feeds context
               } else {
                 showErrorToast({ title: 'Error', body: response.error || 'Failed to clear data' })
               }
@@ -109,7 +110,7 @@ export default function Profile() {
         },
       ]
     )
-  }, [getAccessToken])
+  }, [getAccessToken, resetAll])
 
   const unreadCount = getUnreadCount()
 

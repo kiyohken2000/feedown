@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useCallback, useState, useMemo } from 'react'
+import React, { useContext, useEffect, useCallback, useState, useMemo, useRef } from 'react'
 import {
   StyleSheet,
   Text,
@@ -9,7 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { colors, fontSize } from '../../theme'
 import { FeedsContext } from '../../contexts/FeedsContext'
 import { UserContext } from '../../contexts/UserContext'
@@ -35,6 +35,13 @@ export default function Home() {
 
   const [filter, setFilter] = useState('all') // 'all', 'unread', 'read'
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false)
+  const isFirstFocus = useRef(true)
+  const fetchArticlesRef = useRef(fetchArticles)
+
+  // Keep ref updated with latest fetchArticles
+  useEffect(() => {
+    fetchArticlesRef.current = fetchArticles
+  }, [fetchArticles])
 
   // Initial load
   useEffect(() => {
@@ -42,6 +49,21 @@ export default function Home() {
       refreshAll()
     }
   }, [user])
+
+  // Refresh when tab is focused (fixes stale data after Clear All Data)
+  useFocusEffect(
+    useCallback(() => {
+      // Skip first focus (already handled by initial load)
+      if (isFirstFocus.current) {
+        isFirstFocus.current = false
+        return
+      }
+      // Refresh articles when returning to this tab
+      if (user) {
+        fetchArticlesRef.current(true)
+      }
+    }, [user])
+  )
 
   // Show error toast
   useEffect(() => {

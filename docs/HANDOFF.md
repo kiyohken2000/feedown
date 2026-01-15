@@ -39,29 +39,15 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ## 既知のバグ・未解決問題
 
-### 1. Clear All Data 後に記事が表示されたままになる問題 🟡 対処方針決定
+### 1. Clear All Data 後に記事が表示されたままになる問題 🟢 解決済み
 
 **症状**: Settings画面で「Clear All Data」を実行すると、FavoritesとFeedsは削除されるが、Articlesタブに記事が表示されたままになる。
 
-**原因**: フロントエンドのキャッシュ（React state）が残っている。プルトゥリフレッシュをすると記事が消える。APIは正常に動作している。
+**原因**: フロントエンドのキャッシュ（React state）が残っている。
 
-**対処方針**: Articlesタブにフォーカスが当たったら自動でリフレッシュするようにする。
-
-**実装方法**:
-- `apps/mobile/src/scenes/home/Home.js` で `useFocusEffect` を使用
-- `apps/web/src/pages/DashboardPage.jsx` でも同様の対応が必要
-
-```javascript
-// React Navigation の useFocusEffect を使用
-import { useFocusEffect } from '@react-navigation/native'
-
-useFocusEffect(
-  useCallback(() => {
-    // タブにフォーカスが当たったらリフレッシュ
-    fetchArticles(true)
-  }, [])
-)
-```
+**解決方法**: タブ/ページにフォーカスが当たったら自動でリフレッシュ
+- **Mobile**: `useFocusEffect` で対応（`apps/mobile/src/scenes/home/Home.js`）
+- **Web**: `location.pathname` 監視 + `visibilitychange` で対応（`apps/web/src/pages/DashboardPage.jsx`）
 
 ---
 

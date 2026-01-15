@@ -217,6 +217,31 @@ const DashboardPage = () => {
     handleRefreshRef.current?.();
   }, [location.key]);
 
+  // Refresh when navigating back to dashboard from other pages (fixes stale data after Clear All Data)
+  const prevPathRef = useRef(location.pathname);
+  useEffect(() => {
+    // If we're on dashboard and came from a different page, refresh
+    if (location.pathname === '/dashboard' && prevPathRef.current !== '/dashboard') {
+      fetchArticles(true);
+    }
+    prevPathRef.current = location.pathname;
+  }, [location.pathname, fetchArticles]);
+
+  // Refresh when page becomes visible (handles browser tab switching)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Re-fetch articles without full refresh (just get latest data)
+        fetchArticles(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchArticles]);
+
   // Auto-refresh RSS feeds every 15 minutes
   useEffect(() => {
     const checkInterval = setInterval(() => {
