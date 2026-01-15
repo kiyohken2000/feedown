@@ -4,7 +4,11 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "base": {
+      "node": "22.19.0"
+    },
     "development": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
       "channel": "development",
@@ -13,10 +17,12 @@
       }
     },
     "preview": {
+      "extends": "base",
       "distribution": "internal",
       "channel": "internal"
     },
     "production": {
+      "extends": "base",
       "channel": "production"
     }
   },
