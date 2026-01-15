@@ -1,35 +1,38 @@
 import React, { useContext, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import Button from '../../components/Button'
-import { colors, fontSize } from '../../theme'
+import { colors } from '../../theme'
 import { useNavigation } from '@react-navigation/native'
 import { UserContext } from '../../contexts/UserContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'
 import Logo from '../../components/Logo'
-import { sleep } from '../../utils/utilFunctions'
-import { dummyUser } from '../../config'
 import TextInputBox from '../../components/TextInputBox'
 import { loginButtonStatus } from '../signin/functions'
+import { showToast, showErrorToast } from '../../utils/showToast'
 
 export default function SignUp() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const { setUser } = useContext(UserContext)
+  const { signUp } = useContext(UserContext)
   const navigation = useNavigation()
 
-  const onSignUpPress = async() => {
+  const onSignUpPress = async () => {
     try {
       setIsLoading(true)
-      await sleep(3000)
-      const user = {
-        id: dummyUser.id,
-        userName: email
-      }
-      setUser(user)
-    } catch(e) {
-      console.log('on sign in error', e)
+      await signUp(email, password)
+      showToast({
+        title: 'Account Created',
+        body: 'Please check your email to verify your account',
+      })
+      // Supabase will handle auto-login after signup
+    } catch (e) {
+      console.log('on sign up error', e)
+      showErrorToast({
+        title: 'Sign Up Failed',
+        body: e.message || 'Please try again',
+      })
     } finally {
       setIsLoading(false)
     }
@@ -41,30 +44,28 @@ export default function SignUp() {
         <Logo />
         <View style={styles.element}>
           <TextInputBox
-            placeholder='E-mail'
+            placeholder="E-mail"
             onChangeText={(text) => setEmail(text)}
             autoCapitalize="none"
             value={email}
-            keyboardType={'email-address'}
-            maxLength={12}
+            keyboardType="email-address"
           />
         </View>
         <View style={styles.element}>
           <TextInputBox
             secureTextEntry={true}
-            placeholder='Password'
+            placeholder="Password (min 6 characters)"
             onChangeText={(text) => setPassword(text)}
             value={password}
             autoCapitalize="none"
-            maxLength={12}
           />
         </View>
         <View style={styles.element}>
           <Button
-            label='Sign Up'
+            label="Sign Up"
             onPress={onSignUpPress}
             color={colors.bluePrimary}
-            disable={!loginButtonStatus({email, password})}
+            disable={!loginButtonStatus({ email, password })}
             labelColor={colors.white}
             labelBold={false}
             isLoading={isLoading}
@@ -72,7 +73,7 @@ export default function SignUp() {
         </View>
         <View style={styles.element}>
           <Button
-            label='Go Back'
+            label="Go Back"
             onPress={() => navigation.goBack()}
             color={colors.blueSecondary}
             disable={false}

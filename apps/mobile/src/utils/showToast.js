@@ -1,11 +1,19 @@
-import Toast from 'react-native-toast-message';
+import Toast from 'react-native-toast-message'
 
-const showToast = ({title, body}) => {
+const showToast = ({ title, body, type = 'success' }) => {
   Toast.show({
-    type: 'success',
+    type,
     text1: title,
     text2: body,
-  });
+  })
 }
 
-export { showToast }
+const showErrorToast = ({ title, body }) => {
+  Toast.show({
+    type: 'error',
+    text1: title,
+    text2: body,
+  })
+}
+
+export { showToast, showErrorToast }

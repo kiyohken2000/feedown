@@ -5,31 +5,31 @@ import { colors, fontSize } from '../../theme'
 import { useNavigation } from '@react-navigation/native'
 import { UserContext } from '../../contexts/UserContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
-import { showToast } from '../../utils/showToast'
-import { sleep } from '../../utils/utilFunctions'
-import Spinner from 'react-native-loading-spinner-overlay';
+import { showToast, showErrorToast } from '../../utils/showToast'
+import Spinner from 'react-native-loading-spinner-overlay'
 import BlurBox from '../../components/BlurBox/BlurBox'
 
 export default function Home() {
   const navigation = useNavigation()
-  const { user, setUser } = useContext(UserContext)
+  const { user, signOut } = useContext(UserContext)
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    console.log('user:', user)
+    console.log('user:', user?.email)
   }, [])
 
   const onToastPress = () => {
-    showToast({title: 'Hello', body: 'React Native Developer'})
+    showToast({ title: 'Hello', body: 'React Native Developer' })
   }
 
-  const onSignOutPress = async() => {
+  const onSignOutPress = async () => {
     try {
       setIsLoading(true)
-      await sleep(2000)
-      setUser('')
-    } catch(e) {
+      await signOut()
+      showToast({ title: 'Signed Out', body: 'See you next time!' })
+    } catch (e) {
       console.log('sign out error', e)
+      showErrorToast({ title: 'Error', body: e.message })
     } finally {
       setIsLoading(false)
     }
