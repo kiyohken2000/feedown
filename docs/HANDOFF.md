@@ -195,12 +195,123 @@ apps/mobile/src/
 - [ ] リアルタイム更新機能（Supabase Realtime）
 - [ ] E2Eテスト（Playwright）
 - [ ] API仕様書作成
+- [ ] **アプリ内記事リーダー機能**（下記「将来の実装案」参照）
 
 ### 優先度低
 - [ ] パフォーマンス最適化
 - [ ] 多言語対応
 - [ ] Androidビルド確認
 - [ ] オフライン対応（AsyncStorageキャッシュ）
+
+---
+
+## 将来の実装案：アプリ内記事リーダー
+
+### 概要
+現在は「Visit Original」で外部ブラウザを開いているが、アプリ内で記事を閲覧できる機能を実装する案。
+
+### 技術アプローチ
+Pocket、Instapaper、Safari Reader Modeと同じ手法：
+
+```
+元のHTML → Readability で記事本文を抽出 → クリーンなHTML → react-native-render-html
+```
+
+### サーバーサイド実装（Cloudflare Pages Function）
+
+```javascript
+// functions/api/article-content.js
+import { Readability } from '@mozilla/readability';
+import { JSDOM } from 'jsdom';
+
+export async function onRequestGet(context) {
+  const url = new URL(context.request.url).searchParams.get('url');
+
+  // HTMLを取得（Workerプロキシ経由でCORS回避）
+  const response = await fetch(url);
+  const html = await response.text();
+
+  // Readabilityで記事本文を抽出
+  const dom = new JSDOM(html, { url });
+  const reader = new Readability(dom.window.document);
+  const article = reader.parse();
+
+  return Response.json({
+    title: article.title,
+    content: article.content,      // クリーンなHTML
+    textContent: article.textContent, // プレーンテキスト
+    excerpt: article.excerpt,
+    byline: article.byline,
+    siteName: article.siteName,
+  });
+}
+```
+
+### モバイル側実装
+
+```javascript
+// react-native-render-html を使用
+import RenderHtml from 'react-native-render-html';
+import { useWindowDimensions } from 'react-native';
+
+function ArticleReader({ articleContent }) {
+  const { width } = useWindowDimensions();
+  const { isDarkMode } = useTheme();
+  const theme = getThemeColors(isDarkMode);
+
+  const tagsStyles = {
+    body: { color: theme.text, backgroundColor: theme.background },
+    p: { fontSize: 16, lineHeight: 26, marginBottom: 12 },
+    h1: { fontSize: 24, fontWeight: 'bold', color: theme.text },
+    h2: { fontSize: 20, fontWeight: 'bold', color: theme.text },
+    a: { color: colors.primary },
+    img: { maxWidth: '100%', height: 'auto' },
+    pre: { backgroundColor: theme.surface, padding: 12, borderRadius: 8 },
+    code: { fontFamily: 'monospace', backgroundColor: theme.surface },
+  };
+
+  return (
+    <ScrollView>
+      <RenderHtml
+        contentWidth={width - 32}
+        source={{ html: articleContent }}
+        tagsStyles={tagsStyles}
+      />
+    </ScrollView>
+  );
+}
+```
+
+### 必要なパッケージ
+
+**サーバーサイド:**
+- `@mozilla/readability` - 記事本文抽出
+- `jsdom` - DOM解析
+
+**モバイル:**
+- `react-native-render-html` - HTMLレンダリング
+
+### 成功率の見込み
+
+| コンテンツタイプ | 成功率 | 備考 |
+|-----------------|--------|------|
+| ニュースサイト | 90%+ | Readabilityが最適化されている |
+| ブログ | 85%+ | 標準的な記事構造 |
+| 技術ドキュメント | 70-80% | コードブロックの対応が必要 |
+| SPA/Web App | 低い | JS依存のためHTML取得自体が困難 |
+
+### UI設計案
+
+1. **ArticleDetail画面に「Reader Mode」ボタン追加**
+2. タップするとAPIから記事コンテンツ取得
+3. 取得成功 → アプリ内でレンダリング
+4. 取得失敗 → 「Visit Original」にフォールバック
+
+### 注意点
+
+- Cloudflare Workersでjsdomを使う場合、互換性の問題がある可能性
+- 代替: HTMLRewriterを使った軽量な抽出、または外部サービス利用
+- 画像のプロキシも必要になる可能性（CORS、遅延読み込み対応）
 
 ---
 
