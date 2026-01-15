@@ -21,7 +21,6 @@
     "@react-navigation/native": "^7.1.17",
     "@react-navigation/stack": "^7.4.8",
     "@reduxjs/toolkit": "^1.5.1",
-    "@shopify/react-native-skia": "2.2.12",
     "axios": "^0.21.2",
     "expo": "54.0.8",
     "expo-asset": "~12.0.8",
@@ -49,7 +48,6 @@
     "react-native-toast-message": "^2.1.5",
     "react-native-vector-icons": "^10.1.0",
     "react-native-web": "^0.21.0",
-    "react-native-worklets": "0.5.1",
     "react-redux": "^7.1.1",
     "redux": "^4.0.4",
     "redux-logger": "^3.0.6"
