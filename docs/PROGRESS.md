@@ -1,8 +1,8 @@
 # FeedOwn - 実装進行表
 
 **最終更新**: 2026-01-15
-**現在のフェーズ**: 🟢 Phase 8 完了（Supabase移行）
-**次のフェーズ**: Phase 9（Mobile アプリ）
+**現在のフェーズ**: 🟡 Phase 9 進行中（Mobile アプリ）
+**次のフェーズ**: Phase 10（テスト & ドキュメント）
 
 ---
 
@@ -155,15 +155,40 @@
 
 ---
 
-## Phase 9: Mobile アプリ（Expo） 🔴 未着手
+## Phase 9: Mobile アプリ（Expo） 🟡 進行中
 
-- [ ] Expo プロジェクト初期化
-- [ ] React Navigation 設定
-- [ ] Supabase SDK 初期化（または API経由）
-- [ ] 画面実装（InitScreen, AuthScreen, HomeScreen, ArticleScreen, FavoritesScreen, SettingsScreen）
-- [ ] プルトゥリフレッシュ、無限スクロール
+### Step 1: ボイラープレート起動・ビルド ✅
+- [x] モノレポ構成でExpo Go起動
+- [x] カスタムエントリポイント設定（`App.js` + `registerRootComponent`）
+- [x] babel.config.js module-resolverエイリアス設定
+- [x] EAS Build（iOS preview）成功
+- [x] 依存関係バージョン調整（expo, expo-updates, react-native-worklets）
 
-**完了条件**: iOS/Androidシミュレータで動作確認
+### Step 2: Supabase認証実装 🔴 未着手
+- [ ] SignIn画面をSupabase Auth対応に変更
+- [ ] SignUp画面をSupabase Auth対応に変更
+- [ ] AsyncStorageでセッション永続化
+- [ ] 自動ログイン機能
+
+### Step 3: API連携 🔴 未着手
+- [ ] APIクライアント作成（Cloudflare Pages Functions呼び出し）
+- [ ] フィード一覧取得
+- [ ] 記事一覧取得
+- [ ] リフレッシュ機能
+
+### Step 4: 画面実装 🔴 未着手
+- [ ] Dashboard画面（記事一覧）
+- [ ] フィード管理画面
+- [ ] お気に入り画面
+- [ ] 設定画面（ログアウト、アカウント削除）
+- [ ] 記事詳細画面（WebView）
+
+### Step 5: UX改善 🔴 未着手
+- [ ] プルトゥリフレッシュ
+- [ ] 無限スクロール
+- [ ] オフライン対応（キャッシュ）
+
+**完了条件**: iOS/Androidで全機能が動作
 
 ---
 
@@ -201,7 +226,7 @@
 | Phase 6: Cloudflare Pages デプロイ | 4 | 4 | 100% | 🟢 完了 |
 | Phase 7: Firestore最適化 | 3 | 3 | 100% | 🟢 完了 |
 | Phase 8: Supabase移行 | 20 | 18 | 90% | 🟢 完了 |
-| Phase 9: Mobile | 6 | 0 | 0% | 🔴 未着手 |
+| Phase 9: Mobile | 18 | 5 | 28% | 🟡 進行中 |
 | Phase 10: テスト & ドキュメント | 5 | 0 | 0% | 🔴 未着手 |
 | Phase 11: App Store リリース | 4 | 0 | 0% | 🔴 未着手 |
 
@@ -223,7 +248,7 @@
 
 ## 次のアクション
 
-1. **モバイルアプリ開発**（Phase 9: Expo）
-2. **リアルタイム更新機能**（オプション: Supabase Realtime）
-3. **E2Eテスト**（Phase 10: Playwright）
-4. **API仕様書作成**
+1. **モバイルアプリ: Supabase認証実装**（Phase 9 Step 2）
+2. **モバイルアプリ: API連携**（Phase 9 Step 3）
+3. **モバイルアプリ: 画面実装**（Phase 9 Step 4）
+4. **リアルタイム更新機能**（オプション: Supabase Realtime）

@@ -1,7 +1,7 @@
 # FeedOwn 引継ぎドキュメント
 
 **最終更新**: 2026-01-15
-**ステータス**: Supabase移行完了、本番稼働中
+**ステータス**: Phase 9 進行中（Expoモバイルアプリ）
 
 ---
 
@@ -12,11 +12,13 @@
 - 全APIエンドポイントがSupabase PostgreSQLで動作
 - Supabase Authによる認証
 - Web UIが本番環境で稼働中
+- **Expoモバイルアプリ: ボイラープレート起動・EASビルド成功**
 
 ### デプロイ情報
-- **本番URL**: https://feedown.pages.dev
+- **本番URL（Web）**: https://feedown.pages.dev
 - **Cloudflare Pages Project**: feedown
 - **Supabase Project**: feedown（ダッシュボードで確認）
+- **EAS Project ID**: 09e91d3a-0014-4831-b35f-9962d05db0e3
 
 ---
 
@@ -43,6 +45,71 @@
 **原因**: Supabase Admin APIの権限問題。
 
 **修正**: `functions/api/user/account.ts` でAuth削除をオプショナルに（データは削除、Auth recordは残る可能性あり）。
+
+### 4. Expoモノレポビルドエラー（2026-01-15）
+
+**症状**: EAS Buildで複数のエラーが発生。
+
+**原因と修正**:
+1. **エントリポイント問題**: `package.json`の`main`が`../../node_modules/expo/AppEntry.js`でモノレポのパスが解決できなかった
+   - → `App.js`でカスタムエントリポイント作成（`registerRootComponent`使用）
+   - → `main`を`./App.js`に変更
+
+2. **module-resolverエイリアス未設定**: `utils/store`等のインポートが解決できなかった
+   - → `babel.config.js`にエイリアス設定追加
+
+3. **expo-updatesバージョン不整合**: `reactNativeFactory`が見つからないエラー
+   - → `npx expo install expo-updates --fix`で正しいバージョンに更新
+
+4. **react-native-workletsバージョン不整合**: Reanimated 4.xが0.5.x以上を要求
+   - → worklets 0.5.1に更新、babelプラグインの重複削除
+
+---
+
+## モバイルアプリ開発（Phase 9）
+
+### 現在の状態
+- ✅ Expo Go起動成功
+- ✅ EAS Build（iOS preview）成功
+- 🔴 認証・API連携は未実装（ダミーデータで動作）
+
+### 主要バージョン
+```json
+{
+  "expo": "~54.0.31",
+  "expo-updates": "~29.0.16",
+  "react-native": "0.81.5",
+  "react-native-reanimated": "~4.1.0",
+  "react-native-worklets": "0.5.1"
+}
+```
+
+### モバイルアプリ起動手順
+
+```bash
+# Expo Go で起動
+cd apps/mobile
+npx expo start --clear
+
+# EAS Build（iOS preview）
+cd apps/mobile
+eas build --profile preview --platform ios
+
+# EAS Build（Android preview）
+cd apps/mobile
+eas build --profile preview --platform android
+```
+
+### モノレポ構成の注意点
+
+1. **エントリポイント**: `apps/mobile/App.js`で`registerRootComponent`を直接呼び出し
+2. **babel.config.js**: module-resolverでエイリアス設定済み（`utils`, `theme`, `components`等）
+3. **reanimated/plugin**: 必ずプラグインリストの**最後**に配置
+
+### 次のステップ
+1. SignIn/SignUpをSupabase Auth対応に変更
+2. APIクライアント作成（Cloudflare Pages Functions呼び出し）
+3. 画面実装（Dashboard、フィード管理、お気に入り等）
 
 ---
 
@@ -135,17 +202,20 @@ VITE_API_BASE_URL=
 
 ## 次のタスク候補
 
-### 優先度高
-- [ ] リアルタイム更新機能（Supabase Realtime）
-- [ ] モバイルアプリ（Expo）
+### 優先度高（Phase 9 継続）
+- [ ] モバイルアプリ: Supabase認証実装
+- [ ] モバイルアプリ: API連携（フィード・記事取得）
+- [ ] モバイルアプリ: 主要画面実装
 
 ### 優先度中
+- [ ] リアルタイム更新機能（Supabase Realtime）
 - [ ] E2Eテスト（Playwright）
 - [ ] API仕様書作成
 
 ### 優先度低
 - [ ] パフォーマンス最適化
 - [ ] 多言語対応
+- [ ] Androidビルド確認
 
 ---
 
@@ -165,6 +235,16 @@ VITE_API_BASE_URL=
 1. Supabase DashboardでAuthenticationログ確認
 2. JWTトークンの有効期限確認
 3. RLSポリシーが正しく設定されているか確認
+
+### モバイルアプリが起動しない
+1. `npx expo start --clear` でキャッシュクリア
+2. `node_modules`削除後に`npm install`
+3. babel.config.jsのエイリアス設定確認
+
+### EAS Buildエラー
+1. `npx expo install --fix` で依存関係を自動修正
+2. `eas.json`のNodeバージョン確認（22.19.0）
+3. ビルドログで具体的なエラーを確認
 
 ---
 
