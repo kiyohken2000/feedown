@@ -16,24 +16,7 @@ import { colors, fontSize } from '../../theme'
 import { FeedsContext } from '../../contexts/FeedsContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
-
-// Recommended feeds list (same as Web)
-const RECOMMENDED_FEEDS = [
-  { name: 'AFP', url: 'http://feeds.afpbb.com/rss/afpbb/afpbbnews' },
-  { name: 'BBC', url: 'http://feeds.bbci.co.uk/japanese/rss.xml' },
-  { name: 'CNN', url: 'http://feeds.cnn.co.jp/rss/cnn/cnn.rdf' },
-  { name: 'Rocket News 24', url: 'http://feeds.rocketnews24.com/rocketnews24' },
-  { name: 'Weekly ASCII Plus', url: 'http://weekly.ascii.jp/cate/1/rss.xml' },
-  { name: 'National Geographic', url: 'http://nationalgeographic.jp/nng/rss/index.rdf' },
-  { name: 'Lifehacker', url: 'http://www.lifehacker.jp/index.xml' },
-  { name: 'WIRED.jp', url: 'http://wired.jp/rssfeeder/' },
-  { name: 'GIGAZINE', url: 'https://gigazine.net/news/rss_2.0/' },
-  { name: 'Gizmodo', url: 'http://feeds.gizmodo.jp/rss/gizmodo/index.xml' },
-  { name: 'CNET Japan', url: 'http://feed.japan.cnet.com/rss/index.rdf' },
-  { name: 'AAPL Ch.', url: 'http://applech2.com/index.rdf' },
-  { name: 'Kitamori Kawaraban', url: 'https://northwood.blog.fc2.com/?xml' },
-  { name: 'EE Times Japan', url: 'https://rss.itmedia.co.jp/rss/2.0/eetimes.xml' },
-]
+import { API_BASE_URL } from '../../utils/supabase'
 
 export default function Read() {
   const {
@@ -47,10 +30,30 @@ export default function Read() {
   const [newFeedUrl, setNewFeedUrl] = useState('')
   const [isAdding, setIsAdding] = useState(false)
   const [addingFeedUrl, setAddingFeedUrl] = useState(null)
+  const [recommendedFeeds, setRecommendedFeeds] = useState([])
+  const [recommendedLoading, setRecommendedLoading] = useState(true)
+
+  // Fetch recommended feeds from API
+  const fetchRecommendedFeeds = useCallback(async () => {
+    setRecommendedLoading(true)
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/recommended-feeds`)
+      const data = await response.json()
+      if (data.feeds) {
+        setRecommendedFeeds(data.feeds)
+      }
+    } catch (error) {
+      console.error('Failed to fetch recommended feeds:', error)
+      // Silently fail - recommended feeds are not critical
+    } finally {
+      setRecommendedLoading(false)
+    }
+  }, [])
 
   // Initial load
   useEffect(() => {
     fetchFeeds()
+    fetchRecommendedFeeds()
   }, [])
 
   // Get feed URLs that are already added
@@ -60,8 +63,8 @@ export default function Read() {
 
   // Filter recommended feeds to show only ones not already added
   const availableRecommendedFeeds = useMemo(() => {
-    return RECOMMENDED_FEEDS.filter(rf => !existingFeedUrls.has(rf.url.toLowerCase()))
-  }, [existingFeedUrls])
+    return recommendedFeeds.filter(rf => !existingFeedUrls.has(rf.url.toLowerCase()))
+  }, [existingFeedUrls, recommendedFeeds])
 
   // Handle add feed
   const handleAddFeed = useCallback(async () => {
@@ -197,7 +200,32 @@ export default function Read() {
 
   // Render list header (recommended feeds section)
   const renderListHeader = () => {
-    if (availableRecommendedFeeds.length === 0) return null
+    // Show loading state while fetching recommended feeds
+    if (recommendedLoading) {
+      return (
+        <View style={styles.recommendedSection}>
+          <Text style={styles.sectionTitle}>Recommended Feeds</Text>
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+          {feeds.length > 0 && (
+            <Text style={styles.sectionTitle}>Your Feeds</Text>
+          )}
+        </View>
+      )
+    }
+
+    if (availableRecommendedFeeds.length === 0) {
+      // If there are user feeds but no recommended feeds to show
+      if (feeds.length > 0) {
+        return (
+          <View style={styles.recommendedSection}>
+            <Text style={styles.sectionTitle}>Your Feeds</Text>
+          </View>
+        )
+      }
+      return null
+    }
 
     return (
       <View style={styles.recommendedSection}>
@@ -214,7 +242,7 @@ export default function Read() {
 
   // Render empty state (only show if no recommended feeds available)
   const renderEmpty = () => {
-    if (isLoading) return null
+    if (isLoading || recommendedLoading) return null
     if (availableRecommendedFeeds.length > 0) return null
 
     return (

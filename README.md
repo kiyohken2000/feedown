@@ -30,6 +30,7 @@ English | [日本語](README.ja.md)
 
 - Node.js 22.19.0+
 - Yarn 1.22+
+- Python 3.12.4+ (for managing recommended feeds)
 - Supabase account
 - Cloudflare account
 

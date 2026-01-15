@@ -6,24 +6,6 @@ import Navigation from '../components/Navigation';
 import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from '../components/ToastContainer';
 
-// Recommended feeds
-const RECOMMENDED_FEEDS = [
-  { name: 'AFP', url: 'http://feeds.afpbb.com/rss/afpbb/afpbbnews' },
-  { name: 'BBC', url: 'http://feeds.bbci.co.uk/japanese/rss.xml' },
-  { name: 'CNN', url: 'http://feeds.cnn.co.jp/rss/cnn/cnn.rdf' },
-  { name: 'Rocket News 24', url: 'http://feeds.rocketnews24.com/rocketnews24' },
-  { name: 'Weekly ASCII Plus', url: 'http://weekly.ascii.jp/cate/1/rss.xml' },
-  { name: 'National Geographic', url: 'http://nationalgeographic.jp/nng/rss/index.rdf' },
-  { name: 'Lifehacker', url: 'http://www.lifehacker.jp/index.xml' },
-  { name: 'WIRED.jp', url: 'http://wired.jp/rssfeeder/' },
-  { name: 'GIGAZINE', url: 'https://gigazine.net/news/rss_2.0/' },
-  { name: 'Gizmodo', url: 'http://feeds.gizmodo.jp/rss/gizmodo/index.xml' },
-  { name: 'CNET Japan', url: 'http://feed.japan.cnet.com/rss/index.rdf' },
-  { name: 'AAPL Ch.', url: 'http://applech2.com/index.rdf' },
-  { name: 'Kitamori Kawaraban', url: 'https://northwood.blog.fc2.com/?xml' },
-  { name: 'EE Times Japan', url: 'https://rss.itmedia.co.jp/rss/2.0/eetimes.xml' },
-];
-
 const FeedsPage = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -34,6 +16,8 @@ const FeedsPage = () => {
   const [addingFeed, setAddingFeed] = useState(false);
   const [addingRecommended, setAddingRecommended] = useState({});
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [recommendedFeeds, setRecommendedFeeds] = useState([]);
+  const [recommendedLoading, setRecommendedLoading] = useState(true);
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const { showToast } = useToast();
@@ -62,6 +46,28 @@ const FeedsPage = () => {
       setFeedsLoading(false);
     }
   };
+
+  const fetchRecommendedFeeds = async () => {
+    setRecommendedLoading(true);
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+      const response = await fetch(`${baseUrl}/api/recommended-feeds`);
+      const data = await response.json();
+      if (data.feeds) {
+        setRecommendedFeeds(data.feeds);
+      }
+    } catch (error) {
+      console.error('Failed to fetch recommended feeds:', error);
+      // Silently fail - recommended feeds are not critical
+    } finally {
+      setRecommendedLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Fetch recommended feeds on mount (doesn't require auth)
+    fetchRecommendedFeeds();
+  }, []);
 
   useEffect(() => {
     // Get initial session
@@ -466,40 +472,48 @@ const FeedsPage = () => {
           )}
         </div>
 
-        <div style={styles.card}>
-          <h2 style={styles.sectionHeading}>Recommended Feeds</h2>
-          <div style={styles.recommendedGrid}>
-            {RECOMMENDED_FEEDS.map((feed) => {
-              const isAdded = isFeedAdded(feed.url);
-              const isAdding = addingRecommended[feed.url];
-              return (
-                <div key={feed.url} style={styles.recommendedItem}>
-                  <div style={styles.recommendedName}>{feed.name}</div>
-                  <button
-                    onClick={() => handleAddRecommendedFeed(feed.url, feed.name)}
-                    style={{
-                      ...styles.addButton,
-                      ...(isAdded ? styles.addButtonAdded : {}),
-                    }}
-                    disabled={isAdded || isAdding}
-                    onMouseOver={(e) => {
-                      if (!isAdded && !isAdding) {
-                        e.target.style.backgroundColor = '#218838';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (!isAdded && !isAdding) {
-                        e.target.style.backgroundColor = '#28a745';
-                      }
-                    }}
-                  >
-                    {isAdding ? 'Adding...' : isAdded ? 'Added' : 'Add'}
-                  </button>
-                </div>
-              );
-            })}
+        {recommendedFeeds.length > 0 && (
+          <div style={styles.card}>
+            <h2 style={styles.sectionHeading}>Recommended Feeds</h2>
+            {recommendedLoading ? (
+              <div style={{ textAlign: 'center', padding: '1rem' }}>
+                <p style={{ color: isDarkMode ? '#b0b0b0' : '#999' }}>Loading recommended feeds...</p>
+              </div>
+            ) : (
+              <div style={styles.recommendedGrid}>
+                {recommendedFeeds.map((feed) => {
+                  const isAdded = isFeedAdded(feed.url);
+                  const isAdding = addingRecommended[feed.url];
+                  return (
+                    <div key={feed.url} style={styles.recommendedItem}>
+                      <div style={styles.recommendedName}>{feed.name}</div>
+                      <button
+                        onClick={() => handleAddRecommendedFeed(feed.url, feed.name)}
+                        style={{
+                          ...styles.addButton,
+                          ...(isAdded ? styles.addButtonAdded : {}),
+                        }}
+                        disabled={isAdded || isAdding}
+                        onMouseOver={(e) => {
+                          if (!isAdded && !isAdding) {
+                            e.target.style.backgroundColor = '#218838';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (!isAdded && !isAdding) {
+                            e.target.style.backgroundColor = '#28a745';
+                          }
+                        }}
+                      >
+                        {isAdding ? 'Adding...' : isAdded ? 'Added' : 'Add'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -78,6 +78,17 @@ CREATE TABLE favorites (
   saved_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, id)
 );
+
+-- おすすめフィード（公開データ、管理者がPythonスクリプトで更新）
+CREATE TABLE recommended_feeds (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL UNIQUE,
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
 ### インデックス作成
@@ -93,6 +104,7 @@ CREATE INDEX idx_articles_published_at ON articles(user_id, published_at DESC);
 CREATE INDEX idx_read_articles_user_id ON read_articles(user_id);
 CREATE INDEX idx_favorites_user_id ON favorites(user_id);
 CREATE INDEX idx_favorites_saved_at ON favorites(user_id, saved_at DESC);
+CREATE INDEX idx_recommended_feeds_order ON recommended_feeds(sort_order);
 ```
 
 ### Row Level Security (RLS) 設定
@@ -104,6 +116,7 @@ ALTER TABLE feeds ENABLE ROW LEVEL SECURITY;
 ALTER TABLE articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE read_articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recommended_feeds ENABLE ROW LEVEL SECURITY;
 
 -- ポリシー作成: 自分のデータのみアクセス可能
 CREATE POLICY "Users can manage own profile" ON user_profiles
@@ -120,6 +133,10 @@ CREATE POLICY "Users can manage own read_articles" ON read_articles
 
 CREATE POLICY "Users can manage own favorites" ON favorites
   FOR ALL USING (auth.uid() = user_id);
+
+-- recommended_feeds は公開テーブル（誰でも読み取り可能）
+CREATE POLICY "Anyone can read active recommended feeds" ON recommended_feeds
+  FOR SELECT USING (is_active = true);
 ```
 
 ## 3. Realtime有効化
@@ -163,7 +180,21 @@ Cloudflare Pagesダッシュボードで「Settings」→「Environment variable
 | `SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 | `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 
-## 6. 認証設定
+## 6. おすすめフィードの初期データ投入
+
+おすすめフィードはPythonスクリプトで管理します。
+
+```bash
+# 依存関係インストール
+pip install -r scripts/requirements.txt
+
+# .env.shared に SUPABASE_SERVICE_ROLE_KEY を設定してから実行
+python scripts/sync_recommended_feeds.py
+```
+
+フィードを追加・削除する場合は、`scripts/sync_recommended_feeds.py` 内の `RECOMMENDED_FEEDS` リストを編集して再実行します。
+
+## 7. 認証設定
 
 1. Supabaseダッシュボードで「Authentication」→「Providers」を開く
 2. 「Email」が有効になっていることを確認
@@ -171,7 +202,7 @@ Cloudflare Pagesダッシュボードで「Settings」→「Environment variable
    - **Confirm email**: オフ推奨
    - **Secure password**: オン推奨
 
-## 7. 動作確認
+## 8. 動作確認
 
 1. アプリをローカルで起動: `yarn dev:web`
 2. 新規アカウント作成

@@ -15,6 +15,7 @@
 - **Expoモバイルアプリ: ボイラープレート起動・EASビルド成功**
 - **Expoモバイルアプリ: Supabase認証実装完了**（サインイン、サインアップ、サインアウト、自動ログイン）
 - **Expoモバイルアプリ: 全画面実装完了**（Articles、Favorites、Feeds、Settings）
+- **Recommended Feeds: DB管理に移行**（ハードコードからSupabaseテーブルへ）
 
 ### デプロイ情報
 - **本番URL（Web）**: https://feedown.pages.dev
@@ -267,9 +268,37 @@ VITE_API_BASE_URL=
 - `articles` - 記事（7日TTL）
 - `read_articles` - 既読記事
 - `favorites` - お気に入り
+- `recommended_feeds` - おすすめフィード（公開データ）
 
 ### RLS (Row Level Security)
 全テーブルでRLS有効。ユーザーは自分のデータのみアクセス可能。
+`recommended_feeds`は公開テーブル（誰でも読み取り可能）。
+
+---
+
+## Recommended Feeds 管理
+
+おすすめフィードはDBで管理され、Pythonスクリプトで更新します。
+
+### 更新手順
+
+```bash
+# 1. scripts/sync_recommended_feeds.py の RECOMMENDED_FEEDS リストを編集
+# 2. 依存関係インストール（初回のみ）
+pip install -r scripts/requirements.txt
+
+# 3. スクリプト実行（.env.shared に SUPABASE_SERVICE_ROLE_KEY が必要）
+python scripts/sync_recommended_feeds.py
+
+# 4. Web版をデプロイ（キャッシュクリアのため）
+npm run build --workspace=apps/web
+npx wrangler pages deploy apps/web/dist --project-name=feedown
+```
+
+### 関連ファイル
+- `scripts/sync_recommended_feeds.py` - フィード一覧とDB同期スクリプト
+- `scripts/recommended_feeds_schema.sql` - テーブル定義SQL
+- `functions/api/recommended-feeds.js` - APIエンドポイント（GET /api/recommended-feeds）
 
 ---
 
