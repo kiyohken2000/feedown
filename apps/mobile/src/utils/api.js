@@ -233,6 +233,11 @@ class ArticlesAPI {
   async removeFromFavorites(articleId) {
     return this.client.delete(`/api/articles/${articleId}/favorite`)
   }
+
+  async getContent(articleUrl) {
+    const encodedUrl = encodeURIComponent(articleUrl)
+    return this.client.get(`/api/article-content?url=${encodedUrl}`)
+  }
 }
 
 /**

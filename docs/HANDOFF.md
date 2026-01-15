@@ -19,6 +19,7 @@
 - **Expoモバイルアプリ: ダークモード実装完了**（全画面・コンポーネント対応、AsyncStorage永続化）
 - **Expoモバイルアプリ: サーバーURL入力機能**（各ユーザーが自分のサーバーを指定可能）
 - **Expoモバイルアプリ: Quick Create Test Account**（テストアカウント簡単作成）
+- **Expoモバイルアプリ: アプリ内記事リーダー**（Reader Mode機能）
 
 ### デプロイ情報
 - **本番URL（Web）**: https://feedown.pages.dev
@@ -104,6 +105,23 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 8. **Read.js (Feeds画面)**
    - recommended feeds取得時のURL参照エラー修正
    - `API_BASE_URL`（空文字列）から`UserContext.serverUrl`に変更
+
+### アプリ内記事リーダー機能（Reader Mode）
+
+9. **functions/api/article-content.ts** - 記事コンテンツ抽出API
+   - `linkedom` + `@mozilla/readability` で記事本文を抽出
+   - 相対URLを絶対URLに変換（画像・リンク）
+   - 1時間キャッシュ
+
+10. **ArticleReader.js** - リーダーコンポーネント
+    - `react-native-render-html` でHTMLレンダリング
+    - ダークモード対応のスタイル設定
+    - カスタムリンクハンドラー
+
+11. **ArticleDetail.js** - Reader Mode統合
+    - 「Reader Mode」ボタン追加
+    - 読み込み中・エラー状態の処理
+    - 「Exit Reader」ボタンでデフォルト表示に戻る
 
 ---
 
@@ -259,17 +277,17 @@ apps/mobile/src/
 
 ### 優先度低（将来の機能追加）
 - [ ] リアルタイム更新機能（Supabase Realtime）
-- [ ] **アプリ内記事リーダー機能**（下記「将来の実装案」参照）
+- [x] **アプリ内記事リーダー機能** ✅ 実装完了
 - [ ] パフォーマンス最適化
 - [ ] 多言語対応
 - [ ] オフライン対応（AsyncStorageキャッシュ）
 
 ---
 
-## 将来の実装案：アプリ内記事リーダー
+## 実装済み：アプリ内記事リーダー ✅
 
 ### 概要
-現在は「Visit Original」で外部ブラウザを開いているが、アプリ内で記事を閲覧できる機能を実装する案。
+「Visit Original」で外部ブラウザを開く代わりに、アプリ内で記事を閲覧できる機能。
 
 ### 技術アプローチ
 Pocket、Instapaper、Safari Reader Modeと同じ手法：
@@ -281,20 +299,20 @@ Pocket、Instapaper、Safari Reader Modeと同じ手法：
 ### サーバーサイド実装（Cloudflare Pages Function）
 
 ```javascript
-// functions/api/article-content.js
+// functions/api/article-content.ts
+import { parseHTML } from 'linkedom';  // jsdomはCF Workersで動作しないためlinkedomを使用
 import { Readability } from '@mozilla/readability';
-import { JSDOM } from 'jsdom';
 
 export async function onRequestGet(context) {
   const url = new URL(context.request.url).searchParams.get('url');
 
-  // HTMLを取得（Workerプロキシ経由でCORS回避）
+  // HTMLを取得
   const response = await fetch(url);
   const html = await response.text();
 
-  // Readabilityで記事本文を抽出
-  const dom = new JSDOM(html, { url });
-  const reader = new Readability(dom.window.document);
+  // linkedomでDOM生成、Readabilityで記事本文を抽出
+  const { document } = parseHTML(html);
+  const reader = new Readability(document);
   const article = reader.parse();
 
   return Response.json({
@@ -343,13 +361,13 @@ function ArticleReader({ articleContent }) {
 }
 ```
 
-### 必要なパッケージ
+### 使用パッケージ
 
-**サーバーサイド:**
+**サーバーサイド (functions/):**
+- `linkedom` - 軽量DOM実装（Cloudflare Workers対応）
 - `@mozilla/readability` - 記事本文抽出
-- `jsdom` - DOM解析
 
-**モバイル:**
+**モバイル (apps/mobile/):**
 - `react-native-render-html` - HTMLレンダリング
 
 ### 成功率の見込み
@@ -361,18 +379,19 @@ function ArticleReader({ articleContent }) {
 | 技術ドキュメント | 70-80% | コードブロックの対応が必要 |
 | SPA/Web App | 低い | JS依存のためHTML取得自体が困難 |
 
-### UI設計案
+### 実装済みUI
 
-1. **ArticleDetail画面に「Reader Mode」ボタン追加**
-2. タップするとAPIから記事コンテンツ取得
-3. 取得成功 → アプリ内でレンダリング
-4. 取得失敗 → 「Visit Original」にフォールバック
+1. **ArticleDetail画面に「📖 Reader Mode」ボタン**
+2. タップするとAPIから記事コンテンツ取得（ローディング表示）
+3. 取得成功 → ArticleReaderコンポーネントでレンダリング
+4. 取得失敗 → エラートースト表示、「Visit Original」にフォールバック
+5. ヘッダーに「Exit Reader」ボタンで元の表示に戻る
 
-### 注意点
+### 技術的注意点
 
-- Cloudflare Workersでjsdomを使う場合、互換性の問題がある可能性
-- 代替: HTMLRewriterを使った軽量な抽出、または外部サービス利用
-- 画像のプロキシも必要になる可能性（CORS、遅延読み込み対応）
+- `jsdom`はNode.js依存のためCloudflare Workersでは動作しない → `linkedom`を使用
+- 相対URLはAPIで絶対URLに変換済み
+- 画像のCORS問題は一部のサイトで発生する可能性あり
 
 ---
 

@@ -234,6 +234,13 @@
 - [x] Articles画面の空状態メッセージにプルトゥリフレッシュ説明追加
 - [x] Feeds画面のrecommended feeds取得エラー修正
 
+### Step 11: アプリ内記事リーダー機能 ✅
+- [x] 記事コンテンツ抽出API作成（linkedom + @mozilla/readability）
+- [x] react-native-render-htmlインストール
+- [x] ArticleReaderコンポーネント作成
+- [x] ArticleDetail画面にReader Modeボタン追加
+- [x] ダークモード対応
+
 **完了条件**: iOS/Androidで全機能が動作 ✅
 
 ---

@@ -12,8 +12,11 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { colors, fontSize, getThemeColors } from '../../theme'
 import { FeedsContext } from '../../contexts/FeedsContext'
+import { UserContext } from '../../contexts/UserContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
+import ArticleReader from '../../components/ArticleReader'
+import { createApiClient } from '../../utils/api'
 import { showToast, showErrorToast } from '../../utils/showToast'
 
 export default function ArticleDetail() {
@@ -23,6 +26,7 @@ export default function ArticleDetail() {
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
 
+  const { getAccessToken } = useContext(UserContext)
   const {
     readArticles,
     favoritedArticles,
@@ -31,6 +35,11 @@ export default function ArticleDetail() {
   } = useContext(FeedsContext)
 
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false)
+  const [readerMode, setReaderMode] = useState(false)
+  const [readerContent, setReaderContent] = useState(null)
+  const [isLoadingReader, setIsLoadingReader] = useState(false)
+  const [readerError, setReaderError] = useState(null)
+
   const isFavorited = favoritedArticles.has(article.id)
 
   // Mark as read when screen opens
@@ -67,6 +76,55 @@ export default function ArticleDetail() {
     }
   }, [article.url])
 
+  // Handle Reader Mode toggle
+  const handleReaderMode = useCallback(async () => {
+    if (readerMode) {
+      // Exit reader mode
+      setReaderMode(false)
+      return
+    }
+
+    // If already loaded, just show
+    if (readerContent) {
+      setReaderMode(true)
+      return
+    }
+
+    // Load article content
+    setIsLoadingReader(true)
+    setReaderError(null)
+
+    try {
+      const api = createApiClient(getAccessToken)
+      const response = await api.articles.getContent(article.url)
+
+      if (response.success && response.data?.article?.content) {
+        setReaderContent(response.data.article)
+        setReaderMode(true)
+      } else {
+        setReaderError(response.data?.error || 'Could not extract article content')
+        showErrorToast({
+          title: 'Reader Mode Unavailable',
+          body: 'Could not extract article content. Try "Visit Original" instead.',
+        })
+      }
+    } catch (err) {
+      console.error('Reader mode error:', err)
+      setReaderError(err.message)
+      showErrorToast({
+        title: 'Error',
+        body: 'Failed to load article content',
+      })
+    } finally {
+      setIsLoadingReader(false)
+    }
+  }, [readerMode, readerContent, article.url, getAccessToken])
+
+  // Handle link press in reader
+  const handleLinkPress = useCallback((url) => {
+    Linking.openURL(url)
+  }, [])
+
   // Get relative time string
   const getRelativeTime = (dateString) => {
     if (!dateString) return ''
@@ -98,72 +156,118 @@ export default function ArticleDetail() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
+        {readerMode && (
+          <TouchableOpacity onPress={handleReaderMode} style={styles.exitReaderButton}>
+            <Text style={[styles.exitReaderText, { color: theme.textMuted }]}>Exit Reader</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={styles.contentContainer}>
-        {/* Article Image */}
-        {article.imageUrl && (
-          <Image
-            source={{ uri: article.imageUrl }}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
-        )}
+      {/* Reader Mode View */}
+      {readerMode && readerContent ? (
+        <ArticleReader
+          article={readerContent}
+          onLinkPress={handleLinkPress}
+        />
+      ) : (
+        /* Default Article View */
+        <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={styles.contentContainer}>
+          {/* Article Image */}
+          {article.imageUrl && (
+            <Image
+              source={{ uri: article.imageUrl }}
+              style={styles.heroImage}
+              resizeMode="cover"
+            />
+          )}
 
-        {/* Article Meta */}
-        <View style={styles.metaContainer}>
-          <Text style={styles.feedTitle}>{article.feedTitle || 'Unknown Feed'}</Text>
-          <Text style={[styles.publishDate, { color: theme.textMuted }]}>{getRelativeTime(article.publishedAt)}</Text>
-        </View>
+          {/* Article Meta */}
+          <View style={styles.metaContainer}>
+            <Text style={styles.feedTitle}>{article.feedTitle || 'Unknown Feed'}</Text>
+            <Text style={[styles.publishDate, { color: theme.textMuted }]}>{getRelativeTime(article.publishedAt)}</Text>
+          </View>
 
-        {/* Article Title */}
-        <Text style={[styles.title, { color: theme.text }]}>{article.title}</Text>
+          {/* Article Title */}
+          <Text style={[styles.title, { color: theme.text }]}>{article.title}</Text>
 
-        {/* Article Description */}
-        {article.description && (
-          <Text style={[styles.description, { color: theme.textSecondary }]}>{article.description}</Text>
-        )}
+          {/* Article Description */}
+          {article.description && (
+            <Text style={[styles.description, { color: theme.textSecondary }]}>{article.description}</Text>
+          )}
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.favoriteButton,
-              { backgroundColor: isDarkMode ? theme.card : colors.white },
-              isFavorited && styles.favoriteButtonActive,
-            ]}
-            onPress={handleToggleFavorite}
-            disabled={isTogglingFavorite}
-          >
-            {isTogglingFavorite ? (
-              <ActivityIndicator size="small" color={isFavorited ? colors.white : colors.primary} />
-            ) : (
-              <Text
-                style={[
-                  styles.actionButtonText,
-                  isFavorited && styles.actionButtonTextActive,
-                ]}
-              >
-                {isFavorited ? '★ In Favorites' : '☆ Add to Favorites'}
-              </Text>
-            )}
-          </TouchableOpacity>
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                styles.favoriteButton,
+                { backgroundColor: isDarkMode ? theme.card : colors.white },
+                isFavorited && styles.favoriteButtonActive,
+              ]}
+              onPress={handleToggleFavorite}
+              disabled={isTogglingFavorite}
+            >
+              {isTogglingFavorite ? (
+                <ActivityIndicator size="small" color={isFavorited ? colors.white : colors.primary} />
+              ) : (
+                <Text
+                  style={[
+                    styles.actionButtonText,
+                    isFavorited && styles.actionButtonTextActive,
+                  ]}
+                >
+                  {isFavorited ? '★ In Favorites' : '☆ Add to Favorites'}
+                </Text>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionButton, styles.visitButton]}
-            onPress={handleVisitOriginal}
-          >
-            <Text style={styles.visitButtonText}>Visit Original →</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.visitButton]}
+              onPress={handleVisitOriginal}
+            >
+              <Text style={styles.visitButtonText}>Visit Original →</Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* URL Info */}
-        <View style={[styles.urlContainer, { backgroundColor: theme.surface }]}>
-          <Text style={[styles.urlLabel, { color: theme.textMuted }]}>Source</Text>
-          <Text style={[styles.urlText, { color: theme.textMuted }]} numberOfLines={2}>{article.url}</Text>
-        </View>
-      </ScrollView>
+          {/* Reader Mode Button */}
+          <View style={styles.readerButtonContainer}>
+            <TouchableOpacity
+              style={[
+                styles.readerButton,
+                { backgroundColor: isDarkMode ? theme.card : colors.white, borderColor: theme.border },
+                isLoadingReader && styles.readerButtonLoading,
+              ]}
+              onPress={handleReaderMode}
+              disabled={isLoadingReader}
+            >
+              {isLoadingReader ? (
+                <View style={styles.readerButtonContent}>
+                  <ActivityIndicator size="small" color={colors.bluePrimary} />
+                  <Text style={[styles.readerButtonText, { color: colors.bluePrimary, marginLeft: 8 }]}>
+                    Loading...
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.readerButtonContent}>
+                  <Text style={styles.readerIcon}>📖</Text>
+                  <Text style={[styles.readerButtonText, { color: colors.bluePrimary }]}>
+                    Reader Mode
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <Text style={[styles.readerHint, { color: theme.textMuted }]}>
+              Read article in a clean, distraction-free format
+            </Text>
+          </View>
+
+          {/* URL Info */}
+          <View style={[styles.urlContainer, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.urlLabel, { color: theme.textMuted }]}>Source</Text>
+            <Text style={[styles.urlText, { color: theme.textMuted }]} numberOfLines={2}>{article.url}</Text>
+          </View>
+        </ScrollView>
+      )}
     </ScreenTemplate>
   )
 }
@@ -172,6 +276,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -186,6 +291,14 @@ const styles = StyleSheet.create({
     fontSize: fontSize.normal,
     color: colors.primary,
     fontWeight: '600',
+  },
+  exitReaderButton: {
+    paddingVertical: 4,
+    paddingLeft: 12,
+  },
+  exitReaderText: {
+    fontSize: fontSize.normal,
+    fontWeight: '500',
   },
   container: {
     flex: 1,
@@ -235,7 +348,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   actionButton: {
     flex: 1,
@@ -267,6 +380,38 @@ const styles = StyleSheet.create({
     fontSize: fontSize.normal,
     fontWeight: '600',
     color: colors.white,
+  },
+  readerButtonContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  readerButton: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.grayLight,
+  },
+  readerButtonLoading: {
+    opacity: 0.7,
+  },
+  readerButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  readerIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  readerButtonText: {
+    fontSize: fontSize.normal,
+    fontWeight: '600',
+  },
+  readerHint: {
+    fontSize: fontSize.small,
+    textAlign: 'center',
+    marginTop: 8,
   },
   urlContainer: {
     marginHorizontal: 16,
