@@ -21,6 +21,9 @@
       "fallbackToCacheTimeout": 10000,
       "url": "https://u.expo.dev/09e91d3a-0014-4831-b35f-9962d05db0e3"
     },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -53,9 +56,6 @@
         "ts",
         "tsx"
       ]
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
     },
     "plugins": [
       "expo-font",
