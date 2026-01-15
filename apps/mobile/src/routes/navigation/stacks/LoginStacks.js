@@ -17,22 +17,12 @@ export const LoginStacks = () => {
       <Stack.Screen
         name="SignIn"
         component={SignIn}
-        options={({ navigation }) => ({
-          title: 'SignIn',
-          headerShown: true,
-          headerBackTitleVisible: false,
-          headerBackground: () => <GradientHeader />,
-        })}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="SignUp"
         component={SignUp}
-        options={({ navigation }) => ({
-          title: 'SignUp',
-          headerShown: true,
-          headerBackTitleVisible: false,
-          headerBackground: () => <GradientHeader />,
-        })}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   )

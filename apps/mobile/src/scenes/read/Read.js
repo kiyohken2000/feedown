@@ -14,14 +14,15 @@ import {
 } from 'react-native'
 import { colors, fontSize, getThemeColors } from '../../theme'
 import { FeedsContext } from '../../contexts/FeedsContext'
+import { UserContext } from '../../contexts/UserContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
-import { API_BASE_URL } from '../../utils/supabase'
 
 export default function Read() {
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
+  const { serverUrl } = useContext(UserContext)
   const {
     feeds,
     fetchFeeds,
@@ -38,9 +39,13 @@ export default function Read() {
 
   // Fetch recommended feeds from API
   const fetchRecommendedFeeds = useCallback(async () => {
+    if (!serverUrl) {
+      setRecommendedLoading(false)
+      return
+    }
     setRecommendedLoading(true)
     try {
-      const response = await fetch(`${API_BASE_URL}/api/recommended-feeds`)
+      const response = await fetch(`${serverUrl}/api/recommended-feeds`)
       const data = await response.json()
       if (data.feeds) {
         setRecommendedFeeds(data.feeds)
@@ -51,13 +56,19 @@ export default function Read() {
     } finally {
       setRecommendedLoading(false)
     }
-  }, [])
+  }, [serverUrl])
 
   // Initial load
   useEffect(() => {
     fetchFeeds()
-    fetchRecommendedFeeds()
   }, [])
+
+  // Fetch recommended feeds when serverUrl is available
+  useEffect(() => {
+    if (serverUrl) {
+      fetchRecommendedFeeds()
+    }
+  }, [serverUrl, fetchRecommendedFeeds])
 
   // Get feed URLs that are already added
   const existingFeedUrls = useMemo(() => {

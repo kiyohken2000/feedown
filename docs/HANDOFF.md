@@ -1,7 +1,7 @@
 # FeedOwn 引継ぎドキュメント
 
-**最終更新**: 2026-01-15
-**ステータス**: Phase 9 進行中（Expoモバイルアプリ）
+**最終更新**: 2026-01-16
+**ステータス**: Phase 9 完了（Expoモバイルアプリ）
 
 ---
 
@@ -17,6 +17,8 @@
 - **Expoモバイルアプリ: 全画面実装完了**（Articles、Favorites、Feeds、Settings）
 - **Recommended Feeds: DB管理に移行**（ハードコードからSupabaseテーブルへ）
 - **Expoモバイルアプリ: ダークモード実装完了**（全画面・コンポーネント対応、AsyncStorage永続化）
+- **Expoモバイルアプリ: サーバーURL入力機能**（各ユーザーが自分のサーバーを指定可能）
+- **Expoモバイルアプリ: Quick Create Test Account**（テストアカウント簡単作成）
 
 ### デプロイ情報
 - **本番URL（Web）**: https://feedown.pages.dev
@@ -52,7 +54,60 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ---
 
-## 本日の作業内容（2026-01-15）
+## 本日の作業内容（2026-01-16）
+
+### サーバーURL入力機能
+
+1. **supabase.js** - 大幅リファクタリング
+   - Supabase SDK直接使用からAPI経由に変更
+   - AsyncStorageでサーバーURL、認証トークン、ユーザー情報を保存
+   - `getServerUrl`, `saveServerUrl`, `getAuthToken`, `saveAuthToken` 等のヘルパー関数追加
+   - `clearAuthData`でサーバーURLもクリアするように修正
+
+2. **api.js** - 動的サーバーURL対応
+   - `createApiClient` が動的にサーバーURLを取得
+   - `createApiClientWithUrl` でカスタムURLを指定可能
+   - `AuthAPI` クラス追加（`/api/auth/login`, `/api/auth/register` 呼び出し）
+
+3. **UserContext.js** - API経由認証に変更
+   - Supabase SDK直接使用から `api.auth.login`, `api.auth.register` に変更
+   - `serverUrl` の状態管理追加
+   - セッション永続化（AsyncStorage）
+
+4. **SignIn.js / SingUp.js** - UI改善
+   - サーバーURL入力欄追加（デフォルト空、プレースホルダーに例を表示）
+   - ヘッダーデザインを他の画面（Home, Profile等）に統一
+   - ナビゲーションヘッダー非表示（`LoginStacks.js`で`headerShown: false`）
+   - ロゴ画像（logo-lg.png）表示
+   - ダークモード対応
+
+### Quick Create Test Account
+
+5. **SingUp.js** - テストアカウント簡単作成
+   - 「Quick Create Test Account」ボタン追加
+   - サーバー: `https://feedown.pages.dev`
+   - メールアドレス: `test-{ランダム番号}@test.com`
+   - パスワード: `111111`
+   - テストアカウント制限の注意書き表示
+
+### UI改善
+
+6. **Profile.js (Settings画面)**
+   - テストアカウント判定関数追加（`isTestAccount`）
+   - テストアカウントの場合のみ制限注意書き表示（Feed 3個、Favorites 10個）
+   - Aboutセクションにアプリアイコン（logo-lg.png）追加
+   - 公式サイトリンク追加（https://feedown.pages.dev）
+
+7. **Home.js (Articles画面)**
+   - 空状態メッセージにプルトゥリフレッシュの説明追加
+
+8. **Read.js (Feeds画面)**
+   - recommended feeds取得時のURL参照エラー修正
+   - `API_BASE_URL`（空文字列）から`UserContext.serverUrl`に変更
+
+---
+
+## 以前の作業内容（2026-01-15）
 
 ### ダークモード実装
 
@@ -113,16 +168,19 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ---
 
-## モバイルアプリ開発（Phase 9）
+## モバイルアプリ開発（Phase 9） ✅ 完了
 
 ### 現在の状態
 - ✅ Expo Go起動成功
 - ✅ EAS Build（iOS preview）成功
-- ✅ Supabase認証実装完了
+- ✅ API経由認証実装完了（サーバーURL指定可能）
 - ✅ API連携実装完了（フィード・記事取得）
 - ✅ 画面実装完了（Dashboard、フィード管理、設定、記事詳細、お気に入り）
 - ✅ UX改善（フィルター、Mark All Read、おすすめフィード）
 - ✅ ボトムタブ4つ（Articles / Favorites / Feeds / Settings）
+- ✅ サーバーURL入力機能（各ユーザーが自分のサーバーを指定可能）
+- ✅ Quick Create Test Account（テストアカウント簡単作成）
+- ✅ ダークモード対応
 
 ### 主要バージョン
 ```json
@@ -179,28 +237,31 @@ apps/mobile/src/
 │       ├── FavoritesStacks.js # Favorites + FavoriteDetail
 │       └── ...
 └── utils/
-    ├── api.js               # APIクライアント
-    └── supabase.js          # Supabase設定
+    ├── api.js               # APIクライアント（動的サーバーURL対応）
+    └── supabase.js          # AsyncStorage管理（サーバーURL、認証トークン、ユーザー情報）
 ```
 
 ---
 
 ## 次のタスク候補
 
-### 優先度高（Phase 9 継続）
-- [ ] モバイルアプリ: Expo Goでテスト
-- [ ] モバイルアプリ: EAS Build（iOS/Android）
-
-### 優先度中
-- [ ] リアルタイム更新機能（Supabase Realtime）
+### 優先度高（Phase 10: テスト & ドキュメント）
+- [ ] モバイルアプリ: EAS Build（iOS/Android preview）
 - [ ] E2Eテスト（Playwright）
 - [ ] API仕様書作成
-- [ ] **アプリ内記事リーダー機能**（下記「将来の実装案」参照）
+- [ ] セットアップガイド作成
 
-### 優先度低
+### 優先度中（Phase 11: App Store リリース）
+- [ ] Apple Developer アカウント登録
+- [ ] Google Play Console でアプリ作成
+- [ ] EAS Build 本番設定
+- [ ] 審査提出・リリース
+
+### 優先度低（将来の機能追加）
+- [ ] リアルタイム更新機能（Supabase Realtime）
+- [ ] **アプリ内記事リーダー機能**（下記「将来の実装案」参照）
 - [ ] パフォーマンス最適化
 - [ ] 多言語対応
-- [ ] Androidビルド確認
 - [ ] オフライン対応（AsyncStorageキャッシュ）
 
 ---

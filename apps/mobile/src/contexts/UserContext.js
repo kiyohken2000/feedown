@@ -1,58 +1,117 @@
 import React, { createContext, useState, useEffect } from 'react'
-import { supabase } from '../utils/supabase'
+import {
+  getServerUrl,
+  saveServerUrl,
+  getAuthToken,
+  saveAuthToken,
+  getUser,
+  saveUser,
+  clearAuthData,
+} from '../utils/supabase'
+import { createApiClientWithUrl } from '../utils/api'
 
 export const UserContext = createContext()
 
 export const UserContextProvider = (props) => {
   const [user, setUser] = useState(null)
-  const [session, setSession] = useState(null)
+  const [serverUrl, setServerUrlState] = useState('')
   const [isLoading, setIsLoading] = useState(true)
 
+  // Load saved session on mount
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setIsLoading(false)
-    })
+    const loadSession = async () => {
+      try {
+        const [savedUrl, savedToken, savedUser] = await Promise.all([
+          getServerUrl(),
+          getAuthToken(),
+          getUser(),
+        ])
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
+        setServerUrlState(savedUrl)
+
+        if (savedToken && savedUser) {
+          setUser(savedUser)
+        }
+      } catch (error) {
+        console.error('Failed to load session:', error)
+      } finally {
+        setIsLoading(false)
       }
-    )
+    }
 
-    return () => subscription.unsubscribe()
+    loadSession()
   }, [])
 
-  const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    if (error) throw error
-    return data
+  // Update server URL
+  const setServerUrl = async (url) => {
+    const normalizedUrl = await saveServerUrl(url)
+    setServerUrlState(normalizedUrl)
+    return normalizedUrl
   }
 
-  const signUp = async (email, password) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
-    if (error) throw error
-    return data
+  // Sign in with email/password via API
+  const signIn = async (email, password, customServerUrl = null) => {
+    const url = customServerUrl || serverUrl
+    const api = createApiClientWithUrl(url)
+    const response = await api.auth.login(email, password)
+
+    if (!response.success) {
+      throw new Error(response.error)
+    }
+
+    const { user: userData, token } = response.data
+
+    // Save session data
+    await Promise.all([
+      saveAuthToken(token),
+      saveUser(userData),
+      customServerUrl ? saveServerUrl(customServerUrl) : Promise.resolve(),
+    ])
+
+    if (customServerUrl) {
+      setServerUrlState(customServerUrl)
+    }
+
+    setUser(userData)
+    return response.data
   }
 
+  // Sign up with email/password via API
+  const signUp = async (email, password, customServerUrl = null) => {
+    const url = customServerUrl || serverUrl
+    const api = createApiClientWithUrl(url)
+    const response = await api.auth.register(email, password)
+
+    if (!response.success) {
+      throw new Error(response.error)
+    }
+
+    const { user: userData, token } = response.data
+
+    // Save session data
+    await Promise.all([
+      saveAuthToken(token),
+      saveUser(userData),
+      customServerUrl ? saveServerUrl(customServerUrl) : Promise.resolve(),
+    ])
+
+    if (customServerUrl) {
+      setServerUrlState(customServerUrl)
+    }
+
+    setUser(userData)
+    return response.data
+  }
+
+  // Sign out
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    await clearAuthData()
+    setUser(null)
   }
 
+  // Get access token for API calls
   const getAccessToken = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token
+    return getAuthToken()
   }
 
   return (
@@ -60,7 +119,8 @@ export const UserContextProvider = (props) => {
       value={{
         user,
         setUser,
-        session,
+        serverUrl,
+        setServerUrl,
         isLoading,
         signIn,
         signUp,

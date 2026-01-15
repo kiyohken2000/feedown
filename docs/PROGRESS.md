@@ -1,6 +1,6 @@
 # FeedOwn - 実装進行表
 
-**最終更新**: 2026-01-15
+**最終更新**: 2026-01-16
 **現在のフェーズ**: 🟡 Phase 9 進行中（Mobile アプリ）
 **次のフェーズ**: Phase 10（テスト & ドキュメント）
 
@@ -155,7 +155,7 @@
 
 ---
 
-## Phase 9: Mobile アプリ（Expo） 🟡 進行中
+## Phase 9: Mobile アプリ（Expo） ✅ 完了
 
 ### Step 1: ボイラープレート起動・ビルド ✅
 - [x] モノレポ構成でExpo Go起動
@@ -218,7 +218,23 @@
 - [x] ボトムタブナビゲーターのダークモード対応
 - [x] Settings画面にダークモードトグル追加
 
-**完了条件**: iOS/Androidで全機能が動作
+### Step 9: サーバーURL入力機能 ✅
+- [x] supabase.jsを動的URL対応に変更（AsyncStorageでサーバーURL保存）
+- [x] UserContextをAPI経由認証に変更（Supabase SDK直接使用から移行）
+- [x] SignIn画面にサーバーURL入力欄追加
+- [x] SignUp画面にサーバーURL入力欄追加
+- [x] SignIn/SignUp画面のヘッダーデザインを他の画面に統一
+- [x] ナビゲーションヘッダー非表示（画面内ヘッダーのみ表示）
+- [x] ロゴ画像（logo-lg.png）をSignIn/SignUp画面に表示
+
+### Step 10: Quick Create Test Account & UI改善 ✅
+- [x] SignUp画面に「Quick Create Test Account」ボタン追加
+- [x] テストアカウント制限の注意書き（Settings画面）
+- [x] Settings画面AboutセクションにアプリアイコンとWebサイトリンク追加
+- [x] Articles画面の空状態メッセージにプルトゥリフレッシュ説明追加
+- [x] Feeds画面のrecommended feeds取得エラー修正
+
+**完了条件**: iOS/Androidで全機能が動作 ✅
 
 ---
 
@@ -256,7 +272,7 @@
 | Phase 6: Cloudflare Pages デプロイ | 4 | 4 | 100% | 🟢 完了 |
 | Phase 7: Firestore最適化 | 3 | 3 | 100% | 🟢 完了 |
 | Phase 8: Supabase移行 | 20 | 18 | 90% | 🟢 完了 |
-| Phase 9: Mobile | 24 | 23 | 96% | 🟡 進行中 |
+| Phase 9: Mobile | 30 | 30 | 100% | 🟢 完了 |
 | Phase 10: テスト & ドキュメント | 5 | 0 | 0% | 🔴 未着手 |
 | Phase 11: App Store リリース | 4 | 0 | 0% | 🔴 未着手 |
 

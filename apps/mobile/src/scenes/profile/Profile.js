@@ -7,6 +7,8 @@ import {
   Alert,
   ScrollView,
   Switch,
+  Image,
+  Linking,
 } from 'react-native'
 import { colors, fontSize, getThemeColors } from '../../theme'
 import { UserContext } from '../../contexts/UserContext'
@@ -17,12 +19,19 @@ import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import Spinner from 'react-native-loading-spinner-overlay'
 
+// Check if email is a test account (test-{number}@test.com)
+const isTestAccount = (email) => {
+  if (!email) return false
+  return /^test-\d+@test\.com$/i.test(email)
+}
+
 export default function Profile() {
   const { user, signOut, getAccessToken } = useContext(UserContext)
   const { feeds, articles, getUnreadCount, resetAll } = useContext(FeedsContext)
   const { isDarkMode, toggleDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
   const [isLoading, setIsLoading] = useState(false)
+  const isTestUser = isTestAccount(user?.email)
 
   // Handle sign out
   const handleSignOut = useCallback(async () => {
@@ -134,6 +143,13 @@ export default function Profile() {
             <Text style={[styles.passwordHint, { color: theme.textMuted }]}>
               If you didn't set a custom password, the default password is 111111
             </Text>
+            {isTestUser && (
+              <View style={[styles.testAccountNotice, { backgroundColor: isDarkMode ? '#3a3a2a' : '#fff3cd', borderColor: isDarkMode ? '#666633' : '#ffc107' }]}>
+                <Text style={[styles.testAccountNoticeText, { color: isDarkMode ? '#e0e0a0' : '#856404' }]}>
+                  This is a test account with limited features: max 3 feeds and 10 favorites.
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -207,11 +223,21 @@ export default function Profile() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>About</Text>
           <View style={[styles.card, { backgroundColor: theme.card }]}>
+            <Image
+              source={require('../../../assets/images/logo-lg.png')}
+              style={styles.appIcon}
+            />
             <Text style={styles.appName}>FeedOwn</Text>
             <Text style={[styles.appVersion, { color: theme.textMuted }]}>Version 1.0.0</Text>
             <Text style={[styles.appDescription, { color: theme.textSecondary }]}>
               Your personal RSS feed reader
             </Text>
+            <TouchableOpacity
+              style={styles.websiteLink}
+              onPress={() => Linking.openURL('https://feedown.pages.dev')}
+            >
+              <Text style={styles.websiteLinkText}>https://feedown.pages.dev</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -280,6 +306,16 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontStyle: 'italic',
   },
+  testAccountNotice: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  testAccountNoticeText: {
+    fontSize: fontSize.small,
+    lineHeight: 18,
+  },
   statsRow: {
     flexDirection: 'row',
     gap: 12,
@@ -343,6 +379,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.redSecondary,
   },
+  appIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 16,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
   appName: {
     fontSize: fontSize.xLarge,
     fontWeight: 'bold',
@@ -360,6 +403,16 @@ const styles = StyleSheet.create({
     color: colors.gray,
     textAlign: 'center',
     marginTop: 8,
+  },
+  websiteLink: {
+    marginTop: 12,
+    paddingVertical: 8,
+  },
+  websiteLinkText: {
+    fontSize: fontSize.normal,
+    color: colors.bluePrimary,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
   toggleRow: {
     flexDirection: 'row',

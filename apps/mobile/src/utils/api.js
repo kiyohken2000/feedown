@@ -1,21 +1,22 @@
 /**
  * FeedOwn API Client for Mobile
- * Based on @feedown/shared package
+ * Supports dynamic server URL configuration
  */
 
-import { API_BASE_URL } from './supabase'
+import { getServerUrl, getAuthToken } from './supabase'
 
 /**
  * API Client class for making authenticated requests
  */
 class ApiClient {
-  constructor(baseUrl, getAuthToken) {
-    this.baseUrl = baseUrl
-    this.getAuthToken = getAuthToken
+  constructor(getServerUrlFn, getAuthTokenFn) {
+    this.getServerUrl = getServerUrlFn
+    this.getAuthToken = getAuthTokenFn
   }
 
   async request(endpoint, options = {}) {
     try {
+      const baseUrl = await this.getServerUrl()
       const token = await this.getAuthToken()
       const headers = {
         'Content-Type': 'application/json',
@@ -25,7 +26,7 @@ class ApiClient {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      const response = await fetch(`${baseUrl}${endpoint}`, {
         ...options,
         headers: {
           ...headers,
@@ -95,6 +96,81 @@ class ApiClient {
 
   async delete(endpoint) {
     return this.request(endpoint, { method: 'DELETE' })
+  }
+}
+
+/**
+ * Auth API
+ */
+class AuthAPI {
+  constructor(getServerUrl) {
+    this.getServerUrl = getServerUrl
+  }
+
+  async login(email, password) {
+    try {
+      const baseUrl = await this.getServerUrl()
+      const response = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || 'Login failed',
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          user: data.user,
+          token: data.token,
+        },
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message || 'Login failed',
+      }
+    }
+  }
+
+  async register(email, password) {
+    try {
+      const baseUrl = await this.getServerUrl()
+      const response = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || 'Registration failed',
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          user: data.user,
+          token: data.token,
+        },
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message || 'Registration failed',
+      }
+    }
   }
 }
 
@@ -210,7 +286,9 @@ class UserAPI {
  * Main FeedOwn API class
  */
 export class FeedOwnAPI {
-  constructor(client) {
+  constructor(getServerUrlFn, getAuthTokenFn) {
+    const client = new ApiClient(getServerUrlFn, getAuthTokenFn)
+    this.auth = new AuthAPI(getServerUrlFn)
     this.feeds = new FeedsAPI(client)
     this.articles = new ArticlesAPI(client)
     this.refresh = new RefreshAPI(client)
@@ -221,8 +299,18 @@ export class FeedOwnAPI {
 
 /**
  * Create API client instance
+ * Uses the stored server URL and auth token
  */
-export function createApiClient(getAuthToken) {
-  const client = new ApiClient(API_BASE_URL, getAuthToken)
-  return new FeedOwnAPI(client)
+export function createApiClient(customGetAuthToken) {
+  return new FeedOwnAPI(getServerUrl, customGetAuthToken || getAuthToken)
+}
+
+/**
+ * Create API client with custom server URL
+ * Used during login/signup before URL is saved
+ */
+export function createApiClientWithUrl(serverUrl, authToken = null) {
+  const getServerUrlFn = async () => serverUrl
+  const getAuthTokenFn = async () => authToken
+  return new FeedOwnAPI(getServerUrlFn, getAuthTokenFn)
 }

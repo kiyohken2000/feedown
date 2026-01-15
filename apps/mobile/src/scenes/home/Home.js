@@ -269,7 +269,8 @@ export default function Home() {
       <View style={styles.emptyContainer}>
         <Text style={[styles.emptyTitle, { color: theme.text }]}>No articles yet</Text>
         <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-          Add some feeds in the Feeds tab to get started
+          Add some feeds in the Feeds tab to get started.{'\n'}
+          Pull down to refresh and fetch new articles.
         </Text>
       </View>
     )
