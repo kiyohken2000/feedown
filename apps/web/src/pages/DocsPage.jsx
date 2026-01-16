@@ -13,8 +13,15 @@ import webApp3 from '../assets/images/web_screenshots/web_app_3.png';
 import webApp4 from '../assets/images/web_screenshots/web_app_4.png';
 import webApp5 from '../assets/images/web_screenshots/web_app_5.png';
 import webApp6 from '../assets/images/web_screenshots/web_app_6.png';
-import webApp7 from '../assets/images/web_screenshots/web_app_7.png';
-import webApp8 from '../assets/images/web_screenshots/web_app_8.png';
+
+// Mobile app screenshots
+import mobileLogin from '../assets/images/mobile_screenshots/mobile_ss_login1.PNG';
+import mobileSignup from '../assets/images/mobile_screenshots/mobile_ss_signup1.PNG';
+import mobileArticles1 from '../assets/images/mobile_screenshots/mobile_ss_articles1.PNG';
+import mobileArticle from '../assets/images/mobile_screenshots/mobile_ss_article1.PNG';
+import mobileReader from '../assets/images/mobile_screenshots/mobile_ss_reader1.PNG';
+import mobileFeeds from '../assets/images/mobile_screenshots/mobile_ss_feeds.PNG';
+import mobileSettings from '../assets/images/mobile_screenshots/mobile_ss_settings1.PNG';
 
 export default function DocsPage() {
   const { isDarkMode } = useTheme();
@@ -135,6 +142,21 @@ export default function DocsPage() {
       gap: '16px',
       marginTop: '16px',
       marginBottom: '16px',
+    },
+    mobileScreenshotGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+      gap: '16px',
+      marginTop: '16px',
+      marginBottom: '16px',
+    },
+    mobileScreenshot: {
+      width: '100%',
+      maxWidth: '200px',
+      borderRadius: '12px',
+      border: `1px solid ${isDarkMode ? '#333' : '#e1e4e8'}`,
+      marginBottom: '8px',
+      boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.1)',
     },
     faqItem: {
       marginBottom: '24px',
@@ -293,28 +315,52 @@ export default function DocsPage() {
           <section id="dark-mode" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t.darkModeTitle}</h2>
             <p style={styles.paragraph}>{t.darkModeContent}</p>
-            <div style={styles.screenshotGrid}>
-              <div>
-                <img src={webApp6} alt="Light Mode" style={{ ...styles.screenshot, marginTop: 0 }} />
-                <p style={styles.screenshotCaption}>{language === 'en' ? 'Light Mode' : 'ライトモード'}</p>
-              </div>
-              <div>
-                <img src={webApp7} alt="Dark Mode" style={{ ...styles.screenshot, marginTop: 0 }} />
-                <p style={styles.screenshotCaption}>{language === 'en' ? 'Dark Mode' : 'ダークモード'}</p>
-              </div>
-            </div>
+            <img src={webApp6} alt="Light Mode" style={styles.screenshot} />
+            <p style={styles.screenshotCaption}>{language === 'en' ? 'Toggle between light and dark mode' : 'ライトモードとダークモードの切り替え'}</p>
           </section>
 
           {/* Mobile Setup */}
           <section id="mobile-setup" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t.mobileSetupTitle}</h2>
             <p style={styles.paragraph}>{t.mobileSetupContent}</p>
+            <div style={styles.mobileScreenshotGrid}>
+              <div>
+                <img src={mobileLogin} alt="Mobile Login" style={styles.mobileScreenshot} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Login Screen' : 'ログイン画面'}</p>
+              </div>
+              <div>
+                <img src={mobileSignup} alt="Mobile Signup" style={styles.mobileScreenshot} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Sign Up Screen' : 'サインアップ画面'}</p>
+              </div>
+            </div>
           </section>
 
           {/* Mobile Features */}
           <section id="mobile-features" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t.mobileFeaturesTitle}</h2>
             <p style={styles.paragraph}>{t.mobileFeaturesContent}</p>
+            <div style={styles.mobileScreenshotGrid}>
+              <div>
+                <img src={mobileArticles1} alt="Mobile Articles" style={styles.mobileScreenshot} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Article List' : '記事一覧'}</p>
+              </div>
+              <div>
+                <img src={mobileArticle} alt="Mobile Article Detail" style={styles.mobileScreenshot} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Article Detail' : '記事詳細'}</p>
+              </div>
+              <div>
+                <img src={mobileReader} alt="Mobile Reader Mode" style={styles.mobileScreenshot} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Reader Mode' : 'リーダーモード'}</p>
+              </div>
+              <div>
+                <img src={mobileFeeds} alt="Mobile Feeds" style={styles.mobileScreenshot} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Feed Management' : 'フィード管理'}</p>
+              </div>
+              <div>
+                <img src={mobileSettings} alt="Mobile Settings" style={styles.mobileScreenshot} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Settings' : '設定'}</p>
+              </div>
+            </div>
           </section>
 
           {/* FAQ */}
