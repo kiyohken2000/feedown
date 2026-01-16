@@ -11,10 +11,6 @@ binding = "CACHE"
 id = "76c3c4142838463b8a3b1656e750aa1c"
 preview_id = "737baa0c5e164e17a9c185cf7e4d4f1a"
 
-# Environment variables
-[vars]
-FIREBASE_PROJECT_ID = "feedown-78e22"
-
 # Observability (optional)
 [observability]
 enabled = true
