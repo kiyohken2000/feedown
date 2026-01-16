@@ -617,20 +617,28 @@ npm install`}
 
             <div style={styles.stepTitle}>
               <span style={styles.stepNumber}>2</span>
-              {language === 'en' ? 'Create .env file' : '.envファイル作成'}
+              {language === 'en' ? 'Configure Environment Variables' : '環境変数を設定'}
             </div>
             <p style={styles.paragraph}>
               {language === 'en'
-                ? 'Create apps/web/.env:'
-                : 'apps/web/.env を作成:'}
+                ? 'Copy .env.example to .env.shared and fill in your values:'
+                : '.env.example を .env.shared にコピーして値を入力:'}
             </p>
             <div style={styles.codeBlock}>
               <code style={styles.code}>
-{`VITE_SUPABASE_URL=https://xxxxx.supabase.co
+{`# Copy example file
+cp .env.example .env.shared
+
+# Edit .env.shared with your values:
+VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 VITE_WORKER_URL=https://feedown-worker.your-subdomain.workers.dev
 VITE_APP_NAME=FeedOwn
-VITE_APP_VERSION=1.0.0`}
+VITE_APP_VERSION=1.0.0
+
+# Sync to apps/web/.env
+bash scripts/sync-envs.sh`}
               </code>
             </div>
 
