@@ -18,6 +18,7 @@ import { createApiClient } from '../../utils/api'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import Spinner from 'react-native-loading-spinner-overlay'
+import { appVersion } from '../../config'
 
 // Check if email is a test account (test-{number}@test.com)
 const isTestAccount = (email) => {
@@ -236,7 +237,7 @@ export default function Profile() {
               style={styles.appIcon}
             />
             <Text style={styles.appName}>FeedOwn</Text>
-            <Text style={[styles.appVersion, { color: theme.textMuted }]}>Version 1.0.0</Text>
+            <Text style={[styles.appVersion, { color: theme.textMuted }]}>Version {appVersion}</Text>
             <Text style={[styles.appDescription, { color: theme.textSecondary }]}>
               Your personal RSS feed reader
             </Text>
