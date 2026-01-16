@@ -360,10 +360,32 @@ npm test
 
 ---
 
-## 将来の機能追加（オプション）
+## Phase 13: 機能拡張（計画中）
+
+詳細は `docs/FEATURE_PLAN.md` を参照
+
+### 1. フィードごとの記事一覧表示
+- [ ] Web: DashboardPageにフィード選択UI追加
+- [ ] Mobile: FeedArticles画面新規作成
+- [ ] 既存APIで対応可能（feedIdパラメータ）
+
+### 2. 記事の共有機能
+- [ ] Mobile: ArticleDetailにShareボタン追加
+- [ ] Mobile: ArticleReaderにShareボタン追加
+- [ ] Web: ArticleModalにShare/Copyボタン追加
+
+### 3. フォントサイズ/フォント変更
+- [ ] Mobile: ThemeContext拡張（fontSize, fontFamily）
+- [ ] Mobile: ArticleReaderの動的スタイル対応
+- [ ] Mobile: Profile画面に設定UI追加
+- [ ] Web: オプション（Mobile実装後に検討）
+
+---
+
+## 将来の機能追加（優先度低）
 
 1. **リアルタイム更新機能**（Supabase Realtime）
 2. **オフライン対応**（AsyncStorageキャッシュ）
-3. **OPMLインポート/エクスポート**
-4. **プッシュ通知**
+3. ~~OPMLインポート/エクスポート~~ (需要低)
+4. ~~プッシュ通知~~ (需要低)
 5. **多言語対応の拡充**

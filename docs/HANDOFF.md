@@ -326,14 +326,42 @@ apps/mobile/src/
 
 ---
 
-## 将来のタスク候補（オプション）
+## 次の実装予定（Phase 13）
+
+詳細は `docs/FEATURE_PLAN.md` を参照。
+
+### 1. フィードごとの記事一覧表示
+特定フィードの記事のみを表示する機能。APIは既に`feedId`パラメータをサポート済み。
+
+**変更予定ファイル:**
+- `apps/web/src/pages/DashboardPage.jsx` - フィード選択UI追加
+- `apps/mobile/src/scenes/feeds/FeedArticles.js` - 新規作成
+- `apps/mobile/src/navigation/FeedsStack.js` - ナビゲーション追加
+
+### 2. 記事の共有機能
+記事をSNSや他アプリに共有する機能。
+
+**変更予定ファイル:**
+- `apps/mobile/src/scenes/article/ArticleDetail.js` - Shareボタン追加
+- `apps/mobile/src/components/ArticleReader.js` - Shareボタン追加
+- `apps/web/src/components/ArticleModal.jsx` - Share/Copyボタン追加
+
+### 3. フォントサイズ/フォント変更
+リーダーモードのフォント設定をカスタマイズ可能にする。
+
+**変更予定ファイル:**
+- `apps/mobile/src/contexts/ThemeContext.js` - fontSize, fontFamily state追加
+- `apps/mobile/src/components/ArticleReader.js` - 動的スタイル適用
+- `apps/mobile/src/scenes/profile/Profile.js` - 設定UI追加
+
+---
+
+## 将来のタスク候補（優先度低）
 
 すべてのコアフェーズは完了しています。以下は将来の機能追加候補です：
 
 - [ ] リアルタイム更新機能（Supabase Realtime）
 - [ ] オフライン対応（AsyncStorageキャッシュ）
-- [ ] OPMLインポート/エクスポート
-- [ ] プッシュ通知
 - [ ] 多言語対応の拡充
 - [ ] パフォーマンス最適化
 
