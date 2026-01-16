@@ -6,6 +6,16 @@ import { translations } from '../i18n/translations';
 import PublicHeader from '../components/PublicHeader';
 import Footer from '../components/Footer';
 
+// Web app screenshots
+import webApp1 from '../assets/images/web_screenshots/web_app_1.png';
+import webApp2 from '../assets/images/web_screenshots/web_app_2.png';
+import webApp3 from '../assets/images/web_screenshots/web_app_3.png';
+import webApp4 from '../assets/images/web_screenshots/web_app_4.png';
+import webApp5 from '../assets/images/web_screenshots/web_app_5.png';
+import webApp6 from '../assets/images/web_screenshots/web_app_6.png';
+import webApp7 from '../assets/images/web_screenshots/web_app_7.png';
+import webApp8 from '../assets/images/web_screenshots/web_app_8.png';
+
 export default function DocsPage() {
   const { isDarkMode } = useTheme();
   const { language } = useLanguage();
@@ -62,6 +72,7 @@ export default function DocsPage() {
     },
     content: {
       maxWidth: '800px',
+      textAlign: 'left',
     },
     title: {
       fontSize: '36px',
@@ -93,12 +104,37 @@ export default function DocsPage() {
     list: {
       paddingLeft: '24px',
       marginBottom: '16px',
+      textAlign: 'left',
     },
     listItem: {
       fontSize: '16px',
       lineHeight: '1.8',
       color: isDarkMode ? '#b0b0b0' : '#555',
       marginBottom: '8px',
+      textAlign: 'left',
+    },
+    screenshot: {
+      width: '100%',
+      maxWidth: '100%',
+      borderRadius: '8px',
+      border: `1px solid ${isDarkMode ? '#333' : '#e1e4e8'}`,
+      marginBottom: '8px',
+      marginTop: '16px',
+      boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.1)',
+    },
+    screenshotCaption: {
+      fontSize: '14px',
+      color: isDarkMode ? '#888' : '#666',
+      textAlign: 'center',
+      marginBottom: '16px',
+      fontStyle: 'italic',
+    },
+    screenshotGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      gap: '16px',
+      marginTop: '16px',
+      marginBottom: '16px',
     },
     faqItem: {
       marginBottom: '24px',
@@ -217,30 +253,56 @@ export default function DocsPage() {
               <li style={styles.listItem}>{t.quickStartStep3}</li>
               <li style={styles.listItem}>{t.quickStartStep4}</li>
             </ol>
+            <img src={webApp1} alt="Login Screen" style={styles.screenshot} />
+            <p style={styles.screenshotCaption}>{language === 'en' ? 'Login / Sign Up Screen' : 'ログイン / サインアップ画面'}</p>
           </section>
 
           {/* Adding Feeds */}
           <section id="adding-feeds" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t.addingFeedsTitle}</h2>
             <p style={styles.paragraph}>{t.addingFeedsContent}</p>
+            <img src={webApp4} alt="Feed Management" style={styles.screenshot} />
+            <p style={styles.screenshotCaption}>{language === 'en' ? 'Feed Management - Add and organize your RSS feeds' : 'フィード管理 - RSSフィードの追加と整理'}</p>
           </section>
 
           {/* Reading Articles */}
           <section id="reading-articles" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t.readingArticlesTitle}</h2>
             <p style={styles.paragraph}>{t.readingArticlesContent}</p>
+            <div style={styles.screenshotGrid}>
+              <div>
+                <img src={webApp2} alt="Article List" style={{ ...styles.screenshot, marginTop: 0 }} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Article List' : '記事一覧'}</p>
+              </div>
+              <div>
+                <img src={webApp3} alt="Article Detail" style={{ ...styles.screenshot, marginTop: 0 }} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Article Detail' : '記事詳細'}</p>
+              </div>
+            </div>
           </section>
 
           {/* Favorites */}
           <section id="favorites" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t.favoritesTitle}</h2>
             <p style={styles.paragraph}>{t.favoritesContent}</p>
+            <img src={webApp5} alt="Favorites" style={styles.screenshot} />
+            <p style={styles.screenshotCaption}>{language === 'en' ? 'Favorites - Save articles for later' : 'お気に入り - 記事を後で読むために保存'}</p>
           </section>
 
           {/* Dark Mode */}
           <section id="dark-mode" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t.darkModeTitle}</h2>
             <p style={styles.paragraph}>{t.darkModeContent}</p>
+            <div style={styles.screenshotGrid}>
+              <div>
+                <img src={webApp6} alt="Light Mode" style={{ ...styles.screenshot, marginTop: 0 }} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Light Mode' : 'ライトモード'}</p>
+              </div>
+              <div>
+                <img src={webApp7} alt="Dark Mode" style={{ ...styles.screenshot, marginTop: 0 }} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Dark Mode' : 'ダークモード'}</p>
+              </div>
+            </div>
           </section>
 
           {/* Mobile Setup */}
