@@ -93,7 +93,7 @@ I've written comprehensive documentation for self-hosting FeedOwn. If you can fo
 The setup involves:
 1. Creating a Supabase project (5 minutes)
 2. Creating a Cloudflare Pages project (5 minutes)
-3. Deploying the code (automatic via GitHub)
+3. Deploying the code
 
 No servers to manage. No Docker containers to babysit. No monthly VPS bills.
 
