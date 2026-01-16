@@ -6,6 +6,25 @@ import { translations } from '../i18n/translations';
 import PublicHeader from '../components/PublicHeader';
 import Footer from '../components/Footer';
 
+// Web screenshots
+import supabaseDashboard1 from '../assets/images/web_screenshots/supabase_dashboard_1.png';
+import supabaseDashboard2 from '../assets/images/web_screenshots/supabase_dashboard_2.png';
+import supabaseDashboard3 from '../assets/images/web_screenshots/supabase_dashboard_3.png';
+import supabaseDashboard4 from '../assets/images/web_screenshots/supabase_dashboard_4.png';
+import supabaseDashboard5 from '../assets/images/web_screenshots/supabase_dashboard_5.png';
+import supabaseDashboard6 from '../assets/images/web_screenshots/supabase_dashboard_6.png';
+import cloudflareDashboard1 from '../assets/images/web_screenshots/cloudflare_dashboard_1.png';
+import cloudflareDashboard2 from '../assets/images/web_screenshots/cloudflare_dashboard_2.png';
+import cloudflareDashboard3 from '../assets/images/web_screenshots/cloudflare_dashboard_3.png';
+import webApp1 from '../assets/images/web_screenshots/web_app_1.png';
+import webApp2 from '../assets/images/web_screenshots/web_app_2.png';
+import webApp3 from '../assets/images/web_screenshots/web_app_3.png';
+import webApp4 from '../assets/images/web_screenshots/web_app_4.png';
+import webApp5 from '../assets/images/web_screenshots/web_app_5.png';
+import webApp6 from '../assets/images/web_screenshots/web_app_6.png';
+import webApp7 from '../assets/images/web_screenshots/web_app_7.png';
+import webApp8 from '../assets/images/web_screenshots/web_app_8.png';
+
 export default function SetupGuidePage() {
   const { isDarkMode } = useTheme();
   const { language } = useLanguage();
@@ -62,6 +81,7 @@ export default function SetupGuidePage() {
     },
     content: {
       maxWidth: '800px',
+      textAlign: 'left',
     },
     title: {
       fontSize: '36px',
@@ -93,12 +113,30 @@ export default function SetupGuidePage() {
     list: {
       paddingLeft: '24px',
       marginBottom: '16px',
+      textAlign: 'left',
     },
     listItem: {
       fontSize: '16px',
       lineHeight: '1.8',
       color: isDarkMode ? '#b0b0b0' : '#555',
       marginBottom: '8px',
+      textAlign: 'left',
+    },
+    screenshot: {
+      width: '100%',
+      maxWidth: '100%',
+      borderRadius: '8px',
+      border: `1px solid ${isDarkMode ? '#333' : '#e1e4e8'}`,
+      marginBottom: '16px',
+      boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.1)',
+    },
+    screenshotCaption: {
+      fontSize: '14px',
+      color: isDarkMode ? '#888' : '#666',
+      textAlign: 'center',
+      marginTop: '-8px',
+      marginBottom: '24px',
+      fontStyle: 'italic',
     },
     codeBlock: {
       backgroundColor: isDarkMode ? '#1e1e1e' : '#f6f8fa',
@@ -334,13 +372,15 @@ git --version`}
                 {language === 'en'
                   ? 'Click "New Project" and configure:'
                   : '「New Project」をクリックして設定:'}
-                <ul style={{ ...styles.list, marginTop: '8px' }}>
+                <ul style={{ ...styles.list, marginTop: '8px', textAlign: 'left' }}>
                   <li><strong>Project name:</strong> feedown</li>
                   <li><strong>Database Password:</strong> {language === 'en' ? 'Set a secure password' : '安全なパスワードを設定'}</li>
                   <li><strong>Region:</strong> {language === 'en' ? 'Choose nearest region' : '最寄りのリージョン'}</li>
                 </ul>
               </li>
             </ol>
+            <img src={supabaseDashboard1} alt="Supabase Dashboard" style={styles.screenshot} />
+            <p style={styles.screenshotCaption}>{language === 'en' ? 'Supabase Dashboard - Create New Project' : 'Supabaseダッシュボード - 新規プロジェクト作成'}</p>
 
             <div style={styles.stepTitle}>
               <span style={styles.stepNumber}>2</span>
@@ -351,6 +391,8 @@ git --version`}
                 ? 'Open SQL Editor in Supabase dashboard and run the following SQL:'
                 : 'Supabaseダッシュボードの「SQL Editor」を開き、以下のSQLを実行:'}
             </p>
+            <img src={supabaseDashboard2} alt="Supabase SQL Editor" style={styles.screenshot} />
+            <p style={styles.screenshotCaption}>{language === 'en' ? 'SQL Editor - Run the schema creation SQL' : 'SQL Editor - スキーマ作成SQLを実行'}</p>
             <div style={styles.codeBlock}>
               <code style={styles.code}>
 {`-- User profiles
@@ -471,6 +513,8 @@ CREATE POLICY "Anyone can read active recommended feeds" ON recommended_feeds
                 ? 'Go to Settings → API and note down:'
                 : 'Settings → API に移動して以下をメモ:'}
             </p>
+            <img src={supabaseDashboard3} alt="Supabase API Settings" style={styles.screenshot} />
+            <p style={styles.screenshotCaption}>{language === 'en' ? 'Settings → API - Get your API keys' : 'Settings → API - APIキーを取得'}</p>
             <ul style={styles.list}>
               <li style={styles.listItem}>
                 <strong>Project URL:</strong> <code style={styles.inlineCode}>https://xxxxx.supabase.co</code>
@@ -628,6 +672,8 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown`}
                 {language === 'en' ? 'Add these variables:' : '以下の変数を追加:'}
               </li>
             </ol>
+            <img src={cloudflareDashboard1} alt="Cloudflare Dashboard" style={styles.screenshot} />
+            <p style={styles.screenshotCaption}>{language === 'en' ? 'Cloudflare Pages - Environment Variables' : 'Cloudflare Pages - 環境変数設定'}</p>
 
             <table style={styles.table}>
               <thead>
@@ -801,6 +847,36 @@ npx expo start --clear`}
                 <li>{language === 'en' ? 'Clear browser cache (Ctrl+Shift+R)' : 'ブラウザキャッシュをクリア（Ctrl+Shift+R）'}</li>
                 <li>{language === 'en' ? 'Click Refresh button manually' : '手動でRefreshボタンをクリック'}</li>
               </ol>
+            </div>
+          </section>
+
+          {/* Web App Preview */}
+          <section style={styles.section}>
+            <h2 style={styles.sectionTitle}>
+              {language === 'en' ? 'Web App Preview' : 'Webアプリプレビュー'}
+            </h2>
+            <p style={styles.paragraph}>
+              {language === 'en'
+                ? 'Here\'s what your self-hosted FeedOwn will look like:'
+                : 'セルフホストしたFeedOwnの見た目:'}
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+              <div>
+                <img src={webApp1} alt="Login" style={styles.screenshot} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Login Screen' : 'ログイン画面'}</p>
+              </div>
+              <div>
+                <img src={webApp2} alt="Dashboard" style={styles.screenshot} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Dashboard - Article List' : 'ダッシュボード - 記事一覧'}</p>
+              </div>
+              <div>
+                <img src={webApp3} alt="Article Detail" style={styles.screenshot} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Article Detail' : '記事詳細'}</p>
+              </div>
+              <div>
+                <img src={webApp4} alt="Feed Management" style={styles.screenshot} />
+                <p style={styles.screenshotCaption}>{language === 'en' ? 'Feed Management' : 'フィード管理'}</p>
+              </div>
             </div>
           </section>
 
