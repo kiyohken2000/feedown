@@ -150,6 +150,9 @@ export default function DocsPage() {
       marginTop: '16px',
       marginBottom: '16px',
     },
+    mobileScreenshotItem: {
+      textAlign: 'center',
+    },
     mobileScreenshot: {
       width: '100%',
       maxWidth: '200px',
@@ -324,11 +327,11 @@ export default function DocsPage() {
             <h2 style={styles.sectionTitle}>{t.mobileSetupTitle}</h2>
             <p style={styles.paragraph}>{t.mobileSetupContent}</p>
             <div style={styles.mobileScreenshotGrid}>
-              <div>
+              <div style={styles.mobileScreenshotItem}>
                 <img src={mobileLogin} alt="Mobile Login" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Login Screen' : 'ログイン画面'}</p>
               </div>
-              <div>
+              <div style={styles.mobileScreenshotItem}>
                 <img src={mobileSignup} alt="Mobile Signup" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Sign Up Screen' : 'サインアップ画面'}</p>
               </div>
@@ -340,23 +343,23 @@ export default function DocsPage() {
             <h2 style={styles.sectionTitle}>{t.mobileFeaturesTitle}</h2>
             <p style={styles.paragraph}>{t.mobileFeaturesContent}</p>
             <div style={styles.mobileScreenshotGrid}>
-              <div>
+              <div style={styles.mobileScreenshotItem}>
                 <img src={mobileArticles1} alt="Mobile Articles" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Article List' : '記事一覧'}</p>
               </div>
-              <div>
+              <div style={styles.mobileScreenshotItem}>
                 <img src={mobileArticle} alt="Mobile Article Detail" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Article Detail' : '記事詳細'}</p>
               </div>
-              <div>
+              <div style={styles.mobileScreenshotItem}>
                 <img src={mobileReader} alt="Mobile Reader Mode" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Reader Mode' : 'リーダーモード'}</p>
               </div>
-              <div>
+              <div style={styles.mobileScreenshotItem}>
                 <img src={mobileFeeds} alt="Mobile Feeds" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Feed Management' : 'フィード管理'}</p>
               </div>
-              <div>
+              <div style={styles.mobileScreenshotItem}>
                 <img src={mobileSettings} alt="Mobile Settings" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Settings' : '設定'}</p>
               </div>
