@@ -4,6 +4,8 @@ import {
   saveServerUrl,
   getAuthToken,
   saveAuthToken,
+  getRefreshToken,
+  saveRefreshToken,
   getUser,
   saveUser,
   clearAuthData,
@@ -59,11 +61,12 @@ export const UserContextProvider = (props) => {
       throw new Error(response.error)
     }
 
-    const { user: userData, token } = response.data
+    const { user: userData, token, refreshToken } = response.data
 
     // Save session data
     await Promise.all([
       saveAuthToken(token),
+      refreshToken ? saveRefreshToken(refreshToken) : Promise.resolve(),
       saveUser(userData),
       customServerUrl ? saveServerUrl(customServerUrl) : Promise.resolve(),
     ])
@@ -86,11 +89,12 @@ export const UserContextProvider = (props) => {
       throw new Error(response.error)
     }
 
-    const { user: userData, token } = response.data
+    const { user: userData, token, refreshToken } = response.data
 
     // Save session data
     await Promise.all([
       saveAuthToken(token),
+      refreshToken ? saveRefreshToken(refreshToken) : Promise.resolve(),
       saveUser(userData),
       customServerUrl ? saveServerUrl(customServerUrl) : Promise.resolve(),
     ])

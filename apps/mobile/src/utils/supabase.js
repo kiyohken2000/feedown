@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 // Storage keys
 const SERVER_URL_KEY = '@feedown_server_url'
 const AUTH_TOKEN_KEY = '@feedown_auth_token'
+const REFRESH_TOKEN_KEY = '@feedown_refresh_token'
 const USER_KEY = '@feedown_user'
 
 /**
@@ -63,6 +64,34 @@ export async function saveAuthToken(token) {
 }
 
 /**
+ * Get the saved refresh token from AsyncStorage
+ */
+export async function getRefreshToken() {
+  try {
+    return await AsyncStorage.getItem(REFRESH_TOKEN_KEY)
+  } catch (error) {
+    console.error('Failed to get refresh token:', error)
+    return null
+  }
+}
+
+/**
+ * Save the refresh token to AsyncStorage
+ */
+export async function saveRefreshToken(token) {
+  try {
+    if (token) {
+      await AsyncStorage.setItem(REFRESH_TOKEN_KEY, token)
+    } else {
+      await AsyncStorage.removeItem(REFRESH_TOKEN_KEY)
+    }
+  } catch (error) {
+    console.error('Failed to save refresh token:', error)
+    throw error
+  }
+}
+
+/**
  * Get the saved user from AsyncStorage
  */
 export async function getUser() {
@@ -96,7 +125,7 @@ export async function saveUser(user) {
  */
 export async function clearAuthData() {
   try {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, USER_KEY, SERVER_URL_KEY])
+    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY, SERVER_URL_KEY])
   } catch (error) {
     console.error('Failed to clear auth data:', error)
     throw error

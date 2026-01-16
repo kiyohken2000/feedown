@@ -3,7 +3,7 @@
  * Supports dynamic server URL configuration
  */
 
-import { getServerUrl, getAuthToken } from './supabase'
+import { getServerUrl, getAuthToken, getRefreshToken, saveAuthToken, saveRefreshToken } from './supabase'
 
 /**
  * API Client class for making authenticated requests
@@ -12,9 +12,53 @@ class ApiClient {
   constructor(getServerUrlFn, getAuthTokenFn) {
     this.getServerUrl = getServerUrlFn
     this.getAuthToken = getAuthTokenFn
+    this.isRefreshing = false
   }
 
-  async request(endpoint, options = {}) {
+  async refreshToken() {
+    if (this.isRefreshing) {
+      // Wait for ongoing refresh
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      return await this.getAuthToken()
+    }
+
+    this.isRefreshing = true
+    try {
+      const baseUrl = await this.getServerUrl()
+      const refreshToken = await getRefreshToken()
+
+      if (!refreshToken) {
+        return null
+      }
+
+      const response = await fetch(`${baseUrl}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      })
+
+      if (!response.ok) {
+        return null
+      }
+
+      const data = await response.json()
+      if (data.success && data.token) {
+        await saveAuthToken(data.token)
+        if (data.refreshToken) {
+          await saveRefreshToken(data.refreshToken)
+        }
+        return data.token
+      }
+      return null
+    } catch (error) {
+      console.error('Token refresh failed:', error)
+      return null
+    } finally {
+      this.isRefreshing = false
+    }
+  }
+
+  async request(endpoint, options = {}, isRetry = false) {
     try {
       const baseUrl = await this.getServerUrl()
       const token = await this.getAuthToken()
@@ -47,6 +91,15 @@ class ApiClient {
             console.error('Failed to parse JSON response:', e)
             data = null
           }
+        }
+      }
+
+      // Handle 401 Unauthorized - try to refresh token
+      if (response.status === 401 && !isRetry) {
+        const newToken = await this.refreshToken()
+        if (newToken) {
+          // Retry the request with new token
+          return this.request(endpoint, options, true)
         }
       }
 
@@ -130,6 +183,7 @@ class AuthAPI {
         data: {
           user: data.user,
           token: data.token,
+          refreshToken: data.refreshToken,
         },
       }
     } catch (error) {
@@ -163,6 +217,7 @@ class AuthAPI {
         data: {
           user: data.user,
           token: data.token,
+          refreshToken: data.refreshToken,
         },
       }
     } catch (error) {

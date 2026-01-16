@@ -92,6 +92,7 @@ export async function onRequestPost(context: any): Promise<Response> {
           email: user.email,
         },
         token: session.access_token,
+        refreshToken: session.refresh_token,
       }),
       {
         status: 201,
