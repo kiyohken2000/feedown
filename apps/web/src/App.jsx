@@ -16,6 +16,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ArticlesProvider } from './contexts/ArticlesContext';
 import { ToastProvider } from './components/ToastContainer';
+import ScrollToTop from './components/ScrollToTop';
 
 import './App.css';
 
@@ -81,6 +82,7 @@ function App() {
         <ArticlesProvider>
           <ToastProvider>
             <Router>
+              <ScrollToTop />
               <div className="App">
                 <Routes>
                   {/* Public routes */}

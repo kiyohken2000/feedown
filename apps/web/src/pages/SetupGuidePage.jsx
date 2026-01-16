@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
 import PublicHeader from '../components/PublicHeader';
 import Footer from '../components/Footer';
+import ImageZoom from '../components/ImageZoom';
 
 // Web screenshots
 import supabaseDashboard1 from '../assets/images/web_screenshots/supabase_dashboard_1.png';
@@ -379,7 +380,7 @@ git --version`}
                 </ul>
               </li>
             </ol>
-            <img src={supabaseDashboard1} alt="Supabase Dashboard" style={styles.screenshot} />
+            <ImageZoom src={supabaseDashboard1} alt="Supabase Dashboard" style={styles.screenshot} />
             <p style={styles.screenshotCaption}>{language === 'en' ? 'Supabase Dashboard - Create New Project' : 'Supabaseダッシュボード - 新規プロジェクト作成'}</p>
 
             <div style={styles.stepTitle}>
@@ -391,7 +392,7 @@ git --version`}
                 ? 'Open SQL Editor in Supabase dashboard and run the following SQL:'
                 : 'Supabaseダッシュボードの「SQL Editor」を開き、以下のSQLを実行:'}
             </p>
-            <img src={supabaseDashboard2} alt="Supabase SQL Editor" style={styles.screenshot} />
+            <ImageZoom src={supabaseDashboard2} alt="Supabase SQL Editor" style={styles.screenshot} />
             <p style={styles.screenshotCaption}>{language === 'en' ? 'SQL Editor - Run the schema creation SQL' : 'SQL Editor - スキーマ作成SQLを実行'}</p>
             <div style={styles.codeBlock}>
               <code style={styles.code}>
@@ -513,7 +514,7 @@ CREATE POLICY "Anyone can read active recommended feeds" ON recommended_feeds
                 ? 'Go to Settings → API and note down:'
                 : 'Settings → API に移動して以下をメモ:'}
             </p>
-            <img src={supabaseDashboard3} alt="Supabase API Settings" style={styles.screenshot} />
+            <ImageZoom src={supabaseDashboard3} alt="Supabase API Settings" style={styles.screenshot} />
             <p style={styles.screenshotCaption}>{language === 'en' ? 'Settings → API - Get your API keys' : 'Settings → API - APIキーを取得'}</p>
             <ul style={styles.list}>
               <li style={styles.listItem}>
@@ -680,7 +681,7 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown`}
                 {language === 'en' ? 'Add these variables:' : '以下の変数を追加:'}
               </li>
             </ol>
-            <img src={cloudflareDashboard1} alt="Cloudflare Dashboard" style={styles.screenshot} />
+            <ImageZoom src={cloudflareDashboard1} alt="Cloudflare Dashboard" style={styles.screenshot} />
             <p style={styles.screenshotCaption}>{language === 'en' ? 'Cloudflare Pages - Environment Variables' : 'Cloudflare Pages - 環境変数設定'}</p>
 
             <table style={styles.table}>
@@ -870,19 +871,19 @@ npx expo start --clear`}
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px', marginBottom: '24px' }}>
               <div>
-                <img src={webApp1} alt="Login" style={styles.screenshot} />
+                <ImageZoom src={webApp1} alt="Login" style={styles.screenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Login Screen' : 'ログイン画面'}</p>
               </div>
               <div>
-                <img src={webApp2} alt="Dashboard" style={styles.screenshot} />
+                <ImageZoom src={webApp2} alt="Dashboard" style={styles.screenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Dashboard - Article List' : 'ダッシュボード - 記事一覧'}</p>
               </div>
               <div>
-                <img src={webApp3} alt="Article Detail" style={styles.screenshot} />
+                <ImageZoom src={webApp3} alt="Article Detail" style={styles.screenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Article Detail' : '記事詳細'}</p>
               </div>
               <div>
-                <img src={webApp4} alt="Feed Management" style={styles.screenshot} />
+                <ImageZoom src={webApp4} alt="Feed Management" style={styles.screenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Feed Management' : 'フィード管理'}</p>
               </div>
             </div>

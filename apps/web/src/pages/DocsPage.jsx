@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
 import PublicHeader from '../components/PublicHeader';
 import Footer from '../components/Footer';
+import ImageZoom from '../components/ImageZoom';
 
 // Web app screenshots
 import webApp8 from '../assets/images/web_screenshots/web_app_8.png';
@@ -278,7 +279,7 @@ export default function DocsPage() {
               <li style={styles.listItem}>{t.quickStartStep3}</li>
               <li style={styles.listItem}>{t.quickStartStep4}</li>
             </ol>
-            <img src={webApp8} alt="Login Screen" style={styles.screenshot} />
+            <ImageZoom src={webApp8} alt="Login Screen" style={styles.screenshot} />
             <p style={styles.screenshotCaption}>{language === 'en' ? 'Login / Sign Up Screen' : 'ログイン / サインアップ画面'}</p>
           </section>
 
@@ -286,7 +287,7 @@ export default function DocsPage() {
           <section id="adding-feeds" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t.addingFeedsTitle}</h2>
             <p style={styles.paragraph}>{t.addingFeedsContent}</p>
-            <img src={webApp4} alt="Feed Management" style={styles.screenshot} />
+            <ImageZoom src={webApp4} alt="Feed Management" style={styles.screenshot} />
             <p style={styles.screenshotCaption}>{language === 'en' ? 'Feed Management - Add and organize your RSS feeds' : 'フィード管理 - RSSフィードの追加と整理'}</p>
           </section>
 
@@ -296,11 +297,11 @@ export default function DocsPage() {
             <p style={styles.paragraph}>{t.readingArticlesContent}</p>
             <div style={styles.screenshotGrid}>
               <div>
-                <img src={webApp2} alt="Article List" style={{ ...styles.screenshot, marginTop: 0 }} />
+                <ImageZoom src={webApp2} alt="Article List" style={{ ...styles.screenshot, marginTop: 0 }} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Article List' : '記事一覧'}</p>
               </div>
               <div>
-                <img src={webApp3} alt="Article Detail" style={{ ...styles.screenshot, marginTop: 0 }} />
+                <ImageZoom src={webApp3} alt="Article Detail" style={{ ...styles.screenshot, marginTop: 0 }} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Article Detail' : '記事詳細'}</p>
               </div>
             </div>
@@ -310,7 +311,7 @@ export default function DocsPage() {
           <section id="favorites" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t.favoritesTitle}</h2>
             <p style={styles.paragraph}>{t.favoritesContent}</p>
-            <img src={webApp5} alt="Favorites" style={styles.screenshot} />
+            <ImageZoom src={webApp5} alt="Favorites" style={styles.screenshot} />
             <p style={styles.screenshotCaption}>{language === 'en' ? 'Favorites - Save articles for later' : 'お気に入り - 記事を後で読むために保存'}</p>
           </section>
 
@@ -318,7 +319,7 @@ export default function DocsPage() {
           <section id="dark-mode" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t.darkModeTitle}</h2>
             <p style={styles.paragraph}>{t.darkModeContent}</p>
-            <img src={webApp6} alt="Light Mode" style={styles.screenshot} />
+            <ImageZoom src={webApp6} alt="Light Mode" style={styles.screenshot} />
             <p style={styles.screenshotCaption}>{language === 'en' ? 'Toggle between light and dark mode' : 'ライトモードとダークモードの切り替え'}</p>
           </section>
 
@@ -328,11 +329,11 @@ export default function DocsPage() {
             <p style={styles.paragraph}>{t.mobileSetupContent}</p>
             <div style={styles.mobileScreenshotGrid}>
               <div style={styles.mobileScreenshotItem}>
-                <img src={mobileLogin} alt="Mobile Login" style={styles.mobileScreenshot} />
+                <ImageZoom src={mobileLogin} alt="Mobile Login" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Login Screen' : 'ログイン画面'}</p>
               </div>
               <div style={styles.mobileScreenshotItem}>
-                <img src={mobileSignup} alt="Mobile Signup" style={styles.mobileScreenshot} />
+                <ImageZoom src={mobileSignup} alt="Mobile Signup" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Sign Up Screen' : 'サインアップ画面'}</p>
               </div>
             </div>
@@ -344,23 +345,23 @@ export default function DocsPage() {
             <p style={styles.paragraph}>{t.mobileFeaturesContent}</p>
             <div style={styles.mobileScreenshotGrid}>
               <div style={styles.mobileScreenshotItem}>
-                <img src={mobileArticles1} alt="Mobile Articles" style={styles.mobileScreenshot} />
+                <ImageZoom src={mobileArticles1} alt="Mobile Articles" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Article List' : '記事一覧'}</p>
               </div>
               <div style={styles.mobileScreenshotItem}>
-                <img src={mobileArticle} alt="Mobile Article Detail" style={styles.mobileScreenshot} />
+                <ImageZoom src={mobileArticle} alt="Mobile Article Detail" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Article Detail' : '記事詳細'}</p>
               </div>
               <div style={styles.mobileScreenshotItem}>
-                <img src={mobileReader} alt="Mobile Reader Mode" style={styles.mobileScreenshot} />
+                <ImageZoom src={mobileReader} alt="Mobile Reader Mode" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Reader Mode' : 'リーダーモード'}</p>
               </div>
               <div style={styles.mobileScreenshotItem}>
-                <img src={mobileFeeds} alt="Mobile Feeds" style={styles.mobileScreenshot} />
+                <ImageZoom src={mobileFeeds} alt="Mobile Feeds" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Feed Management' : 'フィード管理'}</p>
               </div>
               <div style={styles.mobileScreenshotItem}>
-                <img src={mobileSettings} alt="Mobile Settings" style={styles.mobileScreenshot} />
+                <ImageZoom src={mobileSettings} alt="Mobile Settings" style={styles.mobileScreenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Settings' : '設定'}</p>
               </div>
             </div>
