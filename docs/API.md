@@ -26,6 +26,7 @@ Authorization: Bearer <access_token>
 |---------|---------------|------|------|
 | POST | `/auth/login` | - | ログイン |
 | POST | `/auth/register` | - | 新規登録 |
+| POST | `/auth/refresh` | - | トークンリフレッシュ |
 | GET | `/feeds` | 必須 | フィード一覧取得 |
 | POST | `/feeds` | 必須 | フィード追加 |
 | DELETE | `/feeds/:id` | 必須 | フィード削除 |
@@ -74,7 +75,8 @@ Authorization: Bearer <access_token>
     "uid": "uuid-string",
     "email": "user@example.com"
   },
-  "token": "eyJhbG..."
+  "token": "eyJhbG...",
+  "refreshToken": "eyJhbG..."
 }
 ```
 
@@ -82,6 +84,10 @@ Authorization: Bearer <access_token>
 - `400`: Email/password or access token required
 - `401`: Invalid email or password / Invalid token
 - `500`: Login failed
+
+**Notes:**
+- `token`（アクセストークン）は約1時間で期限切れ
+- `refreshToken`を使って新しいトークンを取得可能（`/auth/refresh`参照）
 
 ---
 
@@ -105,7 +111,8 @@ Authorization: Bearer <access_token>
     "uid": "uuid-string",
     "email": "user@example.com"
   },
-  "token": "eyJhbG..."
+  "token": "eyJhbG...",
+  "refreshToken": "eyJhbG..."
 }
 ```
 
@@ -114,6 +121,46 @@ Authorization: Bearer <access_token>
 - `400`: Password must be at least 6 characters
 - `400`: Email already registered
 - `500`: Registration failed
+
+**Notes:**
+- `token`（アクセストークン）は約1時間で期限切れ
+- `refreshToken`を使って新しいトークンを取得可能（`/auth/refresh`参照）
+
+---
+
+### POST /api/auth/refresh
+
+アクセストークンをリフレッシュ。
+
+**Request Body:**
+```json
+{
+  "refreshToken": "eyJhbG..."
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "user": {
+    "uid": "uuid-string",
+    "email": "user@example.com"
+  },
+  "token": "eyJhbG...",
+  "refreshToken": "eyJhbG..."
+}
+```
+
+**Error Responses:**
+- `400`: Refresh token is required
+- `401`: Token refresh failed. Please login again.
+- `500`: Token refresh failed
+
+**Notes:**
+- アクセストークンが期限切れになる前（または401エラー発生時）にこのエンドポイントを呼び出す
+- 新しい`refreshToken`も返されるので、次回のリフレッシュ用に保存すること
+- リフレッシュに失敗した場合は再ログインが必要
 
 ---
 
@@ -548,7 +595,7 @@ Authorization: Bearer <token>
 ```
 
 **Headers:**
-- `Cache-Control: public, max-age=3600`（1時間キャッシュ）
+- `Cache-Control: no-store, no-cache, must-revalidate`（キャッシュ無効）
 
 ---
 
