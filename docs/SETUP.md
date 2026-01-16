@@ -271,21 +271,37 @@ npm install
 
 ### 3.2 環境変数設定
 
-`apps/web/.env` を作成:
+`.env.example` をコピーして `.env.shared` を作成し、値を入力:
+
+```bash
+# ルートディレクトリで実行
+cp .env.example .env.shared
+```
+
+`.env.shared` を編集:
 
 ```env
-# Supabase
+# Supabase Configuration
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# Cloudflare Workers
+# Cloudflare Workers URL
 VITE_WORKER_URL=https://feedown-worker.your-subdomain.workers.dev
 
-# App
+# App Configuration
 VITE_APP_NAME=FeedOwn
 VITE_APP_VERSION=1.0.0
 VITE_API_BASE_URL=
 ```
+
+同期スクリプトを実行して `apps/web/.env` を生成:
+
+```bash
+bash scripts/sync-envs.sh
+```
+
+これにより `.env.shared` の内容が `apps/web/.env` にコピーされます。
 
 ### 3.3 ビルドとデプロイ
 
