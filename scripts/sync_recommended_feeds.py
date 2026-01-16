@@ -63,6 +63,8 @@ RECOMMENDED_FEEDS = [
     { "name": "マイナビニュース パソコン", "url": "http://news.mynavi.jp/rss/digital/pc" },
     { "name": "AAPL Ch.", "url": "http://applech2.com/index.rdf" },
     { "name": "北森瓦版", "url": "https://northwood.blog.fc2.com/?xml" },
+    { "name": "iPhone Mania", "url": "https://iphone-mania.jp/feed/" },
+    { "name": "すまほん!!", "url": "https://smhn.info/feed" },
 ]
 # =============================================================================
 
