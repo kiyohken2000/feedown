@@ -7,7 +7,7 @@ import PublicHeader from '../components/PublicHeader';
 import Footer from '../components/Footer';
 
 // Web app screenshots
-import webApp1 from '../assets/images/web_screenshots/web_app_1.png';
+import webApp8 from '../assets/images/web_screenshots/web_app_8.png';
 import webApp2 from '../assets/images/web_screenshots/web_app_2.png';
 import webApp3 from '../assets/images/web_screenshots/web_app_3.png';
 import webApp4 from '../assets/images/web_screenshots/web_app_4.png';
@@ -278,7 +278,7 @@ export default function DocsPage() {
               <li style={styles.listItem}>{t.quickStartStep3}</li>
               <li style={styles.listItem}>{t.quickStartStep4}</li>
             </ol>
-            <img src={webApp1} alt="Login Screen" style={styles.screenshot} />
+            <img src={webApp8} alt="Login Screen" style={styles.screenshot} />
             <p style={styles.screenshotCaption}>{language === 'en' ? 'Login / Sign Up Screen' : 'ログイン / サインアップ画面'}</p>
           </section>
 
