@@ -112,6 +112,7 @@ export default function SetupGuidePage() {
       lineHeight: '1.6',
       whiteSpace: 'pre-wrap',
       wordBreak: 'break-word',
+      textAlign: 'left',
     },
     code: {
       color: isDarkMode ? '#e6e6e6' : '#24292e',
