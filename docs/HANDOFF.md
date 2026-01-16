@@ -1,25 +1,31 @@
 # FeedOwn 引継ぎドキュメント
 
 **最終更新**: 2026-01-16
-**ステータス**: Phase 10 完了（テスト & ドキュメント）
+**ステータス**: 全フェーズ完了、App Store / Google Play 公開済み
 
 ---
 
 ## 現在の状態
+
+### プロジェクト概要
+FeedOwnはセルフホスト可能なRSSリーダーです。Web版とモバイルアプリ（iOS/Android）を提供しています。
+
+### 公開URL
+| プラットフォーム | URL |
+|-----------------|-----|
+| **Web** | https://feedown.pages.dev |
+| **App Store** | https://apps.apple.com/us/app/feedown/id6757896656 |
+| **Google Play** | https://play.google.com/store/apps/details?id=net.votepurchase.feedown |
 
 ### 完了した作業
 - Firebase → Supabase 完全移行
 - 全APIエンドポイントがSupabase PostgreSQLで動作
 - Supabase Authによる認証
 - Web UIが本番環境で稼働中
-- **Expoモバイルアプリ: ボイラープレート起動・EASビルド成功**
-- **Expoモバイルアプリ: Supabase認証実装完了**（サインイン、サインアップ、サインアウト、自動ログイン）
-- **Expoモバイルアプリ: 全画面実装完了**（Articles、Favorites、Feeds、Settings）
-- **Recommended Feeds: DB管理に移行**（ハードコードからSupabaseテーブルへ）
-- **Expoモバイルアプリ: ダークモード実装完了**（全画面・コンポーネント対応、AsyncStorage永続化）
-- **Expoモバイルアプリ: サーバーURL入力機能**（各ユーザーが自分のサーバーを指定可能）
-- **Expoモバイルアプリ: Quick Create Test Account**（テストアカウント簡単作成）
-- **Expoモバイルアプリ: アプリ内記事リーダー**（Reader Mode機能）
+- Expoモバイルアプリ: 全機能実装完了
+- App Store / Google Play 公開完了
+- ランディングページにモバイルアプリ紹介セクション追加
+- RSSパーサー: RSS 2.0 / RSS 1.0 (RDF) / Atom 対応
 
 ### デプロイ情報
 - **本番URL（Web）**: https://feedown.pages.dev
@@ -76,75 +82,55 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ## 本日の作業内容（2026-01-16）
 
-### サーバーURL入力機能
+### 1. RDF形式（RSS 1.0）のサポート追加
 
-1. **supabase.js** - 大幅リファクタリング
-   - Supabase SDK直接使用からAPI経由に変更
-   - AsyncStorageでサーバーURL、認証トークン、ユーザー情報を保存
-   - `getServerUrl`, `saveServerUrl`, `getAuthToken`, `saveAuthToken` 等のヘルパー関数追加
-   - `clearAuthData`でサーバーURLもクリアするように修正
+**問題**: 一部のRSSフィードで記事が表示されない
+- CNN (.rdf)、National Geographic (.rdf)、CNET Japan (.rdf)、PC Watch (.rdf)、朝日新聞 (.rdf)、FC2ブログ等
 
-2. **api.js** - 動的サーバーURL対応
-   - `createApiClient` が動的にサーバーURLを取得
-   - `createApiClientWithUrl` でカスタムURLを指定可能
-   - `AuthAPI` クラス追加（`/api/auth/login`, `/api/auth/register` 呼び出し）
+**原因**: `functions/api/refresh.ts`の`parseRssXml`関数がRSS 2.0形式のみ対応していた
+- RSS 2.0: `<item>`が`<channel>`の**中**にある
+- RSS 1.0 (RDF): `<item>`が`<channel>`の**外側**（`<rdf:RDF>`直下）にある
 
-3. **UserContext.js** - API経由認証に変更
-   - Supabase SDK直接使用から `api.auth.login`, `api.auth.register` に変更
-   - `serverUrl` の状態管理追加
-   - セッション永続化（AsyncStorage）
+**修正内容** (`functions/api/refresh.ts:243-326`):
+```javascript
+const isRdf = xmlText.includes('<rdf:RDF') || xmlText.includes('xmlns="http://purl.org/rss/1.0/"');
 
-4. **SignIn.js / SingUp.js** - UI改善
-   - サーバーURL入力欄追加（デフォルト空、プレースホルダーに例を表示）
-   - ヘッダーデザインを他の画面（Home, Profile等）に統一
-   - ナビゲーションヘッダー非表示（`LoginStacks.js`で`headerShown: false`）
-   - ロゴ画像（logo-lg.png）表示
-   - ダークモード対応
+if (isRdf) {
+  // RSS 1.0 (RDF) format - items are outside channel element
+  const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/g;
+  while ((itemMatch = itemRegex.exec(xmlText)) !== null) {  // XML全体から検索
+    // dc:date（RDF形式の日付）に対応
+    const itemPubDate = itemXml.match(/<dc:date[^>]*>(.*?)<\/dc:date>/)?.[1] || ...
+    // rdf:about属性をGUIDとして使用
+    const rdfAbout = itemMatch[0].match(/<item[^>]*rdf:about="([^"]+)"/)?.[1];
+  }
+}
+```
 
-### Quick Create Test Account
+### 2. ランディングページ - モバイルアプリ紹介セクション
 
-5. **SingUp.js** - テストアカウント簡単作成
-   - 「Quick Create Test Account」ボタン追加
-   - サーバー: `https://feedown.pages.dev`
-   - メールアドレス: `test-{ランダム番号}@test.com`
-   - パスワード: `111111`
-   - テストアカウント制限の注意書き表示
+**追加した機能**:
 
-### UI改善
+1. **8枚のモバイルスクリーンショット表示** (`apps/web/src/pages/LandingPage.jsx`)
+   - ログイン、サインアップ、記事一覧、ダークモード、記事詳細、リーダーモード、フィード管理、設定
+   - レスポンシブグリッド（PC: 4列、タブレット: 2-3列、スマホ: 2列）
+   - スクリーンショット画像: `apps/web/src/assets/images/mobile_screenshots/`
 
-6. **Profile.js (Settings画面)**
-   - テストアカウント判定関数追加（`isTestAccount`）
-   - テストアカウントの場合のみ制限注意書き表示（Feed 3個、Favorites 10個）
-   - Aboutセクションにアプリアイコン（logo-lg.png）追加
-   - 公式サイトリンク追加（https://feedown.pages.dev）
+2. **画像クリックで拡大表示（ライトボックス）**
+   - `useState`でモーダル管理
+   - オーバーレイクリックまたは×ボタンで閉じる
 
-7. **Home.js (Articles画面)**
-   - 空状態メッセージにプルトゥリフレッシュの説明追加
+3. **App Store / Google Play バッジリンク**
+   - バッジ画像: `apps/web/src/assets/images/badges/`
+   - App Store: https://apps.apple.com/us/app/feedown/id6757896656
+   - Google Play: https://play.google.com/store/apps/details?id=net.votepurchase.feedown
 
-8. **Read.js (Feeds画面)**
-   - recommended feeds取得時のURL参照エラー修正
-   - `API_BASE_URL`（空文字列）から`UserContext.serverUrl`に変更
-
-### アプリ内記事リーダー機能（Reader Mode）
-
-9. **functions/api/article-content.ts** - 記事コンテンツ抽出API
-   - `linkedom` + `@mozilla/readability` で記事本文を抽出
-   - 相対URLを絶対URLに変換（画像・リンク）
-   - 1時間キャッシュ
-
-10. **ArticleReader.js** - リーダーコンポーネント
-    - `react-native-render-html` でHTMLレンダリング
-    - ダークモード対応のスタイル設定
-    - カスタムリンクハンドラー
-
-11. **ArticleDetail.js** - Reader Mode統合
-    - 「Reader Mode」ボタン追加
-    - 読み込み中・エラー状態の処理
-    - 「Exit Reader」ボタンでデフォルト表示に戻る
+4. **日英翻訳対応** (`apps/web/src/i18n/translations.js`)
+   - `mobileTitle`, `mobileSubtitle`, `mobileDesc`, `mobileLogin`, `mobileSignup`, etc.
 
 ---
 
-## 以前の作業内容（2026-01-15）
+## 以前の作業内容
 
 ### ダークモード実装
 
@@ -205,19 +191,22 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ---
 
-## モバイルアプリ開発（Phase 9） ✅ 完了
+## モバイルアプリ（Phase 9-11） ✅ 完了・公開済み
 
-### 現在の状態
-- ✅ Expo Go起動成功
-- ✅ EAS Build（iOS preview）成功
-- ✅ API経由認証実装完了（サーバーURL指定可能）
-- ✅ API連携実装完了（フィード・記事取得）
-- ✅ 画面実装完了（Dashboard、フィード管理、設定、記事詳細、お気に入り）
-- ✅ UX改善（フィルター、Mark All Read、おすすめフィード）
-- ✅ ボトムタブ4つ（Articles / Favorites / Feeds / Settings）
-- ✅ サーバーURL入力機能（各ユーザーが自分のサーバーを指定可能）
-- ✅ Quick Create Test Account（テストアカウント簡単作成）
+### ストア公開URL
+- **App Store**: https://apps.apple.com/us/app/feedown/id6757896656
+- **Google Play**: https://play.google.com/store/apps/details?id=net.votepurchase.feedown
+
+### 実装済み機能
+- ✅ Supabase認証（サインイン、サインアップ、自動ログイン）
+- ✅ サーバーURL入力機能（セルフホスト対応）
+- ✅ Quick Create Test Account
+- ✅ 記事一覧（All/Unread/Readフィルター、Mark All Read）
+- ✅ 記事詳細 + Reader Mode
+- ✅ お気に入り機能
+- ✅ フィード管理（追加、削除、おすすめフィード）
 - ✅ ダークモード対応
+- ✅ プルトゥリフレッシュ、無限スクロール
 
 ### 主要バージョン
 ```json
@@ -280,27 +269,16 @@ apps/mobile/src/
 
 ---
 
-## 次のタスク候補
+## 将来のタスク候補（オプション）
 
-### Phase 10: テスト & ドキュメント ✅ 完了
-- [x] `docs/SETUP.md` - 包括的セットアップガイド
-- [x] `docs/API.md` - API仕様書
-- [x] E2Eテスト（Playwright）
-- [x] Workers RSSテスト（Vitest）
-- [x] Functions API統合テスト（Vitest）
+すべてのコアフェーズは完了しています。以下は将来の機能追加候補です：
 
-### 優先度中（Phase 11: App Store リリース）
-- [ ] Apple Developer アカウント登録
-- [ ] Google Play Console でアプリ作成
-- [ ] EAS Build 本番設定
-- [ ] 審査提出・リリース
-
-### 優先度低（将来の機能追加）
 - [ ] リアルタイム更新機能（Supabase Realtime）
-- [x] **アプリ内記事リーダー機能** ✅ 実装完了
-- [ ] パフォーマンス最適化
-- [ ] 多言語対応
 - [ ] オフライン対応（AsyncStorageキャッシュ）
+- [ ] OPMLインポート/エクスポート
+- [ ] プッシュ通知
+- [ ] 多言語対応の拡充
+- [ ] パフォーマンス最適化
 
 ---
 
@@ -526,8 +504,8 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 1. **Delete Account**: Supabase Auth recordが残る可能性あり（データは削除される）
 2. **記事の有効期限**: 7日後に自動削除される設計
-3. **リアルタイム更新**: 未実装（Phase 8 Step 4）
-4. **Clear All Data後の表示**: タブ切り替え時の自動リフレッシュ未実装（useFocusEffectで対応予定）
+3. **リアルタイム更新**: 未実装（オプション機能）
+4. **テストアカウント制限**: フィード3個、お気に入り10個まで
 
 ---
 

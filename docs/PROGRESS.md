@@ -1,8 +1,8 @@
 # FeedOwn - 実装進行表
 
 **最終更新**: 2026-01-16
-**現在のフェーズ**: 🟡 Phase 9 進行中（Mobile アプリ）
-**次のフェーズ**: Phase 10（テスト & ドキュメント）
+**現在のフェーズ**: ✅ Phase 12 完了（ランディングページ改善）
+**ステータス**: 全フェーズ完了、App Store / Google Play 公開済み
 
 ---
 
@@ -276,12 +276,34 @@ npm test
 
 ---
 
-## Phase 11: App Store/Google Play リリース（任意） 🔴 未着手
+## Phase 11: App Store/Google Play リリース ✅ 完了
 
-- [ ] Apple Developer アカウント登録
-- [ ] Google Play Console でアプリ作成
-- [ ] EAS Build 設定
-- [ ] 審査提出・リリース
+- [x] Apple Developer アカウント登録
+- [x] Google Play Console でアプリ作成
+- [x] EAS Build 本番設定
+- [x] 審査提出・リリース
+
+**公開URL**:
+- **App Store**: https://apps.apple.com/us/app/feedown/id6757896656
+- **Google Play**: https://play.google.com/store/apps/details?id=net.votepurchase.feedown
+
+---
+
+## Phase 12: ランディングページ改善 & バグ修正 ✅ 完了
+
+### RSSパーサー改善
+- [x] RDF形式（RSS 1.0）のサポートを追加
+  - RSS 1.0では`<item>`が`<channel>`の外側にある構造に対応
+  - `dc:date`（RDF形式の日付）、`rdf:about`（記事ID）に対応
+  - 対応したフィード: CNN, National Geographic, CNET Japan, PC Watch, 朝日新聞, FC2ブログ等
+
+### ランディングページ - モバイルアプリ紹介セクション
+- [x] 8枚のモバイルスクリーンショット表示
+  - ログイン、サインアップ、記事一覧、ダークモード、記事詳細、リーダーモード、フィード管理、設定
+- [x] 画像クリックで拡大表示（ライトボックス機能）
+- [x] App Store / Google Play バッジリンク追加
+- [x] レスポンシブグリッド対応
+- [x] 日英翻訳対応
 
 ---
 
@@ -300,7 +322,8 @@ npm test
 | Phase 8: Supabase移行 | 20 | 18 | 90% | 🟢 完了 |
 | Phase 9: Mobile | 30 | 30 | 100% | 🟢 完了 |
 | Phase 10: テスト & ドキュメント | 5 | 5 | 100% | 🟢 完了 |
-| Phase 11: App Store リリース | 4 | 0 | 0% | 🔴 未着手 |
+| Phase 11: App Store リリース | 4 | 4 | 100% | 🟢 完了 |
+| Phase 12: ランディングページ改善 | 6 | 6 | 100% | 🟢 完了 |
 
 ---
 
@@ -318,10 +341,20 @@ npm test
 
 ---
 
-## 次のアクション
+## 公開URL
 
-1. **モバイルアプリ: Expo Goでテスト**（動作確認）
-2. **モバイルアプリ: EAS Build**（iOS/Android preview ビルド）
-3. **お気に入り画面実装**（オプション）
-4. **リアルタイム更新機能**（オプション: Supabase Realtime）
-5. **オフライン対応**（オプション: AsyncStorageキャッシュ）
+| プラットフォーム | URL |
+|-----------------|-----|
+| **Web** | https://feedown.pages.dev |
+| **App Store** | https://apps.apple.com/us/app/feedown/id6757896656 |
+| **Google Play** | https://play.google.com/store/apps/details?id=net.votepurchase.feedown |
+
+---
+
+## 将来の機能追加（オプション）
+
+1. **リアルタイム更新機能**（Supabase Realtime）
+2. **オフライン対応**（AsyncStorageキャッシュ）
+3. **OPMLインポート/エクスポート**
+4. **プッシュ通知**
+5. **多言語対応の拡充**

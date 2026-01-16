@@ -29,6 +29,20 @@ export const translations = {
       // Screenshot
       screenshotTitle: 'Clean, Modern Interface',
       screenshotSubtitle: 'Designed for distraction-free reading',
+      // Mobile App
+      mobileTitle: 'Read Anywhere',
+      mobileSubtitle: 'Take your feeds with you on iOS and Android',
+      mobileLogin: 'Login',
+      mobileSignup: 'Sign Up',
+      mobileArticles1: 'Article List',
+      mobileArticles2: 'Dark Mode',
+      mobileArticle: 'Article Detail',
+      mobileReader: 'Reader Mode',
+      mobileFeeds: 'Feed Management',
+      mobileSettings: 'Settings',
+      mobileDesc: 'The FeedOwn mobile app gives you access to all your feeds on the go. Available for iOS and Android with full feature parity including dark mode and Reader Mode.',
+      mobileAppStore: 'App Store',
+      mobileGooglePlay: 'Google Play',
       // Self-host
       selfHostTitle: 'Host It Yourself',
       selfHostDesc: 'FeedOwn is open source. Deploy your own instance on Cloudflare Pages and Supabase in minutes.',
@@ -156,6 +170,20 @@ export const translations = {
       // Screenshot
       screenshotTitle: 'クリーンでモダンなインターフェース',
       screenshotSubtitle: '集中して読書するためにデザイン',
+      // Mobile App
+      mobileTitle: 'どこでも読める',
+      mobileSubtitle: 'iOSとAndroidでフィードを持ち歩こう',
+      mobileLogin: 'ログイン',
+      mobileSignup: 'サインアップ',
+      mobileArticles1: '記事一覧',
+      mobileArticles2: 'ダークモード',
+      mobileArticle: '記事詳細',
+      mobileReader: 'リーダーモード',
+      mobileFeeds: 'フィード管理',
+      mobileSettings: '設定',
+      mobileDesc: 'FeedOwnモバイルアプリで、外出先でもすべてのフィードにアクセス。ダークモードやリーダーモードを含む全機能をiOSとAndroidで。',
+      mobileAppStore: 'App Store',
+      mobileGooglePlay: 'Google Play',
       // Self-host
       selfHostTitle: '自分でホストする',
       selfHostDesc: 'FeedOwnはオープンソース。Cloudflare PagesとSupabaseに数分でデプロイ。',

@@ -240,6 +240,7 @@ async function parseRssXml(xmlText: string): Promise<any> {
   };
 
   const isAtom = xmlText.includes('<feed') && xmlText.includes('xmlns="http://www.w3.org/2005/Atom"');
+  const isRdf = xmlText.includes('<rdf:RDF') || xmlText.includes('xmlns="http://purl.org/rss/1.0/"');
 
   if (isAtom) {
     const titleMatch = xmlText.match(/<title[^>]*>(.*?)<\/title>/);
@@ -275,7 +276,56 @@ async function parseRssXml(xmlText: string): Promise<any> {
         imageUrl,
       });
     }
+  } else if (isRdf) {
+    // RSS 1.0 (RDF) format - items are outside channel element
+    console.log('[parseRssXml] Detected RDF/RSS 1.0 format');
+
+    // Get channel metadata
+    const channelMatch = xmlText.match(/<channel[^>]*>([\s\S]*?)<\/channel>/);
+    if (channelMatch) {
+      const channelXml = channelMatch[1];
+      const titleMatch = channelXml.match(/<title[^>]*>(.*?)<\/title>/);
+      const descMatch = channelXml.match(/<description[^>]*>(.*?)<\/description>/);
+      result.title = titleMatch ? stripHtml(titleMatch[1]) : 'Untitled Feed';
+      result.description = descMatch ? stripHtml(descMatch[1]) : '';
+    }
+
+    // Parse items from the entire XML (items are siblings of channel in RDF)
+    const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/g;
+    let itemMatch;
+
+    while ((itemMatch = itemRegex.exec(xmlText)) !== null) {
+      const itemXml = itemMatch[1];
+
+      const itemTitle = itemXml.match(/<title[^>]*>(.*?)<\/title>/)?.[1] || 'Untitled';
+      const itemLink = itemXml.match(/<link[^>]*>(.*?)<\/link>/)?.[1] || '';
+      // RDF uses rdf:about attribute as identifier, fallback to link
+      const rdfAbout = itemMatch[0].match(/<item[^>]*rdf:about="([^"]+)"/)?.[1];
+      const itemGuid = rdfAbout || itemLink;
+      const itemDesc = itemXml.match(/<description[^>]*>(.*?)<\/description>/s)?.[1] || '';
+      const itemContent = itemXml.match(/<content:encoded[^>]*>(.*?)<\/content:encoded>/s)?.[1] || itemDesc;
+      // RDF uses dc:date instead of pubDate
+      const itemPubDate = itemXml.match(/<dc:date[^>]*>(.*?)<\/dc:date>/)?.[1] ||
+                          itemXml.match(/<pubDate[^>]*>(.*?)<\/pubDate>/)?.[1] || new Date().toISOString();
+      const itemAuthor = itemXml.match(/<dc:creator[^>]*>(.*?)<\/dc:creator>/)?.[1] ||
+                         itemXml.match(/<author[^>]*>(.*?)<\/author>/)?.[1] || '';
+
+      const imageUrl = extractImageUrl(itemXml, itemContent);
+
+      result.items.push({
+        title: stripHtml(itemTitle),
+        link: itemLink.trim(),
+        guid: itemGuid.trim(),
+        content: stripHtml(itemContent),
+        publishedAt: new Date(itemPubDate),
+        author: itemAuthor ? stripHtml(itemAuthor) : null,
+        imageUrl,
+      });
+    }
+
+    console.log(`[parseRssXml] RDF format: Found ${result.items.length} items`);
   } else {
+    // RSS 2.0 format - items are inside channel element
     const channelMatch = xmlText.match(/<channel[^>]*>([\s\S]*)<\/channel>/);
     if (!channelMatch) {
       throw new Error('Invalid RSS feed: no channel element found');
