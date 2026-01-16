@@ -110,6 +110,8 @@ export default function SetupGuidePage() {
       fontFamily: 'Consolas, Monaco, "Courier New", monospace',
       fontSize: '14px',
       lineHeight: '1.6',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
     },
     code: {
       color: isDarkMode ? '#e6e6e6' : '#24292e',
