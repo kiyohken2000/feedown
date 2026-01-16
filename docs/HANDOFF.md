@@ -49,7 +49,18 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ## 既知のバグ・未解決問題
 
-### 1. Clear All Data 後に記事が表示されたままになる問題 🟢 解決済み
+### 1. モバイルアプリが約1時間経過するとunauthorizedエラーが発生 🟢 解決済み
+
+**症状**: 記事一覧、フィード画面、お気に入り画面で401 Unauthorizedエラーが発生。ログインし直すと解消。
+
+**原因**: Supabaseの`access_token`は約1時間で期限切れになるが、`refresh_token`を保存・使用していなかった。
+
+**解決方法**:
+- トークンリフレッシュAPIを新規作成（`/api/auth/refresh`）
+- モバイルアプリで`refresh_token`を保存し、401エラー時に自動リフレッシュ
+- 詳細は「本日の作業内容」セクション参照
+
+### 2. Clear All Data 後に記事が表示されたままになる問題 🟢 解決済み
 
 **症状**: Settings画面で「Clear All Data」を実行すると、FavoritesとFeedsは削除されるが、Articlesタブに記事が表示されたままになる。
 
@@ -59,7 +70,7 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 - **Mobile**: `useFocusEffect` で対応（`apps/mobile/src/scenes/home/Home.js`）
 - **Web**: `location.pathname` 監視 + `visibilitychange` で対応（`apps/web/src/pages/DashboardPage.jsx`）
 
-### 2. Favorites リロード後にデータが消える問題 🟢 解決済み
+### 3. Favorites リロード後にデータが消える問題 🟢 解決済み
 
 **症状**: Favoritesに追加した記事が、アプリをリロードするとサムネイル画像とフィード名以外が消える（タイトル、説明文、URLが表示されない）。
 
@@ -82,7 +93,53 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ## 本日の作業内容（2026-01-16）
 
-### 1. RDF形式（RSS 1.0）のサポート追加
+### 1. モバイルアプリ トークンリフレッシュ機能
+
+**問題**: モバイルアプリが約1時間経過するとunauthorizedエラーが発生する
+- 記事一覧、フィード画面、お気に入り画面で発生
+- ログインし直すと解消する
+
+**原因**: Supabaseの`access_token`は約1時間で期限切れになるが、`refresh_token`を保存・使用していなかった
+
+**修正内容**:
+
+1. **新規APIエンドポイント** (`functions/api/auth/refresh.ts`)
+   - `POST /api/auth/refresh`
+   - `refreshToken`を受け取り、新しい`access_token`と`refresh_token`を返す
+
+2. **ログイン/登録APIの修正** (`functions/api/auth/login.ts`, `register.ts`)
+   - レスポンスに`refreshToken`を追加
+
+3. **モバイルアプリ ストレージ更新** (`apps/mobile/src/utils/supabase.js`)
+   - `getRefreshToken()`, `saveRefreshToken()` 関数追加
+   - `clearAuthData()`で`refreshToken`も削除
+
+4. **APIクライアント更新** (`apps/mobile/src/utils/api.js`)
+   - `ApiClient.refreshToken()` メソッド追加
+   - `request()`で401エラー時に自動でトークンをリフレッシュしてリトライ
+
+5. **UserContext更新** (`apps/mobile/src/contexts/UserContext.js`)
+   - `signIn()`, `signUp()`で`refreshToken`を保存
+
+**注意**:
+- 既存ユーザーは一度ログアウトして再ログインすることで`refreshToken`が保存される
+- モバイルアプリの変更を反映するには再ビルドが必要
+
+### 2. Recommended Feeds キャッシュ問題修正
+
+**問題**: Pythonスクリプトでおすすめフィードを更新しても、Web版で反映されるまで時間がかかる
+
+**原因**: `Cache-Control: public, max-age=3600`が設定されていて、ブラウザが1時間キャッシュしていた
+
+**修正** (`functions/api/recommended-feeds.ts`):
+```javascript
+headers: {
+  'Cache-Control': 'no-store, no-cache, must-revalidate',
+  'Pragma': 'no-cache',
+}
+```
+
+### 3. RDF形式（RSS 1.0）のサポート追加
 
 **問題**: 一部のRSSフィードで記事が表示されない
 - CNN (.rdf)、National Geographic (.rdf)、CNET Japan (.rdf)、PC Watch (.rdf)、朝日新聞 (.rdf)、FC2ブログ等
