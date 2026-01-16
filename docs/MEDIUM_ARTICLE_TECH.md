@@ -10,7 +10,7 @@ When I decided to build my own RSS reader, I had one non-negotiable requirement:
 
 This article is a technical deep dive into how I achieved that with FeedOwn, a self-hosted RSS reader built entirely on serverless infrastructure.
 
-![FeedOwn Architecture](architecture_diagram.svg)
+![FeedOwn Architecture](architecture_diagram.png)
 *FeedOwn System Architecture*
 
 ## The Architecture Overview

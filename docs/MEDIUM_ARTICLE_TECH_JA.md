@@ -10,7 +10,7 @@
 
 この記事では、サーバーレスインフラだけで構築したRSSリーダー「FeedOwn」の技術的な詳細を解説する。
 
-![FeedOwn Architecture](architecture_diagram.svg)
+![FeedOwn Architecture](architecture_diagram.png)
 *FeedOwn システム構成図*
 
 ## アーキテクチャ概要
