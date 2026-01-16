@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { translations } from '../i18n/translations';
 import logoLarge from '../assets/images/logo-lg.png';
 
 const LoginPage = () => {
@@ -11,6 +13,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
+  const { language } = useLanguage();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -195,6 +198,14 @@ const LoginPage = () => {
       fontSize: '0.85rem',
       color: isDarkMode ? '#e0e0a0' : '#856404',
     },
+    backLink: {
+      display: 'block',
+      textAlign: 'center',
+      marginTop: '1.5rem',
+      color: isDarkMode ? '#b0b0b0' : '#666',
+      textDecoration: 'none',
+      fontSize: '0.9rem',
+    },
   };
 
   return (
@@ -296,8 +307,20 @@ const LoginPage = () => {
         )}
 
         <div style={styles.notice}>
-          ⚠️ If you didn't set a custom password, the default password is <strong>111111</strong>
+          {language === 'en'
+            ? "If you didn't set a custom password, the default password is"
+            : 'カスタムパスワードを設定していない場合、デフォルトパスワードは'}
+          {' '}<strong>111111</strong>
         </div>
+
+        <Link
+          to="/"
+          style={styles.backLink}
+          onMouseOver={(e) => (e.target.style.color = '#FF6B35')}
+          onMouseOut={(e) => (e.target.style.color = isDarkMode ? '#b0b0b0' : '#666')}
+        >
+          ← {language === 'en' ? 'Back to Home' : 'ホームに戻る'}
+        </Link>
       </div>
     </div>
   );

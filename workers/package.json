@@ -7,12 +7,15 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "build": "wrangler deploy --dry-run"
+    "build": "wrangler deploy --dry-run",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
-  "dependencies": {},
   "devDependencies": {
-    "wrangler": "^4.0.0",
+    "@cloudflare/vitest-pool-workers": "^0.12.4",
+    "@cloudflare/workers-types": "^4.20231218.0",
     "typescript": "^5.3.3",
-    "@cloudflare/workers-types": "^4.20231218.0"
+    "vitest": "^4.0.17",
+    "wrangler": "^4.0.0"
   }
 }

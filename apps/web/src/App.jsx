@@ -3,12 +3,17 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { supabase } from './lib/supabase';
 
 import LoginPage from './pages/LoginPage';
+import LandingPage from './pages/LandingPage';
+import DocsPage from './pages/DocsPage';
+import SetupGuidePage from './pages/SetupGuidePage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import DashboardPage from './pages/DashboardPage';
 import FeedsPage from './pages/FeedsPage';
 import FavoritesPage from './pages/FavoritesPage';
 import SettingsPage from './pages/SettingsPage';
 import ArticleDetailPage from './pages/ArticleDetailPage';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { LanguageProvider } from './contexts/LanguageContext';
 import { ArticlesProvider } from './contexts/ArticlesContext';
 import { ToastProvider } from './components/ToastContainer';
 
@@ -40,7 +45,7 @@ const ProtectedRoute = ({ children, user, authLoading }) => {
   }
 
   if (!user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return children;
@@ -72,37 +77,43 @@ function App() {
 
   return (
     <ThemeProvider>
-      <ArticlesProvider>
-        <ToastProvider>
-          <Router>
-            <div className="App">
-              <Routes>
-                <Route
-                  path="/"
-                  element={
-                    authLoading ? (
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        height: '100vh'
-                      }}>
+      <LanguageProvider>
+        <ArticlesProvider>
+          <ToastProvider>
+            <Router>
+              <div className="App">
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/docs" element={<DocsPage />} />
+                  <Route path="/docs/setup" element={<SetupGuidePage />} />
+                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                  <Route
+                    path="/login"
+                    element={
+                      authLoading ? (
                         <div style={{
-                          border: '4px solid #f3f3f3',
-                          borderTop: '4px solid #FF6B35',
-                          borderRadius: '50%',
-                          width: '50px',
-                          height: '50px',
-                          animation: 'spin 1s linear infinite'
-                        }}></div>
-                      </div>
-                    ) : user ? (
-                      <Navigate to="/dashboard" replace />
-                    ) : (
-                      <LoginPage />
-                    )
-                  }
-                />
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          height: '100vh'
+                        }}>
+                          <div style={{
+                            border: '4px solid #f3f3f3',
+                            borderTop: '4px solid #FF6B35',
+                            borderRadius: '50%',
+                            width: '50px',
+                            height: '50px',
+                            animation: 'spin 1s linear infinite'
+                          }}></div>
+                        </div>
+                      ) : user ? (
+                        <Navigate to="/dashboard" replace />
+                      ) : (
+                        <LoginPage />
+                      )
+                    }
+                  />
                 <Route
                   path="/dashboard"
                   element={
@@ -143,13 +154,14 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                {/* Fallback for unmatched routes */}
-                <Route path="*" element={<h1>404 Not Found</h1>} />
-              </Routes>
-            </div>
-          </Router>
-        </ToastProvider>
-      </ArticlesProvider>
+                  {/* Fallback for unmatched routes */}
+                  <Route path="*" element={<h1>404 Not Found</h1>} />
+                </Routes>
+              </div>
+            </Router>
+          </ToastProvider>
+        </ArticlesProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
 }

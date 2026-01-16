@@ -1,7 +1,7 @@
 # FeedOwn 引継ぎドキュメント
 
 **最終更新**: 2026-01-16
-**ステータス**: Phase 9 完了（Expoモバイルアプリ）
+**ステータス**: Phase 10 完了（テスト & ドキュメント）
 
 ---
 
@@ -282,11 +282,12 @@ apps/mobile/src/
 
 ## 次のタスク候補
 
-### 優先度高（Phase 10: テスト & ドキュメント）
-- [ ] モバイルアプリ: EAS Build（iOS/Android preview）
-- [ ] E2Eテスト（Playwright）
-- [ ] API仕様書作成
-- [ ] セットアップガイド作成
+### Phase 10: テスト & ドキュメント ✅ 完了
+- [x] `docs/SETUP.md` - 包括的セットアップガイド
+- [x] `docs/API.md` - API仕様書
+- [x] E2Eテスト（Playwright）
+- [x] Workers RSSテスト（Vitest）
+- [x] Functions API統合テスト（Vitest）
 
 ### 優先度中（Phase 11: App Store リリース）
 - [ ] Apple Developer アカウント登録
