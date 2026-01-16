@@ -169,7 +169,7 @@ export default function PrivacyPolicyPage() {
           content: [
             {
               type: 'paragraph',
-              text: 'If you have questions about this Privacy Policy, please contact us through our GitHub repository.',
+              text: 'If you have questions about this Privacy Policy, please contact us at retwpay@gmail.com.',
             },
           ],
         },
@@ -276,7 +276,7 @@ export default function PrivacyPolicyPage() {
           content: [
             {
               type: 'paragraph',
-              text: 'このプライバシーポリシーについてご質問がある場合は、GitHubリポジトリを通じてお問い合わせください。',
+              text: 'このプライバシーポリシーについてご質問がある場合は、retwpay@gmail.com までお問い合わせください。',
             },
           ],
         },
