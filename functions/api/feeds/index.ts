@@ -129,21 +129,25 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     if (!feedTitle) {
       try {
-        const workerUrl = env.WORKER_URL || env.VITE_WORKER_URL;
-        if (workerUrl) {
-          const rssResponse = await fetch(`${workerUrl}/fetch?url=${encodeURIComponent(url)}`, {
-            method: 'GET',
-            headers: {
-              'User-Agent': 'FeedOwn/1.0',
-            },
-          });
+        // Fetch RSS XML directly (same as refresh.ts)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-          if (rssResponse.ok) {
-            const xmlText = await rssResponse.text();
-            const parsedFeed = await parseFeedBasicInfo(xmlText);
-            feedTitle = parsedFeed.title || '';
-            feedDescription = parsedFeed.description || '';
-          }
+        const rssResponse = await fetch(url, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'FeedOwn/1.0 (RSS Reader)',
+          },
+        });
+
+        clearTimeout(timeoutId);
+
+        if (rssResponse.ok) {
+          const xmlText = await rssResponse.text();
+          const parsedFeed = await parseFeedBasicInfo(xmlText);
+          feedTitle = parsedFeed.title || '';
+          feedDescription = parsedFeed.description || '';
         }
       } catch (error) {
         console.error('Failed to fetch feed title:', error);

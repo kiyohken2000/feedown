@@ -27,6 +27,7 @@ FeedOwnはセルフホスト可能なRSSリーダーです。Web版とモバイ�
 - ランディングページにモバイルアプリ紹介セクション追加
 - RSSパーサー: RSS 2.0 / RSS 1.0 (RDF) / Atom 対応
 - **フィードごとの記事一覧表示（Web版）**: DashboardPageにフィード選択ドロップダウン追加
+- **OPMLインポート/エクスポート（Web版）**: FeedsPageでOPML形式のインポート・エクスポートに対応
 
 ### デプロイ情報
 - **本番URL（Web）**: https://feedown.pages.dev
@@ -116,6 +117,42 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 - APIは既に`feedId`パラメータをサポート済み（`/api/articles?feedId=xxx`）
 - フロントエンドのみの変更で完結
 - Mobile版は未実装（Phase 13で予定）
+
+### 2. OPMLインポート/エクスポート機能（Web版）
+
+**概要**: 他のRSSリーダーとの相互運用のためにOPML形式でのフィードインポート/エクスポート機能を追加
+
+**変更ファイル**: `apps/web/src/pages/FeedsPage.jsx`
+
+**実装内容**:
+- `handleExportOPML`: 登録済みフィードをOPML 2.0形式でダウンロード
+- `handleImportOPML`: OPMLファイルを読み込み、フィードを一括登録
+- XMLエスケープ用の`escapeXml`ヘルパー関数
+- Import/Exportボタンを「Your Feeds」セクションに追加
+
+**UI**:
+```
+Your Feeds (N)                    [Import OPML] [Export OPML]
+```
+
+**機能詳細**:
+- **エクスポート**: 全フィードを`feedown-subscriptions-YYYY-MM-DD.opml`としてダウンロード
+- **インポート**: `.opml`または`.xml`ファイルを選択し、重複を除いて新規フィードのみ追加
+- インポート中は進捗表示、成功/失敗件数をトースト通知
+
+**備考**:
+- OPMLインポート時はタイトル情報もAPIに渡すように実装
+- Mobile版は未実装（ファイル操作が煩雑なため不要と判断）
+
+### 3. フィード追加時のタイトル取得修正
+
+**問題**: フィードを追加すると「Untitled Feed」になる
+
+**原因**: `functions/api/feeds/index.ts`がWorker URL経由でRSSを取得しようとしていたが、Worker URLが設定されていなかった
+
+**修正**:
+- Worker URL経由ではなく、`refresh.ts`と同様に直接RSSを取得するように変更
+- `packages/shared/src/api/endpoints.ts`: `feeds.add(url, title?)`にオプションのtitleパラメータを追加
 
 ---
 

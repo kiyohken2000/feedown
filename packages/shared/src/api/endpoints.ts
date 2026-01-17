@@ -41,8 +41,8 @@ export class FeedsAPI {
     return this.client.get<{ feeds: Feed[] }>('/api/feeds');
   }
 
-  async add(url: string) {
-    return this.client.post<{ feed: Feed }>('/api/feeds', { url });
+  async add(url: string, title?: string) {
+    return this.client.post<{ feed: Feed }>('/api/feeds', { url, title });
   }
 
   async delete(feedId: string) {
