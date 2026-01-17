@@ -2,13 +2,14 @@
 
 ## 概要
 
-以下の3機能を実装予定:
+以下の機能を実装予定:
 
 | 機能 | 難易度 | 優先度 |
 |------|--------|--------|
 | フィードごとの記事一覧 | 低 | 1 |
 | 記事の共有 | 低 | 2 |
 | フォントサイズ/フォント変更 | 中 | 3 |
+| バックグラウンド自動更新 | 高 | 4 |
 
 ---
 
@@ -261,9 +262,144 @@ apps/web/src/components/ArticleModal.jsx        # オプション
 
 ---
 
+## 4. バックグラウンド自動更新
+
+### 概要
+
+Cloudflare Cron Triggers を使って定期的にフィードを自動更新する。ユーザーがアプリを開いたときに既に最新の記事がある状態にする。
+
+### 現状の問題
+
+- ユーザーが手動で更新ボタンを押さないとフィードが更新されない
+- アプリを開いてから更新が始まるため、待ち時間が発生する
+
+### 仕組み
+
+```
+現状:
+  ユーザー ──(手動で更新ボタン)──> /api/refresh
+
+改善後:
+  Cloudflare Cron ──(6時間ごと)──> /api/cron/refresh
+                          │
+                          ▼
+                   全ユーザーのフィードを
+                   バックグラウンドで更新
+```
+
+### 技術的制約
+
+- **Pages Functions は Cron Triggers 非対応**
+  - 専用の Cloudflare Worker を作成する必要がある
+  - または外部の cron サービス（GitHub Actions等）から呼び出す
+
+### 実装計画
+
+#### 方法A: Cloudflare Worker（推奨）
+
+1. **新規 Worker の作成**
+   - `workers/cron-refresh/` ディレクトリを作成
+   - Cron Trigger を設定
+
+2. **wrangler.toml**
+
+```toml
+name = "feedown-cron"
+main = "src/index.ts"
+
+[triggers]
+crons = ["0 */6 * * *"]  # 6時間ごと (UTC)
+```
+
+3. **Worker コード**
+
+```typescript
+export default {
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    // 全ユーザーのフィードを取得
+    const { data: users } = await supabase
+      .from('user_profiles')
+      .select('id');
+
+    // 各ユーザーのフィードを更新（並列処理）
+    await Promise.allSettled(
+      users.map(user => refreshUserFeeds(user.id, env))
+    );
+  },
+};
+```
+
+4. **環境変数**
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `CRON_SECRET`（セキュリティ用）
+
+#### 方法B: GitHub Actions
+
+1. **`.github/workflows/cron-refresh.yml`**
+
+```yaml
+name: Refresh Feeds
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # 6時間ごと
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call refresh endpoint
+        run: |
+          curl -X POST https://feedown.pages.dev/api/cron/refresh \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+```
+
+2. **新規エンドポイント `/api/cron/refresh`**
+   - シークレットキーで認証
+   - 全ユーザーのフィードを更新
+
+### 変更ファイル
+
+```
+# 方法A: Worker
+workers/cron-refresh/
+├── src/index.ts
+├── wrangler.toml
+└── package.json
+
+# 方法B: GitHub Actions
+.github/workflows/cron-refresh.yml
+functions/api/cron/refresh.ts  # 新規作成
+```
+
+### 更新頻度の選択肢
+
+| 頻度 | Cron式 | 月間実行回数 | ユースケース |
+|------|--------|-------------|-------------|
+| 1時間ごと | `0 * * * *` | 720回 | ニュース重視 |
+| 6時間ごと | `0 */6 * * *` | 120回 | バランス型（推奨） |
+| 12時間ごと | `0 */12 * * *` | 60回 | 負荷軽減 |
+| 1日1回 | `0 0 * * *` | 30回 | 最小限 |
+
+### 注意事項
+
+- Cloudflare Workers 無料枠: 10万リクエスト/日
+- ユーザー数 × フィード数 で処理量が決まる
+- 大量ユーザー対応にはバッチ処理が必要
+- Supabase の接続数制限（60同時接続）に注意
+
+### API変更
+
+新規エンドポイント:
+- `POST /api/cron/refresh` - Cron用の全ユーザー更新
+
+---
+
 ## 注意事項
 
-- すべての機能はバックエンド変更不要
+- 1〜3の機能はバックエンド変更不要
+- 4はバックエンド（Worker または GitHub Actions）の追加が必要
 - モバイルファーストで実装（15年以上RSSリーダーを使っているユーザー向け）
 - シンプルさを重視（過度な機能追加を避ける）
 - 各機能は独立しているため、個別にリリース可能
