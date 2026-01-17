@@ -583,9 +583,18 @@ npm run build --workspace=apps/web
 npx wrangler pages deploy apps/web/dist --project-name=feedown
 ```
 
+### フィード検証コマンド
+
+```bash
+# 追加前にフィードURLをテスト（パース可能か確認）
+python scripts/sync_recommended_feeds.py --test "https://example.com/feed.xml"
+
+# 全フィードの一括検証
+python scripts/sync_recommended_feeds.py --check
+```
+
 ### 関連ファイル
 - `scripts/sync_recommended_feeds.py` - フィード一覧とDB同期スクリプト
-- `scripts/recommended_feeds_schema.sql` - テーブル定義SQL
 - `functions/api/recommended-feeds.js` - APIエンドポイント（GET /api/recommended-feeds）
 
 ---

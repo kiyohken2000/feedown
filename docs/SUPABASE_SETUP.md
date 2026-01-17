@@ -192,7 +192,20 @@ pip install -r scripts/requirements.txt
 python scripts/sync_recommended_feeds.py
 ```
 
-フィードを追加・削除する場合は、`scripts/sync_recommended_feeds.py` 内の `RECOMMENDED_FEEDS` リストを編集して再実行します。
+### フィード管理コマンド
+
+```bash
+# DBに同期（通常の使い方）
+python scripts/sync_recommended_feeds.py
+
+# 追加前にフィードURLをテスト
+python scripts/sync_recommended_feeds.py --test "https://example.com/feed.xml"
+
+# 全フィードの検証（パース可能か確認）
+python scripts/sync_recommended_feeds.py --check
+```
+
+フィードを追加・削除する場合は、`scripts/sync_recommended_feeds.py` 内の `RECOMMENDED_FEEDS` リストを編集して再実行します。新しいフィードを追加する前に `--test` でパース可能か確認することを推奨します。
 
 ## 7. 認証設定
 
