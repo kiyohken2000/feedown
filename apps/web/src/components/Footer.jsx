@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
+import appStoreBadge from '../assets/images/badges/appstore.png';
+import googlePlayBadge from '../assets/images/badges/googleplay.png';
 
 export default function Footer() {
   const { isDarkMode } = useTheme();
@@ -78,6 +80,16 @@ export default function Footer() {
       color: isDarkMode ? '#b0b0b0' : '#666',
       fontSize: '12px',
       textDecoration: 'none',
+    },
+    storeBadgesContainer: {
+      display: 'flex',
+      justifyContent: 'center',
+      gap: '16px',
+      marginBottom: '24px',
+    },
+    storeBadge: {
+      height: '48px',
+      width: 'auto',
     },
   };
 
@@ -158,6 +170,23 @@ export default function Footer() {
             </a>
             <span style={{ ...styles.link, cursor: 'default' }}>{t.license}</span>
           </div>
+        </div>
+
+        <div style={styles.storeBadgesContainer}>
+          <a
+            href="https://apps.apple.com/us/app/feedown/id6757896656"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img src={appStoreBadge} alt="Download on App Store" style={styles.storeBadge} />
+          </a>
+          <a
+            href="https://play.google.com/store/apps/details?id=net.votepurchase.feedown"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img src={googlePlayBadge} alt="Get it on Google Play" style={styles.storeBadge} />
+          </a>
         </div>
 
         <div style={styles.divider} />
