@@ -82,7 +82,6 @@ FeedOwnはモダンなサーバーレス技術で構築されており、ホス�
 - **フロントエンド**: React (Web) + React Native/Expo (Mobile)
 - **バックエンド**: Cloudflare Pages Functions（サーバーレス、寛大な無料枠）
 - **データベース**: Supabase PostgreSQL（こちらも寛大な無料枠）
-- **RSSプロキシ**: Cloudflare Workers + KVキャッシュ
 
 スタック全体が個人利用なら無料枠で動作する。自分のRSSリーダーをホストするのに**月額0円**だ。
 

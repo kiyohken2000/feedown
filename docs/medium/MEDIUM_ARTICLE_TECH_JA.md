@@ -15,7 +15,7 @@
 
 ## アーキテクチャ概要
 
-FeedOwnは4つの主要コンポーネントで構成されている：
+FeedOwnは3つの主要コンポーネントで構成されている：
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -32,21 +32,19 @@ FeedOwnは4つの主要コンポーネントで構成されている：
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CLOUDFLARE EDGE                               │
 ├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────┐    ┌─────────────────────┐     │
-│  │   Cloudflare Pages          │    │  Cloudflare Worker  │     │
-│  │   ┌───────────────────┐     │    │   (RSS Proxy)       │     │
-│  │   │  Static Assets    │     │    │                     │     │
-│  │   │  (React Bundle)   │     │    │  ┌───────────────┐  │     │
-│  │   └───────────────────┘     │    │  │   KV Cache    │  │     │
-│  │   ┌───────────────────┐     │    │  │  (1hr TTL)    │  │     │
-│  │   │  Pages Functions  │     │    │  └───────────────┘  │     │
-│  │   │  (API Endpoints)  │     │    │                     │     │
-│  │   └─────────┬─────────┘     │    └──────────┬──────────┘     │
-│  └─────────────┼───────────────┘               │                │
-└────────────────┼───────────────────────────────┼────────────────┘
-                 │                               │
-                 │    SQL Queries                │  Fetch RSS XML
-                 ▼                               ▼
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                   Cloudflare Pages                        │  │
+│  │   ┌───────────────────┐    ┌───────────────────────────┐  │  │
+│  │   │  Static Assets    │    │     Pages Functions       │  │  │
+│  │   │  (React Bundle)   │    │     (API Endpoints)       │  │  │
+│  │   └───────────────────┘    └─────────────┬─────────────┘  │  │
+│  └──────────────────────────────────────────┼────────────────┘  │
+└─────────────────────────────────────────────┼───────────────────┘
+                                              │
+                 ┌────────────────────────────┼────────────────┐
+                 │                            │                │
+                 │    SQL Queries             │  Fetch RSS XML │
+                 ▼                            ▼                │
 ┌────────────────────────────────┐    ┌─────────────────────────┐
 │         SUPABASE               │    │    External RSS Feeds   │
 │  ┌──────────────────────────┐  │    │                         │
@@ -118,11 +116,17 @@ export async function onRequestPost(context: any): Promise<Response> {
     .select('*')
     .eq('user_id', uid);
 
-  // 3. 各RSSフィードをWorkerプロキシ経由で取得
+  // 3. 各RSSフィードを直接取得
   for (const feed of feeds) {
-    const rssResponse = await fetch(
-      `${workerUrl}/fetch?url=${encodeURIComponent(feed.url)}`
-    );
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const rssResponse = await fetch(feed.url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'FeedOwn/1.0 (RSS Reader)' },
+    });
+    clearTimeout(timeoutId);
+
     const xmlText = await rssResponse.text();
 
     // 4. RSS/Atom/RDF XMLをパース
@@ -136,51 +140,17 @@ export async function onRequestPost(context: any): Promise<Response> {
 }
 ```
 
-## 2. Cloudflare Worker：RSSプロキシ
+### なぜPages FunctionsでRSSを直接取得できるのか？
 
-RSSフィードはクロスオリジンリクエストをブロックすることが多く、一部のフィードは積極的にキャッシュされている。Workerはこの両方の問題を解決する：
+当初は別のCloudflare WorkerをKVキャッシュ付きのRSSプロキシとして使っていた。これはブラウザがクロスオリジンのRSSリクエストをブロックする（CORS）ために必要だった。
 
-```typescript
-// workers/src/index.ts
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    const feedUrl = url.searchParams.get('url');
+しかしPages Functionsはブラウザではなくサーバーサイドで動作する。CORSの問題なくRSSフィードを直接取得できる。このシンプル化により：
 
-    // まずKVキャッシュをチェック
-    const cached = await env.RSS_CACHE.get(feedUrl);
-    if (cached) {
-      return new Response(cached, {
-        headers: { 'Content-Type': 'application/xml' }
-      });
-    }
+- **複雑さを削減**：別のWorkerのデプロイが不要
+- **コストを削減**：KVストレージ操作なし（日次制限がある）
+- **鮮度を向上**：常に最新のRSSコンテンツを取得
 
-    // 新しいコンテンツを取得
-    const response = await fetch(feedUrl, {
-      headers: { 'User-Agent': 'FeedOwn/1.0' }
-    });
-    const xml = await response.text();
-
-    // 1時間キャッシュ
-    await env.RSS_CACHE.put(feedUrl, xml, { expirationTtl: 3600 });
-
-    return new Response(xml, {
-      headers: {
-        'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*'
-      }
-    });
-  }
-};
-```
-
-### なぜ別のWorkerなのか？
-
-- **KVストレージ**：WorkersはCloudflare KVをキャッシュに使える（Pages Functionsでは使えない）
-- **分離**：RSS取得をメインAPIから分離
-- **レート制限**：フィード提供元への過剰アクセスを防止
-
-## 3. Supabase：データベース + 認証
+## 2. Supabase：データベース + 認証
 
 Supabaseは寛大な無料枠を持つPostgreSQLデータベースと認証システムを提供している。
 
@@ -264,7 +234,7 @@ CREATE POLICY "Users can only insert their own feeds"
 
 多くの読み取りを行うRSSリーダーにとって、Firestoreの操作ごとの課金は懸念材料だった。
 
-## 4. モバイルアプリ：React Native + Expo
+## 3. モバイルアプリ：React Native + Expo
 
 モバイルアプリはExpoで構築している。React Native開発を簡素化してくれる：
 
@@ -322,7 +292,7 @@ class ApiClient {
 }
 ```
 
-## 5. リーダーモード：記事本文の抽出
+## 4. リーダーモード：記事本文の抽出
 
 FeedOwnにはSafariのリーダーやPocketのような「リーダーモード」がある：
 
@@ -359,7 +329,7 @@ export async function onRequestGet(context: any): Promise<Response> {
 
 Cloudflare WorkersはV8 isolateで動作し、Node.jsではない。`jsdom`はNode.js依存があり、この環境では動作しない。`linkedom`はどこでも動作する軽量なDOM実装だ。
 
-## 6. RSSパース：複数フォーマットのサポート
+## 5. RSSパース：複数フォーマットのサポート
 
 RSSフィードには3つの主要フォーマットがある：
 
@@ -392,8 +362,6 @@ RDFフォーマットは特に厄介だった——`<item>`要素が`<channel>`�
 | サービス | 無料枠 | 私の使用量 | コスト |
 |---------|--------|----------|------|
 | Cloudflare Pages | 10万リクエスト/日 | 約1,000/日 | $0 |
-| Cloudflare Workers | 10万リクエスト/日 | 約500/日 | $0 |
-| Cloudflare KV | 10万読み取り/日、1GBストレージ | 最小限 | $0 |
 | Supabase | 500MB DB、5万認証ユーザー | 約10MB、1ユーザー | $0 |
 | **合計** | | | **$0** |
 

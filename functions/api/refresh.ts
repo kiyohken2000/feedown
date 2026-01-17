@@ -80,15 +80,6 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     console.log(`[Refresh] Starting refresh for ${feeds.length} feeds`);
 
-    // Get Worker URL from environment
-    const workerUrl = env.WORKER_URL || env.VITE_WORKER_URL;
-    if (!workerUrl) {
-      return new Response(
-        JSON.stringify({ error: 'Worker URL not configured' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Get all existing article IDs once
     const { data: existingArticles, error: articlesError } = await supabase
       .from('articles')
@@ -110,13 +101,19 @@ export async function onRequestPost(context: any): Promise<Response> {
       console.log(`[Refresh] Processing feed ${feedId}: ${feed.title || feedUrl}`);
 
       try {
-        // Fetch RSS XML via Worker (bypass cache to get fresh data)
-        const rssResponse = await fetch(`${workerUrl}/fetch?url=${encodeURIComponent(feedUrl)}&bypass_cache=1`, {
+        // Fetch RSS XML directly (no Worker/KV overhead for real-time updates)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+        const rssResponse = await fetch(feedUrl, {
           method: 'GET',
+          signal: controller.signal,
           headers: {
-            'User-Agent': 'FeedOwn/1.0',
+            'User-Agent': 'FeedOwn/1.0 (RSS Reader)',
           },
         });
+
+        clearTimeout(timeoutId);
 
         if (!rssResponse.ok) {
           const errorText = await rssResponse.text();

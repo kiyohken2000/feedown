@@ -112,14 +112,15 @@ CREATE POLICY "Users can manage own favorites" ON favorites
 ## 2. Workers vs Functions の役割分担
 
 ### Cloudflare Workers (`workers/src/index.ts`)
-**役割: RSS取得専用プロキシ + CORS回避**
+**役割: RSS取得プロキシ + CORS回避（将来のクライアント直接アクセス用）**
 
 ```typescript
 // GET /fetch?url={rssUrl}
 // - RSS URLをfetchしてXMLを返す
 // - CORSヘッダーを追加
 // - KVキャッシュ (TTL: 1時間)
-// - レート制限: 同じURL 1時間に1回まで
+// ※ 現在はrefresh APIから直接RSS取得するため未使用
+// ※ 将来的にブラウザから直接RSS取得する機能用に保持
 ```
 
 ### Cloudflare Pages Functions (`functions/api/`)
@@ -128,7 +129,7 @@ CREATE POLICY "Users can manage own favorites" ON favorites
 ```
 /api/auth/*          - Supabase Auth連携
 /api/feeds           - フィードCRUD（PostgreSQL操作）
-/api/refresh         - RSS取得 → Worker経由 → PostgreSQL保存
+/api/refresh         - RSS直接取得 → PostgreSQL保存
 /api/articles        - 記事一覧取得（PostgreSQL）
 /api/articles/:id/*  - 既読/お気に入り操作
 /api/favorites       - お気に入り一覧
@@ -140,11 +141,17 @@ CREATE POLICY "Users can manage own favorites" ON favorites
 Client → Pages Functions /api/refresh
          ↓
          ├─ 1. PostgreSQLからフィード一覧取得
-         ├─ 2. 各フィードのRSSを Worker /fetch?url=... で取得
+         ├─ 2. 各フィードのRSSを直接fetch（Worker経由しない）
          ├─ 3. XMLパース → 記事データ抽出
          ├─ 4. PostgreSQL articles テーブルにupsert（バッチ）
          └─ 5. last_fetched_at更新
 ```
+
+**設計理由:**
+- Pages FunctionsはサーバーサイドなのでCORS問題なし
+- Worker/KV経由のオーバーヘッドを削減
+- KV無料枠（Write 1,000回/日）の制限を回避
+- リアルタイム性を維持（キャッシュなしで最新RSS取得）
 
 ---
 
@@ -187,26 +194,36 @@ GET /api/articles
 
 ## 4. KVキャッシュの使い方
 
-### Workers側でRSS XMLをキャッシュ
+### 現在の状況
+
+**refresh API（`/api/refresh`）ではKVキャッシュを使用しない設計に変更。**
+
+理由:
+- KV無料枠のWrite制限（1,000回/日）に達する問題を回避
+- リアルタイム性を重視（常に最新のRSSを取得）
+- Pages Functionsから直接RSS取得することでオーバーヘッド削減
+
+### Workers側のKVキャッシュ（将来用に保持）
 
 ```typescript
 // Worker: /fetch?url={rssUrl}
-const cacheKey = `rss:${MD5(rssUrl)}`;
+// ※ 現在はrefresh APIから使用されていない
+// ※ 将来的にブラウザから直接RSS取得する機能用に保持
+const cacheKey = `rss:${url}`;
 const cached = await KV.get(cacheKey);
 
-if (cached && Date.now() - cached.timestamp < 3600000) {
-  return cached.xml;  // 1時間以内のキャッシュを返す
+if (cached) {
+  return cached;  // キャッシュヒット
 }
 
-const xml = await fetch(rssUrl).then(r => r.text());
-await KV.put(cacheKey, { xml, timestamp: Date.now() }, { expirationTtl: 3600 });
+const xml = await fetch(url).then(r => r.text());
+await KV.put(cacheKey, xml, { expirationTtl: 3600 });
 return xml;
 ```
 
-**効果:**
-- 同じRSSを短時間に複数回取得しない
-- RSS配信元サーバーへの負荷軽減
-- Cloudflare Workers の外部リクエスト数削減
+**想定ユースケース（将来）:**
+- フィード追加時のプレビュー機能
+- ブラウザから直接RSSを検証する機能
 
 ---
 

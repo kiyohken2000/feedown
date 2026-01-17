@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="900" height="650" viewBox="0 0 900 650" xmlns="http://www.w3.org/2000/svg">
+<svg width="900" height="600" viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <style>
       .title { font: bold 16px sans-serif; fill: #333; }
@@ -36,7 +36,7 @@
   </defs>
 
   <!-- Background -->
-  <rect width="900" height="650" fill="#FAFBFC"/>
+  <rect width="900" height="600" fill="#FAFBFC"/>
 
   <!-- Title -->
   <text x="450" y="35" text-anchor="middle" class="title" style="font-size: 20px;">FeedOwn System Architecture</text>
@@ -57,95 +57,80 @@
   <text x="680" y="152" text-anchor="middle" class="label" style="font-weight: normal; font-size: 10px;">React Native + Expo</text>
 
   <!-- ========== CLOUDFLARE SECTION ========== -->
-  <rect x="30" y="210" width="840" height="170" rx="10" fill="#FFF4E6" stroke="#F5D0A9" stroke-width="1"/>
+  <rect x="30" y="210" width="840" height="140" rx="10" fill="#FFF4E6" stroke="#F5D0A9" stroke-width="1"/>
   <text x="50" y="230" class="small-label" style="fill: #F5A623;">CLOUDFLARE EDGE (300+ Global Locations)</text>
 
-  <!-- Cloudflare Pages -->
-  <rect x="60" y="250" width="380" height="115" rx="8" fill="url(#orangeGrad)"/>
-  <text x="250" y="275" text-anchor="middle" class="label">Cloudflare Pages</text>
+  <!-- Cloudflare Pages (expanded to full width) -->
+  <rect x="60" y="250" width="780" height="85" rx="8" fill="url(#orangeGrad)"/>
+  <text x="450" y="275" text-anchor="middle" class="label">Cloudflare Pages</text>
 
   <!-- Static Assets -->
-  <rect x="80" y="290" width="150" height="55" rx="5" fill="#fff" stroke="#F5A623"/>
-  <text x="155" y="315" text-anchor="middle" style="font: bold 11px sans-serif; fill: #F5A623;">Static Assets</text>
-  <text x="155" y="332" text-anchor="middle" class="small-label">HTML, JS, CSS, Images</text>
+  <rect x="100" y="290" width="200" height="35" rx="5" fill="#fff" stroke="#F5A623"/>
+  <text x="200" y="313" text-anchor="middle" style="font: bold 11px sans-serif; fill: #F5A623;">Static Assets</text>
 
   <!-- Pages Functions -->
-  <rect x="250" y="290" width="170" height="55" rx="5" fill="#fff" stroke="#F5A623"/>
-  <text x="335" y="315" text-anchor="middle" style="font: bold 11px sans-serif; fill: #F5A623;">Pages Functions</text>
-  <text x="335" y="332" text-anchor="middle" class="small-label">API Endpoints (TypeScript)</text>
+  <rect x="350" y="290" width="200" height="35" rx="5" fill="#fff" stroke="#F5A623"/>
+  <text x="450" y="313" text-anchor="middle" style="font: bold 11px sans-serif; fill: #F5A623;">Pages Functions (API)</text>
 
-  <!-- Cloudflare Worker -->
-  <rect x="480" y="250" width="180" height="115" rx="8" fill="url(#orangeGrad)"/>
-  <text x="570" y="275" text-anchor="middle" class="label">Cloudflare Worker</text>
-  <text x="570" y="292" text-anchor="middle" class="label" style="font-weight: normal; font-size: 10px;">RSS Proxy</text>
-
-  <!-- KV Cache -->
-  <rect x="500" y="305" width="140" height="45" rx="5" fill="#fff" stroke="#F5A623"/>
-  <text x="570" y="325" text-anchor="middle" style="font: bold 11px sans-serif; fill: #F5A623;">KV Cache</text>
-  <text x="570" y="340" text-anchor="middle" class="small-label">1-hour TTL</text>
+  <!-- Direct RSS Fetch label -->
+  <rect x="600" y="290" width="200" height="35" rx="5" fill="#fff" stroke="#F5A623"/>
+  <text x="700" y="313" text-anchor="middle" style="font: bold 11px sans-serif; fill: #F5A623;">Direct RSS Fetching</text>
 
   <!-- ========== SUPABASE SECTION ========== -->
-  <rect x="30" y="410" width="400" height="160" rx="10" fill="#E6F9F0" stroke="#A3E4C1" stroke-width="1"/>
-  <text x="50" y="430" class="small-label" style="fill: #3ECF8E;">SUPABASE (Backend as a Service)</text>
+  <rect x="30" y="380" width="400" height="140" rx="10" fill="#E6F9F0" stroke="#A3E4C1" stroke-width="1"/>
+  <text x="50" y="400" class="small-label" style="fill: #3ECF8E;">SUPABASE (Backend as a Service)</text>
 
   <!-- PostgreSQL -->
-  <rect x="60" y="450" width="160" height="100" rx="8" fill="url(#greenGrad)"/>
-  <text x="140" y="480" text-anchor="middle" class="label">PostgreSQL</text>
-  <text x="140" y="500" text-anchor="middle" class="label" style="font-weight: normal; font-size: 9px;">• users</text>
-  <text x="140" y="515" text-anchor="middle" class="label" style="font-weight: normal; font-size: 9px;">• feeds</text>
-  <text x="140" y="530" text-anchor="middle" class="label" style="font-weight: normal; font-size: 9px;">• articles</text>
-  <text x="140" y="545" text-anchor="middle" class="label" style="font-weight: normal; font-size: 9px;">• favorites</text>
+  <rect x="60" y="420" width="160" height="85" rx="8" fill="url(#greenGrad)"/>
+  <text x="140" y="450" text-anchor="middle" class="label">PostgreSQL</text>
+  <text x="140" y="470" text-anchor="middle" class="label" style="font-weight: normal; font-size: 9px;">users, feeds,</text>
+  <text x="140" y="485" text-anchor="middle" class="label" style="font-weight: normal; font-size: 9px;">articles, favorites</text>
 
   <!-- Supabase Auth -->
-  <rect x="250" y="450" width="160" height="100" rx="8" fill="url(#greenGrad)"/>
-  <text x="330" y="480" text-anchor="middle" class="label">Supabase Auth</text>
-  <text x="330" y="505" text-anchor="middle" class="label" style="font-weight: normal; font-size: 9px;">JWT Authentication</text>
-  <text x="330" y="525" text-anchor="middle" class="label" style="font-weight: normal; font-size: 9px;">Token Refresh</text>
+  <rect x="250" y="420" width="160" height="85" rx="8" fill="url(#greenGrad)"/>
+  <text x="330" y="450" text-anchor="middle" class="label">Supabase Auth</text>
+  <text x="330" y="470" text-anchor="middle" class="label" style="font-weight: normal; font-size: 9px;">JWT Authentication</text>
+  <text x="330" y="485" text-anchor="middle" class="label" style="font-weight: normal; font-size: 9px;">Token Refresh</text>
 
   <!-- ========== EXTERNAL FEEDS ========== -->
-  <rect x="470" y="410" width="400" height="160" rx="10" fill="#F4F0FA" stroke="#D4C4E8" stroke-width="1"/>
-  <text x="490" y="430" class="small-label" style="fill: #9B59B6;">EXTERNAL RSS FEEDS</text>
+  <rect x="470" y="380" width="400" height="140" rx="10" fill="#F4F0FA" stroke="#D4C4E8" stroke-width="1"/>
+  <text x="490" y="400" class="small-label" style="fill: #9B59B6;">EXTERNAL RSS FEEDS</text>
 
   <!-- Feed Icons -->
-  <rect x="500" y="455" width="110" height="45" rx="5" fill="url(#purpleGrad)"/>
-  <text x="555" y="482" text-anchor="middle" class="label" style="font-size: 10px;">News Sites</text>
+  <rect x="500" y="425" width="100" height="40" rx="5" fill="url(#purpleGrad)"/>
+  <text x="550" y="450" text-anchor="middle" class="label" style="font-size: 10px;">News Sites</text>
 
-  <rect x="625" y="455" width="110" height="45" rx="5" fill="url(#purpleGrad)"/>
-  <text x="680" y="482" text-anchor="middle" class="label" style="font-size: 10px;">Tech Blogs</text>
+  <rect x="620" y="425" width="100" height="40" rx="5" fill="url(#purpleGrad)"/>
+  <text x="670" y="450" text-anchor="middle" class="label" style="font-size: 10px;">Tech Blogs</text>
 
-  <rect x="750" y="455" width="100" height="45" rx="5" fill="url(#purpleGrad)"/>
-  <text x="800" y="482" text-anchor="middle" class="label" style="font-size: 10px;">Podcasts</text>
+  <rect x="740" y="425" width="100" height="40" rx="5" fill="url(#purpleGrad)"/>
+  <text x="790" y="450" text-anchor="middle" class="label" style="font-size: 10px;">Podcasts</text>
 
-  <rect x="560" y="515" width="180" height="40" rx="5" fill="url(#grayGrad)"/>
-  <text x="650" y="540" text-anchor="middle" class="label" style="font-size: 10px;">RSS 2.0 / Atom / RDF</text>
+  <rect x="560" y="480" width="180" height="30" rx="5" fill="url(#grayGrad)"/>
+  <text x="650" y="500" text-anchor="middle" class="label" style="font-size: 10px;">RSS 2.0 / Atom / RDF</text>
 
   <!-- ========== ARROWS ========== -->
 
   <!-- Web App to Pages -->
-  <path d="M 220 165 L 220 200 L 250 200 L 250 250" class="arrow"/>
-  <text x="170" y="195" class="arrow-label">HTTPS</text>
+  <path d="M 220 165 L 220 200 L 350 200 L 350 250" class="arrow"/>
+  <text x="260" y="195" class="arrow-label">HTTPS</text>
 
   <!-- Mobile App to Pages -->
-  <path d="M 680 165 L 680 200 L 335 200 L 335 250" class="arrow"/>
-  <text x="500" y="195" class="arrow-label">HTTPS API</text>
+  <path d="M 680 165 L 680 200 L 550 200 L 550 250" class="arrow"/>
+  <text x="590" y="195" class="arrow-label">HTTPS API</text>
 
   <!-- Pages Functions to Supabase -->
-  <path d="M 335 345 L 335 380 L 230 380 L 230 410" class="arrow"/>
-  <text x="250" y="395" class="arrow-label">SQL Queries</text>
+  <path d="M 400 335 L 400 360 L 230 360 L 230 380" class="arrow"/>
+  <text x="280" y="370" class="arrow-label">SQL Queries</text>
 
-  <!-- Pages Functions to Worker -->
-  <path d="M 420 320 L 480 320" class="arrow"/>
-  <text x="430" y="310" class="arrow-label">Fetch RSS</text>
-
-  <!-- Worker to External Feeds -->
-  <path d="M 570 365 L 570 390 L 650 390 L 650 410" class="arrow"/>
-  <text x="595" y="385" class="arrow-label">HTTP GET</text>
+  <!-- Pages Functions to External Feeds (direct) -->
+  <path d="M 700 335 L 700 360 L 650 360 L 650 380" class="arrow"/>
+  <text x="710" y="370" class="arrow-label">HTTP GET (direct)</text>
 
   <!-- ========== LEGEND ========== -->
-  <rect x="30" y="590" width="840" height="50" rx="5" fill="#fff" stroke="#ddd"/>
-  <text x="50" y="610" class="small-label" style="font-weight: bold;">FREE TIER LIMITS:</text>
-  <text x="50" y="628" class="small-label">Cloudflare: 100K req/day</text>
-  <text x="220" y="628" class="small-label">Supabase: 500MB DB, 50K auth users</text>
-  <text x="450" y="628" class="small-label">KV: 100K reads/day, 1GB storage</text>
-  <text x="680" y="610" class="small-label" style="font-weight: bold; fill: #3ECF8E;">MONTHLY COST: $0</text>
+  <rect x="30" y="540" width="840" height="50" rx="5" fill="#fff" stroke="#ddd"/>
+  <text x="50" y="560" class="small-label" style="font-weight: bold;">FREE TIER LIMITS:</text>
+  <text x="50" y="578" class="small-label">Cloudflare Pages: 100K requests/day</text>
+  <text x="300" y="578" class="small-label">Supabase: 500MB DB, 50K auth users</text>
+  <text x="680" y="560" class="small-label" style="font-weight: bold; fill: #3ECF8E;">MONTHLY COST: $0</text>
 </svg>

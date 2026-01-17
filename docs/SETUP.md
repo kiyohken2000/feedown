@@ -6,7 +6,7 @@
 
 1. [前提条件](#前提条件)
 2. [Supabaseセットアップ](#1-supabaseセットアップ)
-3. [Cloudflare Workersセットアップ](#2-cloudflare-workersセットアップ)
+3. [Cloudflare Workersセットアップ（オプション）](#2-cloudflare-workersセットアップオプション)
 4. [Cloudflare Pagesセットアップ](#3-cloudflare-pagesセットアップ)
 5. [ローカル開発環境](#4-ローカル開発環境)
 6. [モバイルアプリビルド](#5-モバイルアプリビルド)
@@ -197,9 +197,11 @@ CREATE POLICY "Anyone can read active recommended feeds" ON recommended_feeds
 
 ---
 
-## 2. Cloudflare Workersセットアップ
+## 2. Cloudflare Workersセットアップ（オプション）
 
-WorkersはRSSフィードを取得するプロキシとして機能します。
+> **注意**: 現在のバージョンでは、RSS取得はPages Functionsから直接行うため、**Workersのセットアップは不要**です。このセクションは将来のブラウザ直接アクセス機能用に保持されています。スキップして[セクション3](#3-cloudflare-pagesセットアップ)に進んでも問題ありません。
+
+WorkersはRSSフィードを取得するプロキシとして機能します（将来用）。
 
 ### 2.1 Cloudflareアカウント準備
 
@@ -286,8 +288,8 @@ VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# Cloudflare Workers URL
-VITE_WORKER_URL=https://feedown-worker.your-subdomain.workers.dev
+# Cloudflare Workers URL (オプション - 現在未使用)
+# VITE_WORKER_URL=https://feedown-worker.your-subdomain.workers.dev
 
 # App Configuration
 VITE_APP_NAME=FeedOwn
@@ -322,10 +324,10 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 | 変数名 | 値 | 備考 |
 |--------|-----|------|
-| `SUPABASE_URL` | `https://xxxxx.supabase.co` | |
-| `SUPABASE_ANON_KEY` | `eyJhbG...` | |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbG...` | **Secret** |
-| `WORKER_URL` | `https://feedown-worker.xxx.workers.dev` | |
+| `SUPABASE_URL` | `https://xxxxx.supabase.co` | 必須 |
+| `SUPABASE_ANON_KEY` | `eyJhbG...` | 必須 |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbG...` | 必須 **Secret** |
+| `WORKER_URL` | `https://feedown-worker.xxx.workers.dev` | オプション（現在未使用） |
 
 3. 変更を保存し、再デプロイ
 
@@ -369,9 +371,9 @@ npx wrangler pages dev dist \
   --compatibility-flags=nodejs_compat \
   --binding SUPABASE_URL=https://xxxxx.supabase.co \
   --binding SUPABASE_ANON_KEY=your-anon-key \
-  --binding SUPABASE_SERVICE_ROLE_KEY=your-service-role-key \
-  --binding WORKER_URL=https://feedown-worker.xxx.workers.dev
+  --binding SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 # => http://localhost:8788
+# 注: WORKER_URLは現在不要（RSS取得はPages Functionsから直接行う）
 ```
 
 ### 4.4 開発時のアクセス

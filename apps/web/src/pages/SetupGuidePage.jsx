@@ -237,9 +237,9 @@ export default function SetupGuidePage() {
       title: language === 'en' ? 'Setup Steps' : 'セットアップ手順',
       items: [
         { id: 'supabase', label: language === 'en' ? '1. Supabase' : '1. Supabase' },
-        { id: 'workers', label: language === 'en' ? '2. Workers' : '2. Workers' },
-        { id: 'pages', label: language === 'en' ? '3. Pages' : '3. Pages' },
-        { id: 'env-vars', label: language === 'en' ? '4. Environment' : '4. 環境変数' },
+        { id: 'pages', label: language === 'en' ? '2. Pages' : '2. Pages' },
+        { id: 'env-vars', label: language === 'en' ? '3. Environment' : '3. 環境変数' },
+        { id: 'start', label: language === 'en' ? '4. Start Using' : '4. 使い始める' },
       ],
     },
     {
@@ -318,8 +318,8 @@ export default function SetupGuidePage() {
                 </tr>
                 <tr>
                   <td style={styles.td}>Cloudflare</td>
-                  <td style={styles.td}>{language === 'en' ? 'Hosting & Workers' : 'ホスティング・Workers'}</td>
-                  <td style={styles.td}>{language === 'en' ? '100k req/day' : '10万req/日'}</td>
+                  <td style={styles.td}>{language === 'en' ? 'Hosting (Pages)' : 'ホスティング（Pages）'}</td>
+                  <td style={styles.td}>{language === 'en' ? 'Unlimited builds' : '無制限ビルド'}</td>
                 </tr>
                 <tr>
                   <td style={styles.td}>Expo ({language === 'en' ? 'optional' : 'オプション'})</td>
@@ -529,80 +529,10 @@ CREATE POLICY "Anyone can read active recommended feeds" ON recommended_feeds
             </ul>
           </section>
 
-          {/* Step 2: Workers */}
-          <section id="workers" style={styles.section}>
+          {/* Step 2: Pages */}
+          <section id="pages" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t.step2Title}</h2>
             <p style={styles.paragraph}>{t.step2Content}</p>
-
-            <div style={styles.stepTitle}>
-              <span style={styles.stepNumber}>1</span>
-              {language === 'en' ? 'Create KV Namespace' : 'KV Namespace作成'}
-            </div>
-            <div style={styles.codeBlock}>
-              <code style={styles.code}>
-{`# Login to Wrangler
-wrangler login
-
-# Create KV Namespace
-wrangler kv namespace create "CACHE"
-# => Note the ID
-
-# Create Preview KV Namespace
-wrangler kv namespace create "CACHE" --preview
-# => Note the preview_id`}
-              </code>
-            </div>
-
-            <div style={styles.stepTitle}>
-              <span style={styles.stepNumber}>2</span>
-              {language === 'en' ? 'Configure wrangler.toml' : 'wrangler.toml設定'}
-            </div>
-            <p style={styles.paragraph}>
-              {language === 'en'
-                ? 'Edit workers/wrangler.toml:'
-                : 'workers/wrangler.toml を編集:'}
-            </p>
-            <div style={styles.codeBlock}>
-              <code style={styles.code}>
-{`name = "feedown-worker"
-main = "src/index.ts"
-compatibility_date = "2024-01-01"
-
-account_id = "your-account-id"
-
-[[kv_namespaces]]
-binding = "CACHE"
-id = "your-kv-id"
-preview_id = "your-preview-kv-id"
-
-[observability]
-enabled = true`}
-              </code>
-            </div>
-
-            <div style={styles.stepTitle}>
-              <span style={styles.stepNumber}>3</span>
-              {language === 'en' ? 'Deploy Worker' : 'Workerデプロイ'}
-            </div>
-            <div style={styles.codeBlock}>
-              <code style={styles.code}>
-{`cd workers
-npm install
-wrangler deploy`}
-              </code>
-            </div>
-            <p style={styles.paragraph}>
-              {language === 'en'
-                ? 'Note the Worker URL: '
-                : 'Worker URLをメモ: '}
-              <code style={styles.inlineCode}>https://feedown-worker.your-subdomain.workers.dev</code>
-            </p>
-          </section>
-
-          {/* Step 3: Pages */}
-          <section id="pages" style={styles.section}>
-            <h2 style={styles.sectionTitle}>{t.step3Title}</h2>
-            <p style={styles.paragraph}>{t.step3Content}</p>
 
             <div style={styles.stepTitle}>
               <span style={styles.stepNumber}>1</span>
@@ -634,7 +564,6 @@ cp .env.example .env.shared
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-VITE_WORKER_URL=https://feedown-worker.your-subdomain.workers.dev
 VITE_APP_NAME=FeedOwn
 VITE_APP_VERSION=1.0.0
 
@@ -666,10 +595,10 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown`}
             </div>
           </section>
 
-          {/* Step 4: Environment Variables */}
+          {/* Step 3: Environment Variables */}
           <section id="env-vars" style={styles.section}>
-            <h2 style={styles.sectionTitle}>{t.step4Title}</h2>
-            <p style={styles.paragraph}>{t.step4Content}</p>
+            <h2 style={styles.sectionTitle}>{t.step3Title}</h2>
+            <p style={styles.paragraph}>{t.step3Content}</p>
 
             <ol style={styles.list}>
               <li style={styles.listItem}>
@@ -696,25 +625,49 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown`}
                 <tr>
                   <td style={styles.td}><code style={styles.inlineCode}>SUPABASE_URL</code></td>
                   <td style={styles.td}>https://xxxxx.supabase.co</td>
-                  <td style={styles.td}></td>
+                  <td style={styles.td}>{language === 'en' ? 'Required' : '必須'}</td>
                 </tr>
                 <tr>
                   <td style={styles.td}><code style={styles.inlineCode}>SUPABASE_ANON_KEY</code></td>
                   <td style={styles.td}>eyJhbG...</td>
-                  <td style={styles.td}></td>
+                  <td style={styles.td}>{language === 'en' ? 'Required' : '必須'}</td>
                 </tr>
                 <tr>
                   <td style={styles.td}><code style={styles.inlineCode}>SUPABASE_SERVICE_ROLE_KEY</code></td>
                   <td style={styles.td}>eyJhbG...</td>
-                  <td style={styles.td}><strong>Secret</strong></td>
-                </tr>
-                <tr>
-                  <td style={styles.td}><code style={styles.inlineCode}>WORKER_URL</code></td>
-                  <td style={styles.td}>https://feedown-worker.xxx.workers.dev</td>
-                  <td style={styles.td}></td>
+                  <td style={styles.td}>{language === 'en' ? 'Required, Secret' : '必須、秘密'}</td>
                 </tr>
               </tbody>
             </table>
+          </section>
+
+          {/* Step 4: Start Using */}
+          <section id="start" style={styles.section}>
+            <h2 style={styles.sectionTitle}>{t.step4Title}</h2>
+            <p style={styles.paragraph}>{t.step4Content}</p>
+
+            <ol style={styles.list}>
+              <li style={styles.listItem}>
+                {language === 'en'
+                  ? 'Access your deployed URL (e.g., https://feedown.pages.dev)'
+                  : 'デプロイしたURLにアクセス（例: https://feedown.pages.dev）'}
+              </li>
+              <li style={styles.listItem}>
+                {language === 'en'
+                  ? 'Create a new account'
+                  : '新規アカウントを作成'}
+              </li>
+              <li style={styles.listItem}>
+                {language === 'en'
+                  ? 'Add your favorite RSS feeds'
+                  : 'お気に入りのRSSフィードを追加'}
+              </li>
+              <li style={styles.listItem}>
+                {language === 'en'
+                  ? 'Start reading!'
+                  : '読み始めましょう！'}
+              </li>
+            </ol>
           </section>
 
           {/* Local Development */}
@@ -752,8 +705,7 @@ npx wrangler pages dev dist \\
   --compatibility-flags=nodejs_compat \\
   --binding SUPABASE_URL=https://xxxxx.supabase.co \\
   --binding SUPABASE_ANON_KEY=your-anon-key \\
-  --binding SUPABASE_SERVICE_ROLE_KEY=your-service-role-key \\
-  --binding WORKER_URL=https://feedown-worker.xxx.workers.dev
+  --binding SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 # => http://localhost:8788`}
               </code>
             </div>

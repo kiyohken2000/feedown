@@ -10,17 +10,16 @@ Supabase と Cloudflare を使用したセルフホスト型 RSS リーダー
 
 - 📱 **クロスプラットフォーム**: Web (React) とモバイル (Expo)
 - 🔒 **セルフホスト**: データはあなたの Supabase アカウントに保存されます
-- ⚡ **サーバーレス**: Cloudflare Workers によりインフラコストゼロ
+- ⚡ **サーバーレス**: Cloudflare Pages によりインフラコストゼロ
 - 🌐 **オフラインファースト**: インターネットなしで記事を読める
 - 🎨 **モダンな UI**: クリーンでレスポンシブなデザイン
 
 ## 技術スタック
 
 - **フロントエンド**: Vite + React (Web)、Expo + React Native (Mobile)
-- **バックエンド**: Cloudflare Workers + Pages Functions
+- **バックエンド**: Cloudflare Pages Functions
 - **データベース**: Supabase PostgreSQL
 - **認証**: Supabase Auth
-- **キャッシュ**: Cloudflare KV
 
 ## クイックスタート
 
@@ -57,9 +56,6 @@ yarn dev:web
 
 # モバイルアプリを起動
 yarn dev:mobile
-
-# Workers をローカルで起動
-yarn dev:workers
 ```
 
 ### ビルド
@@ -67,42 +63,19 @@ yarn dev:workers
 ```bash
 # Web アプリをビルド
 yarn build:web
-
-# Workers をビルド
-yarn build:workers
-
-# Functions をビルド (TypeScript)
-cd functions && npm run build
 ```
 
 ### デプロイ
 
-#### Cloudflare Pages へのデプロイ（手動）
+#### Cloudflare Pages へのデプロイ
 
 ```bash
-# まず Web アプリをビルド
-cd apps/web
-npm run build
-
-# Cloudflare Pages にデプロイ
-npx wrangler pages deploy dist --project-name=feedown
-
-# または、ルートディレクトリからデプロイ
-cd ../..
+# ルートディレクトリからビルドとデプロイ
+npm run build --workspace=apps/web
 npx wrangler pages deploy apps/web/dist --project-name=feedown
 ```
 
-**注意**:
-- `feedown` を、あなたの Cloudflare Pages プロジェクト名に置き換えてください。
-- このプロジェクトは手動デプロイを使用しています（GitHub 連携は設定されていません）。
-- デプロイ後、固有の URL（例: `https://1df6fe0b.feedown.pages.dev`）が発行されます。
-
-#### Cloudflare Workers のデプロイ
-
-```bash
-cd workers
-npx wrangler deploy
-```
+**重要**: `functions` フォルダを含めるために、必ずルートディレクトリからデプロイしてください。
 
 ## プロジェクト構成
 
@@ -113,9 +86,8 @@ feedown/
 │   └── mobile/           # Expo + React Native
 ├── packages/
 │   └── shared/           # 共有の型とユーティリティ
-├── workers/              # Cloudflare Workers (RSS プロキシ)
 ├── functions/            # Cloudflare Pages Functions (API)
-└── scripts/              # ビルドとデプロイのスクリプト
+└── docs/                 # ドキュメント
 ```
 
 ## ドキュメント

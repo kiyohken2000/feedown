@@ -82,7 +82,6 @@ FeedOwn is built with modern, serverless technologies that keep hosting costs mi
 - **Frontend**: React (Web) + React Native/Expo (Mobile)
 - **Backend**: Cloudflare Pages Functions (serverless, generous free tier)
 - **Database**: Supabase PostgreSQL (also has a generous free tier)
-- **RSS Proxy**: Cloudflare Workers with KV cache
 
 The entire stack can run on free tiers for personal use. You're looking at $0/month to host your own RSS reader.
 

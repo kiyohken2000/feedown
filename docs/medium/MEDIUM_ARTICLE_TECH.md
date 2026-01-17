@@ -15,7 +15,7 @@ This article is a technical deep dive into how I achieved that with FeedOwn, a s
 
 ## The Architecture Overview
 
-FeedOwn consists of four main components:
+FeedOwn consists of three main components:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -32,21 +32,19 @@ FeedOwn consists of four main components:
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CLOUDFLARE EDGE                               │
 ├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────┐    ┌─────────────────────┐     │
-│  │   Cloudflare Pages          │    │  Cloudflare Worker  │     │
-│  │   ┌───────────────────┐     │    │   (RSS Proxy)       │     │
-│  │   │  Static Assets    │     │    │                     │     │
-│  │   │  (React Bundle)   │     │    │  ┌───────────────┐  │     │
-│  │   └───────────────────┘     │    │  │   KV Cache    │  │     │
-│  │   ┌───────────────────┐     │    │  │  (1hr TTL)    │  │     │
-│  │   │  Pages Functions  │     │    │  └───────────────┘  │     │
-│  │   │  (API Endpoints)  │     │    │                     │     │
-│  │   └─────────┬─────────┘     │    └──────────┬──────────┘     │
-│  └─────────────┼───────────────┘               │                │
-└────────────────┼───────────────────────────────┼────────────────┘
-                 │                               │
-                 │    SQL Queries                │  Fetch RSS XML
-                 ▼                               ▼
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                   Cloudflare Pages                        │  │
+│  │   ┌───────────────────┐    ┌───────────────────────────┐  │  │
+│  │   │  Static Assets    │    │     Pages Functions       │  │  │
+│  │   │  (React Bundle)   │    │     (API Endpoints)       │  │  │
+│  │   └───────────────────┘    └─────────────┬─────────────┘  │  │
+│  └──────────────────────────────────────────┼────────────────┘  │
+└─────────────────────────────────────────────┼───────────────────┘
+                                              │
+                 ┌────────────────────────────┼────────────────┐
+                 │                            │                │
+                 │    SQL Queries             │  Fetch RSS XML │
+                 ▼                            ▼                │
 ┌────────────────────────────────┐    ┌─────────────────────────┐
 │         SUPABASE               │    │    External RSS Feeds   │
 │  ┌──────────────────────────┐  │    │                         │
@@ -118,11 +116,17 @@ export async function onRequestPost(context: any): Promise<Response> {
     .select('*')
     .eq('user_id', uid);
 
-  // 3. Fetch each RSS feed via the Worker proxy
+  // 3. Fetch each RSS feed directly
   for (const feed of feeds) {
-    const rssResponse = await fetch(
-      `${workerUrl}/fetch?url=${encodeURIComponent(feed.url)}`
-    );
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const rssResponse = await fetch(feed.url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'FeedOwn/1.0 (RSS Reader)' },
+    });
+    clearTimeout(timeoutId);
+
     const xmlText = await rssResponse.text();
 
     // 4. Parse RSS/Atom/RDF XML
@@ -136,51 +140,17 @@ export async function onRequestPost(context: any): Promise<Response> {
 }
 ```
 
-## 2. Cloudflare Worker: The RSS Proxy
+### Why Pages Functions Can Fetch RSS Directly
 
-RSS feeds often block cross-origin requests, and some feeds have aggressive caching. The Worker solves both problems:
+Originally, I used a separate Cloudflare Worker with KV caching as an RSS proxy. This was needed because browsers block cross-origin RSS requests (CORS).
 
-```typescript
-// workers/src/index.ts
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    const feedUrl = url.searchParams.get('url');
+However, Pages Functions run server-side, not in the browser. They can fetch RSS feeds directly without CORS issues. This simplification:
 
-    // Check KV cache first
-    const cached = await env.RSS_CACHE.get(feedUrl);
-    if (cached) {
-      return new Response(cached, {
-        headers: { 'Content-Type': 'application/xml' }
-      });
-    }
+- **Removes complexity**: No separate Worker deployment needed
+- **Reduces costs**: No KV storage operations (which have daily limits)
+- **Improves freshness**: Always fetches the latest RSS content
 
-    // Fetch fresh content
-    const response = await fetch(feedUrl, {
-      headers: { 'User-Agent': 'FeedOwn/1.0' }
-    });
-    const xml = await response.text();
-
-    // Cache for 1 hour
-    await env.RSS_CACHE.put(feedUrl, xml, { expirationTtl: 3600 });
-
-    return new Response(xml, {
-      headers: {
-        'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*'
-      }
-    });
-  }
-};
-```
-
-### Why a Separate Worker?
-
-- **KV Storage**: Workers can use Cloudflare KV for caching (Pages Functions cannot)
-- **Isolation**: RSS fetching is separate from the main API
-- **Rate limiting**: Prevents hammering feed sources
-
-## 3. Supabase: Database + Authentication
+## 2. Supabase: Database + Authentication
 
 Supabase provides a PostgreSQL database and authentication system with a generous free tier.
 
@@ -264,7 +234,7 @@ I initially built FeedOwn with Firebase/Firestore, but migrated to Supabase for 
 
 For an RSS reader that does many reads (article lists), Firestore's per-operation pricing became a concern.
 
-## 4. Mobile App: React Native + Expo
+## 3. Mobile App: React Native + Expo
 
 The mobile app is built with Expo, which simplifies React Native development:
 
@@ -322,7 +292,7 @@ class ApiClient {
 }
 ```
 
-## 5. Reader Mode: Article Extraction
+## 4. Reader Mode: Article Extraction
 
 FeedOwn includes a "Reader Mode" that extracts article content, similar to Safari's reader or Pocket:
 
@@ -359,7 +329,7 @@ export async function onRequestGet(context: any): Promise<Response> {
 
 Cloudflare Workers run in a V8 isolate, not Node.js. `jsdom` has Node.js dependencies that don't work in this environment. `linkedom` is a lightweight DOM implementation that works everywhere.
 
-## 6. RSS Parsing: Supporting Multiple Formats
+## 5. RSS Parsing: Supporting Multiple Formats
 
 RSS feeds come in three main formats:
 
@@ -392,8 +362,6 @@ Here's the breakdown of running FeedOwn for personal use:
 | Service | Free Tier | My Usage | Cost |
 |---------|-----------|----------|------|
 | Cloudflare Pages | 100K requests/day | ~1K/day | $0 |
-| Cloudflare Workers | 100K requests/day | ~500/day | $0 |
-| Cloudflare KV | 100K reads/day, 1GB storage | Minimal | $0 |
 | Supabase | 500MB DB, 50K auth users | ~10MB, 1 user | $0 |
 | **Total** | | | **$0** |
 

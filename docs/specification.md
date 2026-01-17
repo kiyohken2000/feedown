@@ -17,11 +17,11 @@
 
 ### バックエンド
 - **ホスティング**: Cloudflare Pages + Pages Functions
-- **Workers**: Cloudflare Workers（RSS取得・CORS回避）
+- **Workers**: Cloudflare Workers（将来のCORS回避用に保持、現在未使用）
 - **データベース**: Supabase PostgreSQL
 - **認証**: Supabase Auth（メール/パスワード）
 - **リアルタイム**: Supabase Realtime
-- **キャッシュ**: Cloudflare KV
+- **RSS取得**: Pages Functionsから直接取得（Worker/KV経由しない）
 
 ## 機能要件
 
@@ -249,13 +249,14 @@ id = "your-kv-namespace-id"
 | API | 帯域制限のみ（リクエスト数無制限） |
 
 ### Cloudflare
-| サービス | 制限 |
-|---------|------|
-| Workers | 10万req/日 |
-| KV | 10万read/日 |
-| Pages | 無制限ビルド |
+| サービス | 制限 | 現在の使用状況 |
+|---------|------|---------------|
+| Workers | 10万req/日 | 未使用（将来用に保持） |
+| KV | 10万read/日, 1000write/日 | 未使用（KV制限回避のため） |
+| Pages | 無制限ビルド | 使用中 |
 
-**結論**: Supabase + Cloudflareで実質無料運用可能
+**結論**: Supabase + Cloudflare Pagesで実質無料運用可能
+- RSS取得はPages Functionsから直接行うためWorker/KV不要
 
 ## UI/UXガイドライン
 - **カラーテーマ**: オレンジ（#FF6B35）をメインカラー、ダークモード対応
