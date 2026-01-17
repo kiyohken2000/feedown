@@ -12,6 +12,7 @@ const DashboardPage = () => {
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [articlesError, setArticlesError] = useState(null);
   const [filter, setFilter] = useState('all'); // 'all', 'unread', 'read'
+  const [selectedFeedId, setSelectedFeedId] = useState(''); // '' = All Feeds
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -107,7 +108,7 @@ const DashboardPage = () => {
     }
   }, [api]);
 
-  const fetchArticles = useCallback(async (reset = true) => {
+  const fetchArticles = useCallback(async (reset = true, feedId = null) => {
     if (reset) {
       setArticlesLoading(true);
       // Don't clear articles to keep them visible during refresh
@@ -124,7 +125,8 @@ const DashboardPage = () => {
 
       const response = await api.articles.list({
         limit,
-        offset: currentOffset
+        offset: currentOffset,
+        feedId: feedId || undefined,
       });
 
       if (response.success) {
@@ -195,18 +197,18 @@ const DashboardPage = () => {
         }
 
         // Always fetch articles after refresh to ensure UI is up to date
-        await fetchArticles(true); // reset=true for full reload
+        await fetchArticles(true, selectedFeedId); // reset=true for full reload
       } else {
         // On error, fetch both feeds and articles
         await fetchFeeds();
-        await fetchArticles(true);
+        await fetchArticles(true, selectedFeedId);
       }
     } catch (error) {
       console.error('Failed to refresh:', error);
       setArticlesError('Failed to refresh feeds.');
       setArticlesLoading(false);
     }
-  }, [api, fetchFeeds, fetchArticles, setFeeds]);
+  }, [api, fetchFeeds, fetchArticles, setFeeds, selectedFeedId]);
 
   // Keep ref updated with latest handleRefresh
   handleRefreshRef.current = handleRefresh;
@@ -222,17 +224,17 @@ const DashboardPage = () => {
   useEffect(() => {
     // If we're on dashboard and came from a different page, refresh
     if (location.pathname === '/dashboard' && prevPathRef.current !== '/dashboard') {
-      fetchArticles(true);
+      fetchArticles(true, selectedFeedId);
     }
     prevPathRef.current = location.pathname;
-  }, [location.pathname, fetchArticles]);
+  }, [location.pathname, fetchArticles, selectedFeedId]);
 
   // Refresh when page becomes visible (handles browser tab switching)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         // Re-fetch articles without full refresh (just get latest data)
-        fetchArticles(true);
+        fetchArticles(true, selectedFeedId);
       }
     };
 
@@ -240,7 +242,7 @@ const DashboardPage = () => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchArticles]);
+  }, [fetchArticles, selectedFeedId]);
 
   // Auto-refresh RSS feeds every 15 minutes
   useEffect(() => {
@@ -279,6 +281,17 @@ const DashboardPage = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [filter]);
+
+  // Fetch articles when selected feed changes
+  const prevFeedIdRef = useRef(selectedFeedId);
+  useEffect(() => {
+    // Skip initial render (handled by handleRefresh)
+    if (prevFeedIdRef.current !== selectedFeedId) {
+      fetchArticles(true, selectedFeedId);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    prevFeedIdRef.current = selectedFeedId;
+  }, [selectedFeedId, fetchArticles]);
 
   // Setup Intersection Observer for auto-mark-as-read
   useEffect(() => {
@@ -345,7 +358,7 @@ const DashboardPage = () => {
       (entries) => {
         const [entry] = entries;
         if (entry.isIntersecting && hasMore && !loadingMore && !articlesLoading) {
-          fetchArticles(false);
+          fetchArticles(false, selectedFeedId);
         }
       },
       { threshold: 0.1 }
@@ -360,7 +373,7 @@ const DashboardPage = () => {
         loadMoreObserverRef.current.disconnect();
       }
     };
-  }, [hasMore, loadingMore, articlesLoading]);
+  }, [hasMore, loadingMore, articlesLoading, selectedFeedId]);
 
   const handleMarkAllAsRead = async () => {
     if (articlesLoading) return;
@@ -381,7 +394,7 @@ const DashboardPage = () => {
     try {
       await api.articles.batchMarkAsRead(unreadArticleIds);
       // Refresh articles after marking all as read
-      await fetchArticles(true);
+      await fetchArticles(true, selectedFeedId);
     } catch (error) {
       console.error('Failed to mark all as read:', error);
       // Rollback on error
@@ -506,6 +519,24 @@ const DashboardPage = () => {
     filterGroup: {
       display: 'flex',
       gap: '0.5rem',
+    },
+    leftControls: {
+      display: 'flex',
+      gap: '1rem',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+    },
+    feedSelector: {
+      padding: '0.5rem 1rem',
+      border: '2px solid #FF6B35',
+      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
+      color: isDarkMode ? '#e0e0e0' : '#333',
+      borderRadius: '5px',
+      cursor: 'pointer',
+      fontSize: '0.9rem',
+      fontWeight: '600',
+      minWidth: '150px',
+      maxWidth: '250px',
     },
     filterButton: {
       padding: '0.5rem 1rem',
@@ -676,34 +707,49 @@ const DashboardPage = () => {
       <Navigation unreadCount={unreadCount} />
       <div style={styles.controlsWrapper}>
         <div style={styles.controls}>
-          <div style={styles.filterGroup}>
-            <button
-              onClick={() => setFilter('all')}
-              style={{
-                ...styles.filterButton,
-                ...(filter === 'all' ? styles.activeFilter : {}),
-              }}
+          <div style={styles.leftControls}>
+            <select
+              value={selectedFeedId}
+              onChange={(e) => setSelectedFeedId(e.target.value)}
+              style={styles.feedSelector}
             >
-              All
-            </button>
-            <button
-              onClick={() => setFilter('unread')}
-              style={{
-                ...styles.filterButton,
-                ...(filter === 'unread' ? styles.activeFilter : {}),
-              }}
-            >
-              Unread
-            </button>
-            <button
-              onClick={() => setFilter('read')}
-              style={{
-                ...styles.filterButton,
-                ...(filter === 'read' ? styles.activeFilter : {}),
-              }}
-            >
-              Read
-            </button>
+              <option value="">All Feeds</option>
+              {feeds.map((feed) => (
+                <option key={feed.id} value={feed.id}>
+                  {feed.title || feed.url}
+                </option>
+              ))}
+            </select>
+
+            <div style={styles.filterGroup}>
+              <button
+                onClick={() => setFilter('all')}
+                style={{
+                  ...styles.filterButton,
+                  ...(filter === 'all' ? styles.activeFilter : {}),
+                }}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilter('unread')}
+                style={{
+                  ...styles.filterButton,
+                  ...(filter === 'unread' ? styles.activeFilter : {}),
+                }}
+              >
+                Unread
+              </button>
+              <button
+                onClick={() => setFilter('read')}
+                style={{
+                  ...styles.filterButton,
+                  ...(filter === 'read' ? styles.activeFilter : {}),
+                }}
+              >
+                Read
+              </button>
+            </div>
           </div>
 
           <div style={styles.buttonGroup}>

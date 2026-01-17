@@ -1,7 +1,7 @@
 # FeedOwn 引継ぎドキュメント
 
-**最終更新**: 2026-01-16
-**ステータス**: 全フェーズ完了、App Store / Google Play 公開済み
+**最終更新**: 2026-01-18
+**ステータス**: Phase 13進行中、App Store / Google Play 公開済み
 
 ---
 
@@ -26,6 +26,7 @@ FeedOwnはセルフホスト可能なRSSリーダーです。Web版とモバイ�
 - App Store / Google Play 公開完了
 - ランディングページにモバイルアプリ紹介セクション追加
 - RSSパーサー: RSS 2.0 / RSS 1.0 (RDF) / Atom 対応
+- **フィードごとの記事一覧表示（Web版）**: DashboardPageにフィード選択ドロップダウン追加
 
 ### デプロイ情報
 - **本番URL（Web）**: https://feedown.pages.dev
@@ -91,7 +92,34 @@ npx wrangler pages deploy apps/web/dist --project-name=feedown
 
 ---
 
-## 本日の作業内容（2026-01-16）
+## 本日の作業内容（2026-01-18）
+
+### 1. フィードごとの記事一覧表示（Web版）
+
+**概要**: 特定のフィードの記事のみを表示する機能を追加
+
+**変更ファイル**: `apps/web/src/pages/DashboardPage.jsx`
+
+**実装内容**:
+- `selectedFeedId` stateを追加
+- フィード選択ドロップダウンを追加（All/Unread/Readフィルターの左側）
+- `fetchArticles`に`feedId`パラメータを追加
+- フィード変更時に記事を自動再取得
+- Mark All Read時にも選択中フィードを維持
+
+**UI**:
+```
+[All Feeds ▼]  [All] [Unread] [Read]    [✓ Mark All Read] [🔄 Refresh]
+```
+
+**備考**:
+- APIは既に`feedId`パラメータをサポート済み（`/api/articles?feedId=xxx`）
+- フロントエンドのみの変更で完結
+- Mobile版は未実装（Phase 13で予定）
+
+---
+
+## 以前の作業内容（2026-01-16）
 
 ### 1. モバイルアプリ トークンリフレッシュ機能
 
@@ -331,12 +359,27 @@ apps/mobile/src/
 詳細は `docs/FEATURE_PLAN.md` を参照。
 
 ### 1. フィードごとの記事一覧表示
-特定フィードの記事のみを表示する機能。APIは既に`feedId`パラメータをサポート済み。
 
-**変更予定ファイル:**
-- `apps/web/src/pages/DashboardPage.jsx` - フィード選択UI追加
-- `apps/mobile/src/scenes/feeds/FeedArticles.js` - 新規作成
-- `apps/mobile/src/navigation/FeedsStack.js` - ナビゲーション追加
+#### Web版 ✅ 完了（2026-01-18）
+- `apps/web/src/pages/DashboardPage.jsx` にフィード選択ドロップダウン追加済み
+- 本番デプロイ済み: https://feedown.pages.dev
+
+#### Mobile版 📋 実装待ち
+`react-native-element-dropdown` を使用してArticles画面（Home.js）にドロップダウンを追加する。
+
+**変更予定ファイル（3つのみ）:**
+| ファイル | 変更内容 |
+|---------|----------|
+| `apps/mobile/package.json` | `react-native-element-dropdown` 追加 |
+| `apps/mobile/src/scenes/home/Home.js` | Dropdown追加、selectedFeedId state追加 |
+| `apps/mobile/src/contexts/FeedsContext.js` | `fetchArticles`にfeedIdパラメータ追加 |
+
+**インストールコマンド:**
+```bash
+yarn workspace mobile add react-native-element-dropdown
+```
+
+**実装の詳細は `docs/FEATURE_PLAN.md` の「Mobile版 実装計画」セクションを参照。**
 
 ### 2. 記事の共有機能
 記事をSNSや他アプリに共有する機能。
@@ -506,12 +549,18 @@ cd apps/web && npx wrangler pages dev dist \
 
 ### 環境変数
 
-**フロントエンド** (`apps/web/.env.shared`):
+**フロントエンド** (`apps/web/.env`):
 ```
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_API_BASE_URL=
 ```
+
+**ローカル開発時の注意:**
+- `VITE_API_BASE_URL=` が空の場合、APIリクエストは同じホスト（localhost:5173）に送られる
+- Vite開発サーバーだけではAPIは動かない（Cloudflare Pages Functionsが必要）
+- **簡単な方法**: `VITE_API_BASE_URL=https://feedown.pages.dev` を設定して本番APIを使用
+- wranglerでローカルAPIを起動する場合は空のままでOK
 
 **Cloudflare Pages** (Secrets):
 - `SUPABASE_URL`

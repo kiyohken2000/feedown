@@ -13,10 +13,186 @@
 
 ---
 
-## 1. フィードごとの記事一覧
+## 1. フィードごとの記事一覧 ✅ Web版完了
 
 ### 概要
 特定のフィードの記事のみを表示する機能。現在は全フィードの記事が混在して表示されている。
+
+### 実装済み（2026-01-18）
+
+**Web版**: `apps/web/src/pages/DashboardPage.jsx`にフィード選択ドロップダウンを追加
+- `selectedFeedId` stateで選択中のフィードを管理
+- `fetchArticles`に`feedId`パラメータを渡して絞り込み
+- フィード変更時に自動で記事を再取得
+
+---
+
+### Mobile版 実装計画
+
+#### 概要
+Web版と同じアプローチで、Articles画面（Home.js）にフィード選択ドロップダウンを追加する。
+`react-native-element-dropdown` パッケージを使用。
+
+#### 実装手順
+
+**Step 0: パッケージインストール**
+
+```bash
+# ルートディレクトリから実行
+yarn workspace mobile add react-native-element-dropdown
+```
+
+**Step 1: Home.jsにselectedFeedId stateを追加**
+
+`apps/mobile/src/scenes/home/Home.js`
+
+```javascript
+import { Dropdown } from 'react-native-element-dropdown'
+
+const [selectedFeedId, setSelectedFeedId] = useState('')
+```
+
+**Step 2: FeedsContextのfetchArticlesを修正**
+
+`apps/mobile/src/contexts/FeedsContext.js`
+
+```javascript
+// feedIdパラメータを追加
+const fetchArticles = useCallback(async (reset = true, limit = 50, feedId = null) => {
+  // ...
+  const response = await api.articles.list({
+    limit,
+    offset: currentOffset,
+    feedId: feedId || undefined,  // ← これを追加
+  })
+  // ...
+}, [getApi])
+```
+
+**Step 3: Home.jsにDropdownコンポーネントを追加**
+
+フィルターボタン（All/Unread/Read）の上にドロップダウンを追加：
+
+```javascript
+// ドロップダウン用データを生成
+const feedDropdownData = useMemo(() => [
+  { label: 'All Feeds', value: '' },
+  ...feeds.map(feed => ({
+    label: feed.title || feed.url,
+    value: feed.id,
+  }))
+], [feeds])
+
+// JSX
+<View style={styles.dropdownContainer}>
+  <Dropdown
+    style={styles.dropdown}
+    placeholderStyle={styles.dropdownText}
+    selectedTextStyle={styles.dropdownText}
+    data={feedDropdownData}
+    maxHeight={300}
+    labelField="label"
+    valueField="value"
+    placeholder="All Feeds"
+    value={selectedFeedId}
+    onChange={item => setSelectedFeedId(item.value)}
+  />
+</View>
+```
+
+**Step 4: スタイル追加**
+
+```javascript
+dropdownContainer: {
+  paddingHorizontal: 16,
+  paddingVertical: 8,
+},
+dropdown: {
+  height: 44,
+  borderColor: colors.primary,
+  borderWidth: 2,
+  borderRadius: 8,
+  paddingHorizontal: 12,
+  backgroundColor: theme.card,
+},
+dropdownText: {
+  fontSize: 14,
+  color: theme.text,
+  fontWeight: '600',
+},
+```
+
+**Step 5: fetchArticles呼び出しにselectedFeedIdを渡す**
+
+```javascript
+// handleRefresh
+const handleRefresh = useCallback(async () => {
+  await refreshAll(selectedFeedId)
+}, [refreshAll, selectedFeedId])
+
+// handleLoadMore
+const handleLoadMore = useCallback(async () => {
+  if (!isLoading && hasMore) {
+    await fetchArticles(false, 50, selectedFeedId)
+  }
+}, [isLoading, hasMore, fetchArticles, selectedFeedId])
+```
+
+**Step 6: selectedFeedId変更時に記事を再取得**
+
+```javascript
+// selectedFeedId変更時
+const prevFeedIdRef = useRef(selectedFeedId)
+useEffect(() => {
+  if (prevFeedIdRef.current !== selectedFeedId && user) {
+    fetchArticles(true, 50, selectedFeedId)
+  }
+  prevFeedIdRef.current = selectedFeedId
+}, [selectedFeedId, user, fetchArticles])
+```
+
+#### 変更ファイル一覧
+
+| ファイル | 変更内容 |
+|---------|----------|
+| `apps/mobile/package.json` | `react-native-element-dropdown` 追加 |
+| `scenes/home/Home.js` | Dropdown追加、selectedFeedId state追加 |
+| `contexts/FeedsContext.js` | `fetchArticles`にfeedIdパラメータ追加 |
+
+#### UI設計
+
+```
+┌─────────────────────────────────────┐
+│  ┌─────────────────────────────┐    │
+│  │ All Feeds                 ▼ │    │  ← ドロップダウン
+│  └─────────────────────────────┘    │
+├─────────────────────────────────────┤
+│  [All] [Unread] [Read]  [Mark All]  │  ← 既存のフィルター
+├─────────────────────────────────────┤
+│  記事カード                          │
+│  記事カード                          │
+│  ...                                 │
+└─────────────────────────────────────┘
+
+ドロップダウンをタップすると:
+┌─────────────────────────────────────┐
+│  ┌─────────────────────────────┐    │
+│  │ All Feeds              ✓   │    │
+│  │ TechCrunch                 │    │
+│  │ The Verge                  │    │
+│  │ Engadget                   │    │
+│  │ ...                        │    │
+│  └─────────────────────────────┘    │
+└─────────────────────────────────────┘
+```
+
+#### 備考
+- Web版と同じパターンで実装（新規画面不要）
+- 変更ファイルは3つ（package.json含む）
+- `react-native-element-dropdown` は週間DL 10万超の人気パッケージ
+- ダークモード対応も容易（theme.card, theme.textを使用）
+
+---
 
 ### 現状分析
 
@@ -248,9 +424,9 @@ apps/web/src/components/ArticleModal.jsx        # オプション
 
 ## 実装順序
 
-1. **フィードごとの記事一覧** (低難易度、即効性高)
-   - Mobile: Feeds.js → FeedArticles.js 新規作成
-   - Web: DashboardPage.jsx にフィード選択UI追加
+1. **フィードごとの記事一覧** (低難易度、即効性高) ✅ Web版完了
+   - Mobile: Feeds.js → FeedArticles.js 新規作成（未実装）
+   - Web: DashboardPage.jsx にフィード選択UI追加 ✅
 
 2. **記事の共有** (低難易度、ユーザー価値高)
    - Mobile: ArticleDetail.js に Share ボタン追加

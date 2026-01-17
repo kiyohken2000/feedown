@@ -360,14 +360,14 @@ npm test
 
 ---
 
-## Phase 13: 機能拡張（計画中）
+## Phase 13: 機能拡張
 
 詳細は `docs/FEATURE_PLAN.md` を参照
 
-### 1. フィードごとの記事一覧表示
-- [ ] Web: DashboardPageにフィード選択UI追加
+### 1. フィードごとの記事一覧表示 ✅ Web版完了
+- [x] Web: DashboardPageにフィード選択ドロップダウン追加
 - [ ] Mobile: FeedArticles画面新規作成
-- [ ] 既存APIで対応可能（feedIdパラメータ）
+- [x] 既存APIで対応可能（feedIdパラメータ）
 
 ### 2. 記事の共有機能
 - [ ] Mobile: ArticleDetailにShareボタン追加
