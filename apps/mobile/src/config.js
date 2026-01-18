@@ -5,6 +5,6 @@ const dummyUser = {
   userName: 'abcdef'
 }
 
-const appVersion = '1.0.1'
+const appVersion = '1.0.2'
 
 export { dummyUser, isAutoLogin, appVersion }

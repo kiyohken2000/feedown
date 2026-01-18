@@ -26,8 +26,10 @@ FeedOwnはセルフホスト可能なRSSリーダーです。Web版とモバイ�
 - App Store / Google Play 公開完了
 - ランディングページにモバイルアプリ紹介セクション追加
 - RSSパーサー: RSS 2.0 / RSS 1.0 (RDF) / Atom 対応
-- **フィードごとの記事一覧表示（Web版）**: DashboardPageにフィード選択ドロップダウン追加
+- **フィードごとの記事一覧表示**: Web/Mobile両方でフィード選択ドロップダウン追加
 - **OPMLインポート/エクスポート（Web版）**: FeedsPageでOPML形式のインポート・エクスポートに対応
+- **記事の共有機能（Mobile版）**: ArticleDetailヘッダーにShareボタン追加
+- **フォントサイズ変更（Mobile版）**: Reader Modeのフォントサイズを設定画面から変更可能
 
 ### デプロイ情報
 - **本番URL（Web）**: https://feedown.pages.dev
@@ -170,6 +172,44 @@ Your Feeds (N)                    [Import OPML] [Export OPML]
 - Dashboardボタン: Mark All Read(✓)、Refresh(🔄)、Top(↑)
 - 記事モーダルボタン: Mark as Read(✓)、Add to Favorites(☆/★)、Visit Original(↗)
 - 「Top」ボタンでスクロール位置を一番上に戻す機能を追加
+
+### 5. Mobile版 フィードごとの記事一覧表示
+
+**概要**: Home画面でフィードを選択して記事をフィルタリングする機能を追加
+
+**変更ファイル**:
+- `apps/mobile/package.json`: `react-native-element-dropdown` 追加
+- `apps/mobile/src/scenes/home/Home.js`: ドロップダウン追加
+
+**実装内容**:
+- ヘッダー右側にフィード選択ドロップダウンを追加
+- 「All Feeds」または特定のフィードを選択可能
+- 選択したフィードの記事のみ表示
+
+### 6. Mobile版 記事の共有機能
+
+**概要**: 記事詳細画面から記事をシェアする機能を追加
+
+**変更ファイル**: `apps/mobile/src/scenes/article/ArticleDetail.js`
+
+**実装内容**:
+- ヘッダーに「Share」ボタンを追加
+- React Native の Share モジュールを使用
+- タイトルとURLを共有
+
+### 7. Mobile版 フォントサイズ変更
+
+**概要**: Reader Modeのフォントサイズを設定画面から変更可能にする機能を追加
+
+**変更ファイル**:
+- `apps/mobile/src/contexts/ThemeContext.js`: fontSize設定を追加（Small/Medium/Large/Extra Large）
+- `apps/mobile/src/components/ArticleReader.js`: 動的フォントサイズを適用
+- `apps/mobile/src/scenes/profile/Profile.js`: 「Reader」セクションにフォントサイズ選択UI追加
+
+**実装内容**:
+- ThemeContextに`readerFontSize`、`setFontSize`、`getFontSizeConfig`を追加
+- AsyncStorageに設定を永続化
+- Profile画面に4つのサイズオプションを表示（ボタン式）
 
 ---
 

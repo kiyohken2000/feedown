@@ -13,7 +13,7 @@ import {
 import { colors, fontSize, getThemeColors } from '../../theme'
 import { UserContext } from '../../contexts/UserContext'
 import { FeedsContext } from '../../contexts/FeedsContext'
-import { useTheme } from '../../contexts/ThemeContext'
+import { useTheme, FONT_SIZE_OPTIONS } from '../../contexts/ThemeContext'
 import { createApiClient } from '../../utils/api'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
@@ -29,7 +29,7 @@ const isTestAccount = (email) => {
 export default function Profile() {
   const { user, signOut, getAccessToken, serverUrl } = useContext(UserContext)
   const { feeds, articles, getUnreadCount, resetAll } = useContext(FeedsContext)
-  const { isDarkMode, toggleDarkMode } = useTheme()
+  const { isDarkMode, toggleDarkMode, readerFontSize, setFontSize } = useTheme()
   const theme = getThemeColors(isDarkMode)
   const [isLoading, setIsLoading] = useState(false)
   const isTestUser = isTestAccount(user?.email)
@@ -179,6 +179,40 @@ export default function Profile() {
                 trackColor={{ false: '#767577', true: colors.primary }}
                 thumbColor={isDarkMode ? colors.white : '#f4f3f4'}
               />
+            </View>
+          </View>
+        </View>
+
+        {/* Reader Settings */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Reader</Text>
+          <View style={[styles.card, { backgroundColor: theme.card }]}>
+            <Text style={[styles.toggleLabel, { color: theme.text, marginBottom: 8 }]}>Font Size</Text>
+            <Text style={[styles.toggleDescription, { color: theme.textMuted, marginBottom: 12 }]}>
+              Adjust text size in Reader Mode
+            </Text>
+            <View style={styles.fontSizeOptions}>
+              {Object.entries(FONT_SIZE_OPTIONS).map(([key, option]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.fontSizeButton,
+                    { borderColor: theme.border },
+                    readerFontSize === key && styles.fontSizeButtonActive,
+                  ]}
+                  onPress={() => setFontSize(key)}
+                >
+                  <Text
+                    style={[
+                      styles.fontSizeButtonText,
+                      { color: theme.text },
+                      readerFontSize === key && styles.fontSizeButtonTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         </View>
@@ -444,5 +478,28 @@ const styles = StyleSheet.create({
     fontSize: fontSize.small,
     color: colors.gray,
     marginTop: 4,
+  },
+  fontSizeOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  fontSizeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.grayLight,
+  },
+  fontSizeButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  fontSizeButtonText: {
+    fontSize: fontSize.small,
+    fontWeight: '500',
+  },
+  fontSizeButtonTextActive: {
+    color: colors.white,
   },
 })

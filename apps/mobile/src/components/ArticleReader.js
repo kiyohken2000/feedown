@@ -13,16 +13,17 @@ import { useTheme } from '../contexts/ThemeContext'
 
 export default function ArticleReader({ article, onLinkPress }) {
   const { width } = useWindowDimensions()
-  const { isDarkMode } = useTheme()
+  const { isDarkMode, getFontSizeConfig } = useTheme()
   const theme = getThemeColors(isDarkMode)
+  const fontConfig = getFontSizeConfig()
   const contentWidth = width - 32
 
   // Define tag styles for rendering HTML
   const tagsStyles = useMemo(() => ({
     body: {
       color: theme.text,
-      fontSize: 17,
-      lineHeight: 28,
+      fontSize: fontConfig.bodySize,
+      lineHeight: fontConfig.lineHeight,
     },
     p: {
       marginBottom: 16,
@@ -137,7 +138,7 @@ export default function ArticleReader({ article, onLinkPress }) {
     em: {
       fontStyle: 'italic',
     },
-  }), [theme, isDarkMode])
+  }), [theme, isDarkMode, fontConfig])
 
   // Custom renderers for specific tags
   const renderers = useMemo(() => ({

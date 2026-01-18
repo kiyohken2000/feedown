@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { useNavigation, useFocusEffect } from '@react-navigation/native'
+import { Dropdown } from 'react-native-element-dropdown'
 import { colors, fontSize, getThemeColors } from '../../theme'
 import { FeedsContext } from '../../contexts/FeedsContext'
 import { UserContext } from '../../contexts/UserContext'
@@ -37,6 +38,7 @@ export default function Home() {
   } = useContext(FeedsContext)
 
   const [filter, setFilter] = useState('all') // 'all', 'unread', 'read'
+  const [selectedFeedId, setSelectedFeedId] = useState(null) // null = All Feeds
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false)
   const isFirstFocus = useRef(true)
   const fetchArticlesRef = useRef(fetchArticles)
@@ -75,17 +77,33 @@ export default function Home() {
     }
   }, [error])
 
-  // Filter articles based on selected filter
+  // Feed dropdown options
+  const feedOptions = useMemo(() => {
+    const options = [{ label: 'All Feeds', value: null }]
+    feeds.forEach(feed => {
+      options.push({ label: feed.title || feed.url, value: feed.id })
+    })
+    return options
+  }, [feeds])
+
+  // Filter articles based on selected filter and feed
   const filteredArticles = useMemo(() => {
-    if (filter === 'all') {
-      return articles
-    } else if (filter === 'unread') {
-      return articles.filter(article => !readArticles.has(article.id))
-    } else if (filter === 'read') {
-      return articles.filter(article => readArticles.has(article.id))
+    let result = articles
+
+    // Filter by feed
+    if (selectedFeedId) {
+      result = result.filter(article => article.feedId === selectedFeedId)
     }
-    return articles
-  }, [articles, filter, readArticles])
+
+    // Filter by read status
+    if (filter === 'unread') {
+      result = result.filter(article => !readArticles.has(article.id))
+    } else if (filter === 'read') {
+      result = result.filter(article => readArticles.has(article.id))
+    }
+
+    return result
+  }, [articles, filter, readArticles, selectedFeedId])
 
   // Calculate unread count
   const unreadCount = useMemo(() => {
@@ -280,11 +298,28 @@ export default function Home() {
     <ScreenTemplate>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <Text style={styles.headerTitle}>FeedOwn</Text>
-        {unreadCount > 0 && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadText}>{unreadCount} unread</Text>
-          </View>
-        )}
+        <View style={styles.headerRight}>
+          <Dropdown
+            style={[styles.feedDropdown, { backgroundColor: theme.card, borderColor: theme.border }]}
+            placeholderStyle={[styles.feedDropdownText, { color: theme.text }]}
+            selectedTextStyle={[styles.feedDropdownText, { color: theme.text }]}
+            containerStyle={[styles.feedDropdownList, { backgroundColor: theme.card }]}
+            itemTextStyle={{ color: theme.text }}
+            activeColor={isDarkMode ? '#333' : '#f0f0f0'}
+            data={feedOptions}
+            maxHeight={300}
+            labelField="label"
+            valueField="value"
+            placeholder="All Feeds"
+            value={selectedFeedId}
+            onChange={item => setSelectedFeedId(item.value)}
+          />
+          {unreadCount > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadText}>{unreadCount} unread</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Filter and Actions Bar */}
@@ -369,14 +404,36 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.grayLight,
   },
+  // Feed dropdown
+  feedDropdown: {
+    width: 120,
+    height: 32,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+  },
+  feedDropdownText: {
+    fontSize: fontSize.small,
+  },
+  feedDropdownList: {
+    borderRadius: 8,
+    marginTop: 4,
+    width: 180,
+    marginLeft: -60,
+  },
   headerTitle: {
     fontSize: fontSize.xxLarge,
     fontWeight: 'bold',
     color: colors.primary,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   unreadBadge: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },

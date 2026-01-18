@@ -4,6 +4,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 const ThemeContext = createContext()
 
 const THEME_KEY = '@feedown_theme'
+const FONT_SIZE_KEY = '@feedown_font_size'
+
+// Font size options
+export const FONT_SIZE_OPTIONS = {
+  small: { label: 'Small', bodySize: 15, lineHeight: 24 },
+  medium: { label: 'Medium', bodySize: 17, lineHeight: 28 },
+  large: { label: 'Large', bodySize: 19, lineHeight: 32 },
+  xlarge: { label: 'Extra Large', bodySize: 21, lineHeight: 36 },
+}
 
 export const useTheme = () => {
   const context = useContext(ThemeContext)
@@ -15,23 +24,30 @@ export const useTheme = () => {
 
 export const ThemeProvider = ({ children }) => {
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [readerFontSize, setReaderFontSize] = useState('medium')
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load saved theme on mount
+  // Load saved theme and font size on mount
   useEffect(() => {
-    const loadTheme = async () => {
+    const loadSettings = async () => {
       try {
-        const savedTheme = await AsyncStorage.getItem(THEME_KEY)
+        const [savedTheme, savedFontSize] = await Promise.all([
+          AsyncStorage.getItem(THEME_KEY),
+          AsyncStorage.getItem(FONT_SIZE_KEY),
+        ])
         if (savedTheme !== null) {
           setIsDarkMode(savedTheme === 'true')
         }
+        if (savedFontSize !== null && FONT_SIZE_OPTIONS[savedFontSize]) {
+          setReaderFontSize(savedFontSize)
+        }
       } catch (error) {
-        console.error('Failed to load theme:', error)
+        console.error('Failed to load settings:', error)
       } finally {
         setIsLoading(false)
       }
     }
-    loadTheme()
+    loadSettings()
   }, [])
 
   // Save theme when it changes
@@ -43,13 +59,35 @@ export const ThemeProvider = ({ children }) => {
     }
   }, [isDarkMode, isLoading])
 
+  // Save font size when it changes
+  useEffect(() => {
+    if (!isLoading) {
+      AsyncStorage.setItem(FONT_SIZE_KEY, readerFontSize).catch((error) => {
+        console.error('Failed to save font size:', error)
+      })
+    }
+  }, [readerFontSize, isLoading])
+
   const toggleDarkMode = () => {
     setIsDarkMode((prev) => !prev)
+  }
+
+  const setFontSize = (size) => {
+    if (FONT_SIZE_OPTIONS[size]) {
+      setReaderFontSize(size)
+    }
+  }
+
+  const getFontSizeConfig = () => {
+    return FONT_SIZE_OPTIONS[readerFontSize] || FONT_SIZE_OPTIONS.medium
   }
 
   const value = {
     isDarkMode,
     toggleDarkMode,
+    readerFontSize,
+    setFontSize,
+    getFontSizeConfig,
     isLoading,
   }
 

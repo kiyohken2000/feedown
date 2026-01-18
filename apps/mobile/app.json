@@ -7,7 +7,7 @@
       "ios",
       "android"
     ],
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/AppIcon_2.png",
     "splash": {
@@ -30,7 +30,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "net.votepurchase.feedown",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Use the photo library to change your avatar.",
         "CFBundleDevelopmentRegion": "ja_JP",
@@ -40,7 +40,7 @@
     },
     "android": {
       "package": "net.votepurchase.feedown",
-      "versionCode": 2,
+      "versionCode": 3,
       "userInterfaceStyle": "automatic",
       "permissions": [
         "VIBRATE",

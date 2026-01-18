@@ -8,6 +8,7 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Share,
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { colors, fontSize, getThemeColors } from '../../theme'
@@ -125,6 +126,19 @@ export default function ArticleDetail() {
     Linking.openURL(url)
   }, [])
 
+  // Handle share
+  const handleShare = useCallback(async () => {
+    try {
+      await Share.share({
+        message: `${article.title}\n\n${article.url}`,
+        url: article.url,
+        title: article.title,
+      })
+    } catch (err) {
+      console.error('Share error:', err)
+    }
+  }, [article.title, article.url])
+
   // Get relative time string
   const getRelativeTime = (dateString) => {
     if (!dateString) return ''
@@ -156,11 +170,16 @@ export default function ArticleDetail() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
-        {readerMode && (
-          <TouchableOpacity onPress={handleReaderMode} style={styles.exitReaderButton}>
-            <Text style={[styles.exitReaderText, { color: theme.textMuted }]}>Exit Reader</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleShare} style={styles.shareButton}>
+            <Text style={styles.shareButtonText}>Share</Text>
           </TouchableOpacity>
-        )}
+          {readerMode && (
+            <TouchableOpacity onPress={handleReaderMode} style={styles.exitReaderButton}>
+              <Text style={[styles.exitReaderText, { color: theme.textMuted }]}>Exit Reader</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Reader Mode View */}
@@ -290,6 +309,22 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: fontSize.normal,
     color: colors.primary,
+    fontWeight: '600',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  shareButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    backgroundColor: colors.primary,
+    borderRadius: 6,
+  },
+  shareButtonText: {
+    fontSize: fontSize.small,
+    color: colors.white,
     fontWeight: '600',
   },
   exitReaderButton: {

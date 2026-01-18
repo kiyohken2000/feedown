@@ -364,9 +364,9 @@ npm test
 
 詳細は `docs/FEATURE_PLAN.md` を参照
 
-### 1. フィードごとの記事一覧表示 ✅ Web版完了
+### 1. フィードごとの記事一覧表示 ✅ 完了
 - [x] Web: DashboardPageにフィード選択ドロップダウン追加
-- [ ] Mobile: FeedArticles画面新規作成
+- [x] Mobile: Home.jsヘッダーにフィード選択ドロップダウン追加
 - [x] 既存APIで対応可能（feedIdパラメータ）
 
 ### 2. OPMLインポート/エクスポート ✅ Web版完了
@@ -374,16 +374,16 @@ npm test
 - [x] フロントエンドのみで完結（既存APIを使用）
 - Mobile: 未実装（ファイル操作が煩雑なため不要と判断）
 
-### 3. 記事の共有機能
-- [ ] Mobile: ArticleDetailにShareボタン追加
-- [ ] Mobile: ArticleReaderにShareボタン追加
-- [ ] Web: ArticleModalにShare/Copyボタン追加
+### 3. 記事の共有機能 ✅ Mobile版完了
+- [x] Mobile: ArticleDetailヘッダーにShareボタン追加
+- Web: 不要と判断
 
-### 4. フォントサイズ/フォント変更
-- [ ] Mobile: ThemeContext拡張（fontSize, fontFamily）
-- [ ] Mobile: ArticleReaderの動的スタイル対応
-- [ ] Mobile: Profile画面に設定UI追加
-- [ ] Web: オプション（Mobile実装後に検討）
+### 4. フォントサイズ変更 ✅ Mobile版完了
+- [x] Mobile: ThemeContext拡張（fontSize設定追加）
+- [x] Mobile: ArticleReaderの動的スタイル対応
+- [x] Mobile: Profile画面に設定UI追加（Small/Medium/Large/Extra Large）
+- Web: 不要と判断
+- フォント変更: 不要と判断（Mobile/Web両方）
 
 ---
 

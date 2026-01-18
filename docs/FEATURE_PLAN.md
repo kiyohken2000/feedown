@@ -4,16 +4,16 @@
 
 以下の機能を実装予定:
 
-| 機能 | 難易度 | 優先度 |
-|------|--------|--------|
-| フィードごとの記事一覧 | 低 | 1 |
-| 記事の共有 | 低 | 2 |
-| フォントサイズ/フォント変更 | 中 | 3 |
-| バックグラウンド自動更新 | 高 | 4 |
+| 機能 | 難易度 | 優先度 | 状態 |
+|------|--------|--------|------|
+| フィードごとの記事一覧 | 低 | 1 | ✅ 完了 |
+| 記事の共有 | 低 | 2 | ✅ Mobile完了 |
+| フォントサイズ変更 | 中 | 3 | ✅ Mobile完了 |
+| バックグラウンド自動更新 | 高 | 4 | 未実装 |
 
 ---
 
-## 1. フィードごとの記事一覧 ✅ Web版完了
+## 1. フィードごとの記事一覧 ✅ 完了
 
 ### 概要
 特定のフィードの記事のみを表示する機能。現在は全フィードの記事が混在して表示されている。
@@ -25,9 +25,16 @@
 - `fetchArticles`に`feedId`パラメータを渡して絞り込み
 - フィード変更時に自動で記事を再取得
 
+**Mobile版**: `apps/mobile/src/scenes/home/Home.js`にフィード選択ドロップダウンを追加
+- `react-native-element-dropdown` パッケージを使用
+- ヘッダー右側にドロップダウンを配置
+- `selectedFeedId` stateで選択中のフィードを管理
+- フィード変更時に自動で記事を再取得
+- ダークモード対応
+
 ---
 
-### Mobile版 実装計画
+### Mobile版 実装詳細（参考用）
 
 #### 概要
 Web版と同じアプローチで、Articles画面（Home.js）にフィード選択ドロップダウンを追加する。
@@ -259,29 +266,17 @@ apps/mobile/src/contexts/FeedsContext.js     # selectedFeedId追加
 
 ---
 
-## 2. 記事の共有
+## 2. 記事の共有 ✅ Mobile版完了
 
 ### 概要
 記事をSNSや他アプリに共有する機能。
 
-### 現状分析
+### 実装済み（2026-01-18）
 
-**Web:**
-- `ArticleModal.jsx` に「元の記事を読む」ボタンあり
-- 共有機能なし
-
-**Mobile:**
-- `ArticleDetail.js` に「元の記事を読む」ボタンあり
-- 共有機能なし
-- React Native の `Share` API 利用可能
-
-### 実装計画
-
-#### Mobile (apps/mobile) - 優先
-
-1. **ArticleDetail.js の修正**
-   - 共有ボタンを追加（ヘッダーまたは本文下）
-   - React Native `Share` API を使用
+**Mobile版**: `apps/mobile/src/scenes/article/ArticleDetail.js`にShareボタンを追加
+- ヘッダー右側にShareアイコンボタンを配置
+- React Native の `Share` API を使用
+- 記事タイトルとURLを共有
 
 ```javascript
 import { Share } from 'react-native';
@@ -289,9 +284,9 @@ import { Share } from 'react-native';
 const handleShare = async () => {
   try {
     await Share.share({
+      message: `${article.title}\n\n${article.url}`,
+      url: article.url,
       title: article.title,
-      message: `${article.title}\n${article.url}`,
-      url: article.url, // iOS only
     });
   } catch (error) {
     console.error('Share error:', error);
@@ -299,37 +294,13 @@ const handleShare = async () => {
 };
 ```
 
-2. **ArticleReader.js の修正**
-   - リーダーモードにも共有ボタンを追加
-
-#### Web (apps/web)
-
-1. **ArticleModal.jsx の修正**
-   - 共有ボタンを追加
-   - Web Share API（対応ブラウザ）またはコピーボタン
-
-```javascript
-const handleShare = async () => {
-  if (navigator.share) {
-    await navigator.share({
-      title: article.title,
-      url: article.url,
-    });
-  } else {
-    // Fallback: copy to clipboard
-    await navigator.clipboard.writeText(article.url);
-    alert('URLをコピーしました');
-  }
-};
-```
+**Web版**: 実装不要
+- ユーザー要件によりWeb版での共有機能は不要
 
 ### 変更ファイル
 
 ```
 apps/mobile/src/scenes/article/ArticleDetail.js  # 共有ボタン追加
-apps/mobile/src/components/ArticleReader.js      # 共有ボタン追加
-
-apps/web/src/components/ArticleModal.jsx         # 共有ボタン追加
 ```
 
 ### API変更
@@ -337,73 +308,35 @@ apps/web/src/components/ArticleModal.jsx         # 共有ボタン追加
 
 ---
 
-## 3. フォントサイズ/フォント変更
+## 3. フォントサイズ変更 ✅ Mobile版完了
 
 ### 概要
-リーダーモードのフォントサイズとフォントファミリーをカスタマイズ可能にする。
+リーダーモードのフォントサイズをカスタマイズ可能にする。
 
-### 現状分析
+### 実装済み（2026-01-18）
 
-**Mobile:**
-- `ArticleReader.js` で `react-native-render-html` 使用
-- フォントサイズはハードコード（body: 17px）
-- `ThemeContext.js` はダークモードのみ管理
-
-**Web:**
-- `ArticleModal.jsx` で記事プレビュー表示
-- 本格的なリーダーモードはなし
-- `ThemeContext.jsx` はダークモードのみ管理
-
-### 実装計画
-
-#### Mobile (apps/mobile) - 優先
-
-1. **ThemeContext.js の拡張**
+**Mobile版**: フォントサイズ設定を実装
+- `ThemeContext.js`に`readerFontSize` stateを追加
+- 4段階のサイズオプション（Small, Medium, Large, Extra Large）
+- AsyncStorageに永続化（`@feedown_readerFontSize`）
+- `ArticleReader.js`で動的にフォントサイズを適用
+- `Profile.js`に設定UIを追加（Readerセクション）
 
 ```javascript
-// 追加するstate
-const [fontSize, setFontSize] = useState('medium'); // small, medium, large, xlarge
-const [fontFamily, setFontFamily] = useState('default'); // default, serif, mono
-
-// フォントサイズマッピング
-const fontSizeMap = {
-  small: { body: 14, h1: 22, h2: 18, h3: 16 },
-  medium: { body: 17, h1: 26, h2: 22, h3: 19 },
-  large: { body: 20, h1: 30, h2: 26, h3: 22 },
-  xlarge: { body: 24, h1: 36, h2: 30, h3: 26 },
-};
-
-// フォントファミリーマッピング
-const fontFamilyMap = {
-  default: Platform.OS === 'ios' ? 'System' : 'Roboto',
-  serif: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-  mono: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-};
+// ThemeContext.js
+export const FONT_SIZE_OPTIONS = {
+  small: { label: 'Small', bodySize: 15, lineHeight: 24 },
+  medium: { label: 'Medium', bodySize: 17, lineHeight: 28 },
+  large: { label: 'Large', bodySize: 19, lineHeight: 32 },
+  xlarge: { label: 'Extra Large', bodySize: 21, lineHeight: 36 },
+}
 ```
 
-2. **AsyncStorage への永続化**
-   - `@feedown_fontSize`
-   - `@feedown_fontFamily`
+**フォントファミリー変更**: 実装不要
+- ユーザー要件によりフォント変更機能は不要
 
-3. **ArticleReader.js の修正**
-   - ThemeContext からフォント設定を取得
-   - `tagsStyles` を動的に生成
-
-4. **Profile.js に設定UIを追加**
-   - フォントサイズ選択（4段階）
-   - フォントファミリー選択（3種類）
-   - プレビュー表示
-
-#### Web (apps/web) - オプション
-
-1. **ThemeContext.jsx の拡張**
-   - 同様にフォント設定を追加
-   - localStorage に永続化
-
-2. **SettingsPage.jsx に設定UIを追加**
-
-3. **ArticleModal.jsx の修正**
-   - フォント設定を適用
+**Web版**: 実装不要
+- ユーザー要件によりWeb版でのフォントサイズ変更は不要
 
 ### 変更ファイル
 
@@ -411,10 +344,6 @@ const fontFamilyMap = {
 apps/mobile/src/contexts/ThemeContext.js        # フォント設定state追加
 apps/mobile/src/components/ArticleReader.js     # 動的スタイル適用
 apps/mobile/src/scenes/profile/Profile.js       # 設定UI追加
-
-apps/web/src/contexts/ThemeContext.jsx          # オプション
-apps/web/src/pages/SettingsPage.jsx             # オプション
-apps/web/src/components/ArticleModal.jsx        # オプション
 ```
 
 ### API変更
@@ -424,17 +353,18 @@ apps/web/src/components/ArticleModal.jsx        # オプション
 
 ## 実装順序
 
-1. **フィードごとの記事一覧** (低難易度、即効性高) ✅ Web版完了
-   - Mobile: Feeds.js → FeedArticles.js 新規作成（未実装）
+1. **フィードごとの記事一覧** ✅ 完了（2026-01-18）
    - Web: DashboardPage.jsx にフィード選択UI追加 ✅
+   - Mobile: Home.js にフィード選択ドロップダウン追加 ✅
 
-2. **記事の共有** (低難易度、ユーザー価値高)
-   - Mobile: ArticleDetail.js に Share ボタン追加
-   - Web: ArticleModal.jsx に Share/Copy ボタン追加
+2. **記事の共有** ✅ Mobile版完了（2026-01-18）
+   - Mobile: ArticleDetail.js に Share ボタン追加 ✅
+   - Web: 不要（ユーザー要件）
 
-3. **フォントサイズ/フォント変更** (中難易度、カスタマイズ性向上)
-   - Mobile: ThemeContext 拡張 → ArticleReader 修正 → Profile UI追加
-   - Web: オプション（Mobileで様子見）
+3. **フォントサイズ変更** ✅ Mobile版完了（2026-01-18）
+   - Mobile: ThemeContext 拡張 → ArticleReader 修正 → Profile UI追加 ✅
+   - Web: 不要（ユーザー要件）
+   - フォント変更: 不要（ユーザー要件）
 
 ---
 
@@ -574,8 +504,18 @@ functions/api/cron/refresh.ts  # 新規作成
 
 ## 注意事項
 
-- 1〜3の機能はバックエンド変更不要
-- 4はバックエンド（Worker または GitHub Actions）の追加が必要
+- 1〜3の機能はバックエンド変更不要 → **全て完了**
+- 4はバックエンド（Worker または GitHub Actions）の追加が必要 → **未実装**
 - モバイルファーストで実装（15年以上RSSリーダーを使っているユーザー向け）
 - シンプルさを重視（過度な機能追加を避ける）
 - 各機能は独立しているため、個別にリリース可能
+
+## 完了サマリー（2026-01-18）
+
+| 機能 | Web | Mobile | 備考 |
+|------|-----|--------|------|
+| フィードごとの記事一覧 | ✅ | ✅ | 両プラットフォーム完了 |
+| 記事の共有 | - | ✅ | Web版は不要 |
+| フォントサイズ変更 | - | ✅ | Web版は不要 |
+| フォント変更 | - | - | 実装不要 |
+| バックグラウンド自動更新 | - | - | 今後検討 |
