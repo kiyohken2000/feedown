@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FaTimes } from 'react-icons/fa';
 import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
@@ -110,6 +111,16 @@ const FavoritesPage = () => {
     }
   };
 
+  const handleRemoveFavoriteFromList = async (e, articleId) => {
+    e.stopPropagation(); // Prevent card click
+    try {
+      await api.articles.removeFromFavorites(articleId);
+      await fetchFavorites();
+    } catch (error) {
+      console.error('Failed to remove from favorites:', error);
+    }
+  };
+
   const getRelativeTime = (dateString) => {
     if (!dateString) return 'Unknown date';
 
@@ -181,6 +192,24 @@ const FavoritesPage = () => {
       cursor: 'pointer',
       display: 'flex',
       gap: '1.5rem',
+      position: 'relative',
+    },
+    removeButton: {
+      position: 'absolute',
+      top: '0.75rem',
+      right: '0.75rem',
+      backgroundColor: isDarkMode ? '#444' : '#e0e0e0',
+      color: isDarkMode ? '#b0b0b0' : '#666',
+      border: 'none',
+      borderRadius: '50%',
+      width: '28px',
+      height: '28px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      fontSize: '0.85rem',
     },
     articleImage: {
       width: '200px',
@@ -311,6 +340,21 @@ const FavoritesPage = () => {
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
+                  <button
+                    style={styles.removeButton}
+                    onClick={(e) => handleRemoveFavoriteFromList(e, favorite.articleId)}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = '#dc3545';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#444' : '#e0e0e0';
+                      e.currentTarget.style.color = isDarkMode ? '#b0b0b0' : '#666';
+                    }}
+                    title="Remove from favorites"
+                  >
+                    <FaTimes />
+                  </button>
                   {favorite.imageUrl ? (
                     <img
                       src={favorite.imageUrl}

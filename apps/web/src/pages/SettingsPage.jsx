@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FaSignOutAlt, FaMoon, FaSun, FaExclamationTriangle, FaTrash } from 'react-icons/fa';
 import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
@@ -169,6 +170,17 @@ const SettingsPage = () => {
       fontSize: '1rem',
       fontWeight: '600',
       transition: 'background-color 0.3s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+    },
+    buttonIcon: {
+      fontSize: '0.9rem',
+    },
+    themeIcon: {
+      fontSize: '1.2rem',
+      marginRight: '0.75rem',
+      color: isDarkMode ? '#ffc107' : '#FF6B35',
     },
     dangerButton: {
       backgroundColor: '#dc3545',
@@ -270,7 +282,10 @@ const SettingsPage = () => {
         <div style={styles.card}>
           <h2 style={styles.sectionHeading}>Appearance</h2>
           <div style={styles.infoRow}>
-            <span style={styles.label}>Dark Mode</span>
+            <span style={{ ...styles.label, display: 'flex', alignItems: 'center' }}>
+              {isDarkMode ? <FaMoon style={styles.themeIcon} /> : <FaSun style={styles.themeIcon} />}
+              Dark Mode
+            </span>
             <div
               style={styles.toggleSwitch}
               onClick={toggleDarkMode}
@@ -299,14 +314,17 @@ const SettingsPage = () => {
 
         <div style={styles.card}>
           <h2 style={styles.sectionHeading}>Actions</h2>
-          <button
-            onClick={handleLogout}
-            style={{ ...styles.button, ...styles.dangerButton }}
-            onMouseOver={(e) => (e.target.style.backgroundColor = '#c82333')}
-            onMouseOut={(e) => (e.target.style.backgroundColor = '#dc3545')}
-          >
-            Logout
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <button
+              onClick={handleLogout}
+              style={{ ...styles.button, ...styles.dangerButton }}
+              onMouseOver={(e) => (e.target.style.backgroundColor = '#c82333')}
+              onMouseOut={(e) => (e.target.style.backgroundColor = '#dc3545')}
+            >
+              <FaSignOutAlt style={styles.buttonIcon} />
+              Logout
+            </button>
+          </div>
         </div>
 
         <div style={styles.card}>
@@ -327,6 +345,7 @@ const SettingsPage = () => {
                 onMouseOver={(e) => (e.target.style.backgroundColor = '#e68900')}
                 onMouseOut={(e) => (e.target.style.backgroundColor = '#ff9800')}
               >
+                <FaExclamationTriangle style={styles.buttonIcon} />
                 Clear Data
               </button>
             </div>
@@ -344,6 +363,7 @@ const SettingsPage = () => {
                 onMouseOver={(e) => (e.target.style.backgroundColor = '#a00000')}
                 onMouseOut={(e) => (e.target.style.backgroundColor = '#c82333')}
               >
+                <FaTrash style={styles.buttonIcon} />
                 Delete Account
               </button>
             </div>

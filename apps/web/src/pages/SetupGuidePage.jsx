@@ -380,8 +380,8 @@ git --version`}
                 </ul>
               </li>
             </ol>
-            <ImageZoom src={supabaseDashboard1} alt="Supabase Dashboard" style={styles.screenshot} />
-            <p style={styles.screenshotCaption}>{language === 'en' ? 'Supabase Dashboard - Create New Project' : 'Supabaseダッシュボード - 新規プロジェクト作成'}</p>
+            <ImageZoom src={supabaseDashboard1} alt="Supabase API Settings" style={styles.screenshot} />
+            <p style={styles.screenshotCaption}>{language === 'en' ? 'Supabase Dashboard - API Settings' : 'Supabaseダッシュボード - API設定'}</p>
 
             <div style={styles.stepTitle}>
               <span style={styles.stepNumber}>2</span>
@@ -392,7 +392,7 @@ git --version`}
                 ? 'Open SQL Editor in Supabase dashboard and run the following SQL:'
                 : 'Supabaseダッシュボードの「SQL Editor」を開き、以下のSQLを実行:'}
             </p>
-            <ImageZoom src={supabaseDashboard2} alt="Supabase SQL Editor" style={styles.screenshot} />
+            <ImageZoom src={supabaseDashboard3} alt="Supabase SQL Editor" style={styles.screenshot} />
             <p style={styles.screenshotCaption}>{language === 'en' ? 'SQL Editor - Run the schema creation SQL' : 'SQL Editor - スキーマ作成SQLを実行'}</p>
             <div style={styles.codeBlock}>
               <code style={styles.code}>
@@ -514,8 +514,8 @@ CREATE POLICY "Anyone can read active recommended feeds" ON recommended_feeds
                 ? 'Go to Settings → API and note down:'
                 : 'Settings → API に移動して以下をメモ:'}
             </p>
-            <ImageZoom src={supabaseDashboard3} alt="Supabase API Settings" style={styles.screenshot} />
-            <p style={styles.screenshotCaption}>{language === 'en' ? 'Settings → API - Get your API keys' : 'Settings → API - APIキーを取得'}</p>
+            <ImageZoom src={supabaseDashboard2} alt="Supabase API Keys" style={styles.screenshot} />
+            <p style={styles.screenshotCaption}>{language === 'en' ? 'Settings → API Keys - Get your API keys' : 'Settings → API Keys - APIキーを取得'}</p>
             <ul style={styles.list}>
               <li style={styles.listItem}>
                 <strong>Project URL:</strong> <code style={styles.inlineCode}>https://xxxxx.supabase.co</code>
@@ -823,7 +823,7 @@ npx expo start --clear`}
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px', marginBottom: '24px' }}>
               <div>
-                <ImageZoom src={webApp1} alt="Login" style={styles.screenshot} />
+                <ImageZoom src={webApp7} alt="Login" style={styles.screenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Login Screen' : 'ログイン画面'}</p>
               </div>
               <div>

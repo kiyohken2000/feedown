@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FaPlus, FaTrash, FaUpload, FaDownload, FaCheck } from 'react-icons/fa';
 import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
@@ -363,6 +364,12 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
       fontSize: '1rem',
       fontWeight: '600',
       transition: 'background-color 0.3s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+    },
+    buttonIcon: {
+      fontSize: '0.9rem',
     },
     feedsList: {
       display: 'grid',
@@ -426,6 +433,9 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
       fontSize: '0.9rem',
       fontWeight: '600',
       transition: 'background-color 0.3s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.4rem',
     },
     noFeeds: {
       textAlign: 'center',
@@ -473,6 +483,9 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
       fontWeight: '600',
       transition: 'background-color 0.3s',
       flexShrink: 0,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.4rem',
     },
     addButtonAdded: {
       backgroundColor: '#6c757d',
@@ -493,6 +506,9 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
       fontSize: '0.85rem',
       fontWeight: '500',
       transition: 'background-color 0.3s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.4rem',
     },
     sectionHeader: {
       display: 'flex',
@@ -537,6 +553,7 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
               disabled={addingFeed}
             />
             <button type="submit" style={styles.button} disabled={addingFeed}>
+              <FaPlus style={styles.buttonIcon} />
               {addingFeed ? 'Adding...' : 'Add Feed'}
             </button>
           </form>
@@ -562,7 +579,8 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
                   opacity: importing ? 0.7 : 1,
                 }}
               >
-                {importing ? 'Importing...' : 'Import OPML'}
+                <FaUpload style={{ fontSize: '0.8rem' }} />
+                {importing ? 'Importing...' : 'Import'}
               </label>
               <button
                 onClick={handleExportOPML}
@@ -571,7 +589,8 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
                 onMouseOver={(e) => (e.target.style.backgroundColor = isDarkMode ? '#555' : '#d0d0d0')}
                 onMouseOut={(e) => (e.target.style.backgroundColor = isDarkMode ? '#444' : '#e0e0e0')}
               >
-                Export OPML
+                <FaDownload style={{ fontSize: '0.8rem' }} />
+                Export
               </button>
             </div>
           </div>
@@ -624,6 +643,7 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
                       onMouseOver={(e) => (e.target.style.backgroundColor = '#c82333')}
                       onMouseOut={(e) => (e.target.style.backgroundColor = '#dc3545')}
                     >
+                      <FaTrash style={{ fontSize: '0.8rem' }} />
                       Delete
                     </button>
                   </div>
@@ -671,6 +691,7 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
                           }
                         }}
                       >
+                        {isAdded ? <FaCheck style={{ fontSize: '0.8rem' }} /> : <FaPlus style={{ fontSize: '0.8rem' }} />}
                         {isAdding ? 'Adding...' : isAdded ? 'Added' : 'Add'}
                       </button>
                     </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FaNewspaper, FaStar, FaMoon, FaLock, FaArrowRight, FaBook, FaServer, FaRocket } from 'react-icons/fa';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
@@ -127,6 +128,10 @@ export default function LandingPage() {
     featureIcon: {
       fontSize: '40px',
       marginBottom: '16px',
+      color: '#FF6B35',
+    },
+    buttonIcon: {
+      marginRight: '8px',
     },
     featureTitle: {
       fontSize: '18px',
@@ -306,10 +311,10 @@ export default function LandingPage() {
   };
 
   const features = [
-    { icon: '📰', title: t.feature1Title, desc: t.feature1Desc },
-    { icon: '⭐', title: t.feature2Title, desc: t.feature2Desc },
-    { icon: '🌙', title: t.feature3Title, desc: t.feature3Desc },
-    { icon: '🔒', title: t.feature4Title, desc: t.feature4Desc },
+    { icon: FaNewspaper, title: t.feature1Title, desc: t.feature1Desc },
+    { icon: FaStar, title: t.feature2Title, desc: t.feature2Desc },
+    { icon: FaMoon, title: t.feature3Title, desc: t.feature3Desc },
+    { icon: FaLock, title: t.feature4Title, desc: t.feature4Desc },
   ];
 
   return (
@@ -324,7 +329,7 @@ export default function LandingPage() {
           <div style={styles.heroButtons}>
             <Link
               to="/login"
-              style={styles.primaryButton}
+              style={{ ...styles.primaryButton, display: 'inline-flex', alignItems: 'center' }}
               onMouseOver={(e) => {
                 e.target.style.transform = 'translateY(-2px)';
                 e.target.style.boxShadow = '0 6px 20px rgba(255, 107, 53, 0.4)';
@@ -334,11 +339,12 @@ export default function LandingPage() {
                 e.target.style.boxShadow = '0 4px 14px rgba(255, 107, 53, 0.3)';
               }}
             >
+              <FaRocket style={styles.buttonIcon} />
               {t.getStarted}
             </Link>
             <Link
               to="/docs"
-              style={styles.secondaryButton}
+              style={{ ...styles.secondaryButton, display: 'inline-flex', alignItems: 'center' }}
               onMouseOver={(e) => {
                 e.target.style.backgroundColor = '#FF6B35';
                 e.target.style.color = '#fff';
@@ -348,6 +354,7 @@ export default function LandingPage() {
                 e.target.style.color = '#FF6B35';
               }}
             >
+              <FaBook style={styles.buttonIcon} />
               {t.viewDocs}
             </Link>
           </div>
@@ -359,22 +366,25 @@ export default function LandingPage() {
         <h2 style={styles.sectionTitle}>{t.featuresTitle}</h2>
         <p style={styles.sectionSubtitle}>{t.featuresSubtitle}</p>
         <div style={styles.featuresGrid}>
-          {features.map((feature, index) => (
-            <div
-              key={index}
-              style={styles.featureCard}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              <div style={styles.featureIcon}>{feature.icon}</div>
-              <h3 style={styles.featureTitle}>{feature.title}</h3>
-              <p style={styles.featureDesc}>{feature.desc}</p>
-            </div>
-          ))}
+          {features.map((feature, index) => {
+            const IconComponent = feature.icon;
+            return (
+              <div
+                key={index}
+                style={styles.featureCard}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <IconComponent style={styles.featureIcon} />
+                <h3 style={styles.featureTitle}>{feature.title}</h3>
+                <p style={styles.featureDesc}>{feature.desc}</p>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -527,7 +537,7 @@ export default function LandingPage() {
           </p>
           <Link
             to="/docs/setup"
-            style={styles.secondaryButton}
+            style={{ ...styles.secondaryButton, display: 'inline-flex', alignItems: 'center' }}
             onMouseOver={(e) => {
               e.target.style.backgroundColor = '#FF6B35';
               e.target.style.color = '#fff';
@@ -537,6 +547,7 @@ export default function LandingPage() {
               e.target.style.color = '#FF6B35';
             }}
           >
+            <FaServer style={styles.buttonIcon} />
             {t.selfHostButton}
           </Link>
         </div>
@@ -548,7 +559,7 @@ export default function LandingPage() {
         <p style={styles.ctaDesc}>{t.ctaDesc}</p>
         <Link
           to="/login"
-          style={styles.ctaButton}
+          style={{ ...styles.ctaButton, display: 'inline-flex', alignItems: 'center' }}
           onMouseOver={(e) => {
             e.target.style.transform = 'scale(1.05)';
           }}
@@ -557,6 +568,7 @@ export default function LandingPage() {
           }}
         >
           {t.ctaButton}
+          <FaArrowRight style={{ marginLeft: '8px' }} />
         </Link>
       </section>
 
