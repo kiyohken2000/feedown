@@ -66,14 +66,53 @@ export default function PrivacyPolicyPage() {
       textDecoration: 'none',
       fontSize: '14px',
     },
+    supportSection: {
+      marginBottom: '32px',
+      padding: '24px',
+      backgroundColor: isDarkMode ? '#1e3a2f' : '#e8f5e9',
+      borderRadius: '12px',
+      borderLeft: '4px solid #4CAF50',
+    },
+    supportTitle: {
+      fontSize: '22px',
+      fontWeight: '700',
+      marginBottom: '16px',
+      color: isDarkMode ? '#81c784' : '#2e7d32',
+    },
+    supportEmail: {
+      display: 'inline-block',
+      color: '#FF6B35',
+      fontWeight: '600',
+    },
   };
 
   const content = {
     en: {
-      title: 'Privacy Policy',
+      title: 'Privacy Policy & Support',
       lastUpdated: 'Last updated: January 2025',
       intro: 'FeedOwn ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our RSS reader application.',
       sections: [
+        {
+          title: 'Support',
+          isSupport: true,
+          content: [
+            {
+              type: 'paragraph',
+              text: 'Need help or have questions? We are here to assist you.',
+            },
+            {
+              type: 'list',
+              items: [
+                'Email: retwpay@gmail.com',
+                'GitHub Issues: https://github.com/kiyohken2000/feedown/issues',
+              ],
+            },
+            {
+              type: 'paragraph',
+              text: 'We typically respond within 24-48 hours. For bug reports, please include your device information and steps to reproduce the issue.',
+            },
+          ],
+        },
         {
           title: '1. Information We Collect',
           content: [
@@ -169,7 +208,7 @@ export default function PrivacyPolicyPage() {
           content: [
             {
               type: 'paragraph',
-              text: 'If you have questions about this Privacy Policy, please contact us at retwpay@gmail.com.',
+              text: 'If you have questions about this Privacy Policy or need support, please see the Support section at the top of this page.',
             },
           ],
         },
@@ -177,10 +216,31 @@ export default function PrivacyPolicyPage() {
       backToHome: 'Back to Home',
     },
     ja: {
-      title: 'プライバシーポリシー',
+      title: 'プライバシーポリシー & サポート',
       lastUpdated: '最終更新日: 2025年1月',
       intro: 'FeedOwn（以下「当サービス」）は、お客様のプライバシーを保護することをお約束します。このプライバシーポリシーでは、RSSリーダーアプリケーションをご利用いただく際に、どのような情報を収集し、どのように使用・保護するかについて説明します。',
       sections: [
+        {
+          title: 'サポート',
+          isSupport: true,
+          content: [
+            {
+              type: 'paragraph',
+              text: 'お困りのことやご質問がありましたら、お気軽にお問い合わせください。',
+            },
+            {
+              type: 'list',
+              items: [
+                'メール: retwpay@gmail.com',
+                'GitHub Issues: https://github.com/kiyohken2000/feedown/issues',
+              ],
+            },
+            {
+              type: 'paragraph',
+              text: '通常24〜48時間以内にご返信いたします。バグ報告の際は、お使いのデバイス情報と再現手順をお知らせください。',
+            },
+          ],
+        },
         {
           title: '1. 収集する情報',
           content: [
@@ -276,7 +336,7 @@ export default function PrivacyPolicyPage() {
           content: [
             {
               type: 'paragraph',
-              text: 'このプライバシーポリシーについてご質問がある場合は、retwpay@gmail.com までお問い合わせください。',
+              text: 'このプライバシーポリシーに関するご質問やサポートが必要な場合は、ページ上部のサポートセクションをご覧ください。',
             },
           ],
         },
@@ -297,8 +357,8 @@ export default function PrivacyPolicyPage() {
         <p style={styles.paragraph}>{t.intro}</p>
 
         {t.sections.map((section, idx) => (
-          <section key={idx} style={styles.section}>
-            <h2 style={styles.sectionTitle}>{section.title}</h2>
+          <section key={idx} style={section.isSupport ? styles.supportSection : styles.section}>
+            <h2 style={section.isSupport ? styles.supportTitle : styles.sectionTitle}>{section.title}</h2>
             {section.content.map((item, itemIdx) => {
               if (item.type === 'paragraph') {
                 return <p key={itemIdx} style={styles.paragraph}>{item.text}</p>;
