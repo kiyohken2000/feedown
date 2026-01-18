@@ -1,15 +1,16 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { FaNewspaper, FaStar, FaRss, FaCog } from 'react-icons/fa';
 import logoIcon from '../assets/images/icon.png';
 
 const Navigation = ({ unreadCount = 0 }) => {
   const location = useLocation();
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard' },
-    { path: '/feeds', label: 'Feeds' },
-    { path: '/favorites', label: 'Favorites' },
-    { path: '/settings', label: 'Settings' },
+    { path: '/dashboard', label: 'Dashboard', icon: FaNewspaper },
+    { path: '/favorites', label: 'Favorites', icon: FaStar },
+    { path: '/feeds', label: 'Feeds', icon: FaRss },
+    { path: '/settings', label: 'Settings', icon: FaCog },
   ];
 
   const styles = {
@@ -58,6 +59,12 @@ const Navigation = ({ unreadCount = 0 }) => {
       padding: '0.5rem 1rem',
       borderRadius: '4px',
       transition: 'background-color 0.3s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+    },
+    navIcon: {
+      fontSize: '1rem',
     },
     activeNavLink: {
       backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -82,22 +89,26 @@ const Navigation = ({ unreadCount = 0 }) => {
           FeedOwn
         </Link>
         <ul style={styles.navList}>
-          {navItems.map((item) => (
-            <li key={item.path} style={styles.navItem}>
-              <Link
-                to={item.path}
-                style={{
-                  ...styles.navLink,
-                  ...(location.pathname === item.path ? styles.activeNavLink : {}),
-                }}
-              >
-                {item.label}
-                {item.path === '/dashboard' && unreadCount > 0 && (
-                  <span style={styles.unreadBadge}>{unreadCount}</span>
-                )}
-              </Link>
-            </li>
-          ))}
+          {navItems.map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <li key={item.path} style={styles.navItem}>
+                <Link
+                  to={item.path}
+                  style={{
+                    ...styles.navLink,
+                    ...(location.pathname === item.path ? styles.activeNavLink : {}),
+                  }}
+                >
+                  <IconComponent style={styles.navIcon} />
+                  {item.label}
+                  {item.path === '/dashboard' && unreadCount > 0 && (
+                    <span style={styles.unreadBadge}>{unreadCount}</span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </nav>

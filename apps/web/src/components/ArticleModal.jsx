@@ -1,4 +1,5 @@
 import React from 'react';
+import { FaCheck, FaStar, FaRegStar, FaExternalLinkAlt } from 'react-icons/fa';
 import { useTheme } from '../contexts/ThemeContext';
 
 const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead, isFavorited }) => {
@@ -96,6 +97,9 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
       fontSize: '1rem',
       fontWeight: '600',
       transition: 'all 0.3s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
     },
     readButton: {
       backgroundColor: '#28a745',
@@ -109,7 +113,9 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
       backgroundColor: '#FF6B35',
       color: 'white',
       textDecoration: 'none',
-      display: 'inline-block',
+    },
+    buttonIcon: {
+      fontSize: '0.9rem',
     },
   };
 
@@ -159,13 +165,15 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
               onClick={onMarkAsRead}
               disabled={isRead}
             >
-              {isRead ? '✓ Marked as Read' : 'Mark as Read'}
+              <FaCheck style={styles.buttonIcon} />
+              {isRead ? 'Marked as Read' : 'Mark as Read'}
             </button>
             <button
               style={{ ...styles.button, ...styles.favoriteButton }}
               onClick={onToggleFavorite}
             >
-              {isFavorited ? '★ Unfavorite' : '☆ Add to Favorites'}
+              {isFavorited ? <FaStar style={styles.buttonIcon} /> : <FaRegStar style={styles.buttonIcon} />}
+              {isFavorited ? 'Unfavorite' : 'Add to Favorites'}
             </button>
             <a
               href={article.url}
@@ -173,7 +181,8 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
               rel="noopener noreferrer"
               style={{ ...styles.button, ...styles.visitButton }}
             >
-              Visit Original →
+              <FaExternalLinkAlt style={styles.buttonIcon} />
+              Visit Original
             </a>
           </div>
         </div>

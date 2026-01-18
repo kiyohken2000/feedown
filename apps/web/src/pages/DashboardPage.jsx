@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import { FaCheck, FaSync, FaArrowUp } from 'react-icons/fa';
 import { getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
@@ -563,6 +564,9 @@ const DashboardPage = () => {
       fontSize: '0.9rem',
       fontWeight: '600',
       transition: 'background-color 0.3s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.4rem',
     },
     markAllReadButton: {
       padding: '0.5rem 1.5rem',
@@ -574,6 +578,26 @@ const DashboardPage = () => {
       fontSize: '0.9rem',
       fontWeight: '600',
       transition: 'background-color 0.3s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.4rem',
+    },
+    scrollTopButton: {
+      padding: '0.5rem 1.5rem',
+      backgroundColor: '#6c757d',
+      color: 'white',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+      fontSize: '0.9rem',
+      fontWeight: '600',
+      transition: 'background-color 0.3s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.4rem',
+    },
+    buttonIcon: {
+      fontSize: '0.85rem',
     },
     articlesList: {
       display: 'grid',
@@ -758,14 +782,20 @@ const DashboardPage = () => {
               style={styles.markAllReadButton}
               disabled={articlesLoading || unreadCount === 0}
             >
-              ✓ Mark All Read
+              <FaCheck style={styles.buttonIcon} /> Mark All Read
             </button>
             <button
               onClick={handleRefresh}
               style={styles.refreshButton}
               disabled={articlesLoading}
             >
-              🔄 Refresh
+              <FaSync style={styles.buttonIcon} /> Refresh
+            </button>
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              style={styles.scrollTopButton}
+            >
+              <FaArrowUp style={styles.buttonIcon} /> Top
             </button>
             {articlesLoading && (
               <div style={styles.inlineSpinner}></div>

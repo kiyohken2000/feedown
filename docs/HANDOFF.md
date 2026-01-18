@@ -154,6 +154,23 @@ Your Feeds (N)                    [Import OPML] [Export OPML]
 - Worker URL経由ではなく、`refresh.ts`と同様に直接RSSを取得するように変更
 - `packages/shared/src/api/endpoints.ts`: `feeds.add(url, title?)`にオプションのtitleパラメータを追加
 
+### 4. Web版UI改善: アイコン追加 & ナビゲーション統一
+
+**概要**: `react-icons`ライブラリを導入し、ナビゲーションとボタンにアイコンを追加
+
+**変更ファイル**:
+- `apps/web/package.json`: `react-icons`追加
+- `apps/web/src/components/Navigation.jsx`: ナビゲーションにアイコン追加、順序変更
+- `apps/web/src/components/ArticleModal.jsx`: ボタンにアイコン追加
+- `apps/web/src/pages/DashboardPage.jsx`: ボタンにアイコン追加、Scroll to Topボタン追加
+
+**実装内容**:
+- ナビゲーション: Dashboard(📰)、Favorites(⭐)、Feeds(📡)、Settings(⚙️)
+- ナビゲーションの順序をモバイル版と統一（Favorites → Feeds）
+- Dashboardボタン: Mark All Read(✓)、Refresh(🔄)、Top(↑)
+- 記事モーダルボタン: Mark as Read(✓)、Add to Favorites(☆/★)、Visit Original(↗)
+- 「Top」ボタンでスクロール位置を一番上に戻す機能を追加
+
 ---
 
 ## 以前の作業内容（2026-01-16）
