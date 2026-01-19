@@ -121,6 +121,16 @@ FeedOwnはRSSを救おうとしているわけではない。商用サービス�
 
 *FeedOwnはオープンソースで無料で使える。もしあなたも同じようにRSSを使い続けている仲間なら、ぜひあなたのストーリーを聞かせてほしい。GitHubで見つけるか、アプリを試してみてください。*
 
+---
+
+📖 **技術的な詳細に興味がある方へ**
+
+FeedOwnのアーキテクチャ、なぜCloudflareとSupabaseを選んだのか、本当に月額0円で運用できるのか——技術的な詳細を解説した記事も書きました：
+
+👉 [月額0円でRSSリーダーを運用する：CloudflareとSupabaseで作るサーバーレスアーキテクチャ](https://medium.com/@anthropic/feedown-tech-architecture-ja)
+
+---
+
 **リンク:**
 - ライブデモ: https://feedown.pages.dev
 - GitHub: https://github.com/kiyohken2000/feedown

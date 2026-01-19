@@ -121,6 +121,16 @@ Because they will. Someday. And when that day comes, I'll still have my feeds.
 
 *FeedOwn is open source and free to use. If you're a fellow RSS holdout, I'd love to hear your story. Find me on GitHub or try the app yourself.*
 
+---
+
+📖 **Interested in the technical details?**
+
+How did I build an RSS reader that costs $0/month to run? What's the architecture behind FeedOwn? I wrote a technical deep dive explaining the serverless stack:
+
+👉 [Building a $0/Month RSS Reader with Cloudflare and Supabase](https://medium.com/@anthropic/feedown-tech-architecture)
+
+---
+
 **Links:**
 - Live Demo: https://feedown.pages.dev
 - GitHub: https://github.com/kiyohken2000/feedown

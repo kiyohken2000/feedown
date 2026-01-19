@@ -407,6 +407,14 @@ If you're building a side project, consider going serverless-first. You might be
 
 ---
 
+📖 **Why I built this project**
+
+Want to know why I decided to build my own RSS reader? I wrote about my 15+ years of using RSS, the fear of Feedly shutting down someday, and why I believe in owning your data:
+
+👉 [I Built My Own RSS Reader Because I'm Afraid Feedly Will Die Someday](https://medium.com/@anthropic/feedown-why-i-built)
+
+---
+
 **Links:**
 - GitHub: https://github.com/kiyohken2000/feedown
 - Live Demo: https://feedown.pages.dev

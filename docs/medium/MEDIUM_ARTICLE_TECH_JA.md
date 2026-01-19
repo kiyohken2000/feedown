@@ -407,6 +407,14 @@ Cloudflare（エッジコンピュート + CDN）とSupabase（データベー�
 
 ---
 
+📖 **このプロジェクトを始めた理由**
+
+なぜ自分でRSSリーダーを作ることにしたのか？15年以上RSSを使い続けてきた経験と、Feedlyがいつか終わるかもしれないという恐怖について書いた記事もあります：
+
+👉 [Feedlyがいつか終わるかもしれないから、自分でRSSリーダーを作った](https://medium.com/@anthropic/feedown-why-i-built-ja)
+
+---
+
 **リンク:**
 - GitHub: https://github.com/kiyohken2000/feedown
 - ライブデモ: https://feedown.pages.dev
