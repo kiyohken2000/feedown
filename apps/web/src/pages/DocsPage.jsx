@@ -16,13 +16,13 @@ import webApp5 from '../assets/images/web_screenshots/web_app_5.png';
 import webApp6 from '../assets/images/web_screenshots/web_app_6.png';
 
 // Mobile app screenshots
-import mobileLogin from '../assets/images/mobile_screenshots/mobile_ss_login1.PNG';
-import mobileSignup from '../assets/images/mobile_screenshots/mobile_ss_signup1.PNG';
-import mobileArticles1 from '../assets/images/mobile_screenshots/mobile_ss_articles1.PNG';
-import mobileArticle from '../assets/images/mobile_screenshots/mobile_ss_article1.PNG';
-import mobileReader from '../assets/images/mobile_screenshots/mobile_ss_reader1.PNG';
-import mobileFeeds from '../assets/images/mobile_screenshots/mobile_ss_feeds.PNG';
-import mobileSettings from '../assets/images/mobile_screenshots/mobile_ss_settings1.PNG';
+import mobileLogin from '../assets/images/mobile_screenshots/mobile_ss_login1.png';
+import mobileSignup from '../assets/images/mobile_screenshots/mobile_ss_signup1.png';
+import mobileArticles1 from '../assets/images/mobile_screenshots/mobile_ss_articles1.png';
+import mobileArticle from '../assets/images/mobile_screenshots/mobile_ss_article1.png';
+import mobileReader from '../assets/images/mobile_screenshots/mobile_ss_reader1.png';
+import mobileFeeds from '../assets/images/mobile_screenshots/mobile_ss_feeds.png';
+import mobileSettings from '../assets/images/mobile_screenshots/mobile_ss_settings1.png';
 
 export default function DocsPage() {
   const { isDarkMode } = useTheme();

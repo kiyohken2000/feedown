@@ -11,14 +11,14 @@ import screenshotImage from '../assets/images/screenshot_1.png';
 import appStoreBadge from '../assets/images/badges/appstore.png';
 import googlePlayBadge from '../assets/images/badges/googleplay.png';
 // Mobile screenshots
-import mobileLogin from '../assets/images/mobile_screenshots/mobile_ss_login1.PNG';
-import mobileSignup from '../assets/images/mobile_screenshots/mobile_ss_signup1.PNG';
-import mobileArticles1 from '../assets/images/mobile_screenshots/mobile_ss_articles1.PNG';
-import mobileArticles2 from '../assets/images/mobile_screenshots/mobile_ss_articles2.PNG';
-import mobileArticle from '../assets/images/mobile_screenshots/mobile_ss_article1.PNG';
-import mobileReader from '../assets/images/mobile_screenshots/mobile_ss_reader1.PNG';
-import mobileFeeds from '../assets/images/mobile_screenshots/mobile_ss_feeds.PNG';
-import mobileSettings from '../assets/images/mobile_screenshots/mobile_ss_settings1.PNG';
+import mobileLogin from '../assets/images/mobile_screenshots/mobile_ss_login1.png';
+import mobileSignup from '../assets/images/mobile_screenshots/mobile_ss_signup1.png';
+import mobileArticles1 from '../assets/images/mobile_screenshots/mobile_ss_articles1.png';
+import mobileArticles2 from '../assets/images/mobile_screenshots/mobile_ss_articles2.png';
+import mobileArticle from '../assets/images/mobile_screenshots/mobile_ss_article1.png';
+import mobileReader from '../assets/images/mobile_screenshots/mobile_ss_reader1.png';
+import mobileFeeds from '../assets/images/mobile_screenshots/mobile_ss_feeds.png';
+import mobileSettings from '../assets/images/mobile_screenshots/mobile_ss_settings1.png';
 
 export default function LandingPage() {
   const { isDarkMode } = useTheme();
