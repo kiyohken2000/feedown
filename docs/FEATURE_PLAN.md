@@ -10,6 +10,7 @@
 | 記事の共有 | 低 | 2 | ✅ Mobile完了 |
 | フォントサイズ変更 | 中 | 3 | ✅ Mobile完了 |
 | バックグラウンド自動更新 | 高 | 4 | 未実装 |
+| QRコードログイン | 低 | 5 | 🔄 実装中 |
 
 ---
 
@@ -519,3 +520,145 @@ functions/api/cron/refresh.ts  # 新規作成
 | フォントサイズ変更 | - | ✅ | Web版は不要 |
 | フォント変更 | - | - | 実装不要 |
 | バックグラウンド自動更新 | - | - | 今後検討 |
+| QRコードログイン | ✅ | 🔄 | 実装中 |
+
+---
+
+## 5. QRコードログイン 🔄 実装中
+
+### 概要
+
+Web版Settings画面にQRコードを表示し、モバイルアプリでスキャンしてログインを簡略化する機能。
+
+### アプローチ
+
+QRコードにはサーバーURLとメールアドレスのみを含め、パスワードはユーザーが手動入力する。
+
+**メリット:**
+- 新規API不要（既存のlogin APIをそのまま使用）
+- トークンがQRに含まれないので安全
+- 実装がシンプル
+
+### QRコードの内容
+
+```json
+{
+  "server": "https://feedown.pages.dev",
+  "email": "user@example.com"
+}
+```
+
+### ユーザーフロー
+
+```
+1. Web Settings画面を開く
+   ↓
+2. 「Mobile Login」セクションにQRコードが表示される
+   ↓
+3. モバイルアプリのSignIn画面で「Scan QR Code」をタップ
+   ↓
+4. カメラが起動、QRコードをスキャン
+   ↓
+5. SignIn画面に戻り、サーバーURLとメールアドレスが自動入力
+   ↓
+6. ユーザーがパスワードを入力して「Sign In」
+   ↓
+7. ログイン完了
+```
+
+### 変更ファイル一覧
+
+#### Web版
+
+| ファイル | 変更内容 |
+|---------|----------|
+| `apps/web/package.json` | `qrcode.react` パッケージ追加 |
+| `apps/web/src/pages/SettingsPage.jsx` | QRコード表示セクション追加 |
+
+#### Mobile版
+
+| ファイル | 変更内容 |
+|---------|----------|
+| `apps/mobile/package.json` | `expo-camera` パッケージ追加 |
+| `apps/mobile/src/scenes/signin/SignIn.js` | 「Scan QR Code」ボタン追加、QRデータ受け取り処理 |
+| `apps/mobile/src/scenes/signin/QrScanner.js` | 新規作成：QRスキャン画面 |
+| `apps/mobile/src/routes/navigation/stacks/LoginStacks.js` | QrScanner画面をナビゲーションに追加 |
+
+### 実装詳細
+
+#### Web版: SettingsPage.jsx
+
+Account Informationセクションの下に「Mobile Login」セクションを追加：
+
+```jsx
+import { QRCodeSVG } from 'qrcode.react';
+import { FaMobileAlt } from 'react-icons/fa';
+
+// Account Informationセクションの後に追加
+<div style={styles.card}>
+  <h2 style={styles.sectionHeading}>
+    <FaMobileAlt style={{ marginRight: 8 }} />
+    Mobile Login
+  </h2>
+  <p style={styles.infoText}>
+    Scan this QR code with the FeedOwn mobile app to auto-fill your server URL and email.
+  </p>
+  <div style={{ textAlign: 'center', padding: '20px 0' }}>
+    <QRCodeSVG
+      value={JSON.stringify({
+        server: window.location.origin,
+        email: user?.email || ''
+      })}
+      size={200}
+      bgColor={isDarkMode ? '#2d2d2d' : '#ffffff'}
+      fgColor={isDarkMode ? '#ffffff' : '#000000'}
+    />
+  </div>
+  <p style={styles.hintText}>
+    After scanning, enter your password to complete login.
+  </p>
+</div>
+```
+
+#### Mobile版: SignIn.js
+
+QRスキャン結果をパラメータで受け取る：
+
+```jsx
+import { useNavigation, useRoute } from '@react-navigation/native'
+
+const route = useRoute()
+
+// QRスキャンからの戻り時にデータを反映
+useEffect(() => {
+  if (route.params?.qrServerUrl) {
+    setServerUrl(route.params.qrServerUrl)
+  }
+  if (route.params?.qrEmail) {
+    setEmail(route.params.qrEmail)
+  }
+}, [route.params])
+
+// Sign Upボタンの下に追加
+<View style={styles.element}>
+  <Button
+    label="Scan QR Code"
+    onPress={() => navigation.navigate('QrScanner')}
+    color={colors.grayDark}
+    labelColor={colors.white}
+  />
+</View>
+```
+
+#### Mobile版: QrScanner.js（新規作成）
+
+```jsx
+// expo-cameraを使用してQRコードをスキャン
+// スキャン成功時：
+// 1. QRデータをパース { server, email }
+// 2. navigation.navigate('SignIn', { qrServerUrl: server, qrEmail: email })
+```
+
+### API変更
+
+なし（既存APIで対応可能）

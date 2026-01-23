@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaSignOutAlt, FaMoon, FaSun, FaExclamationTriangle, FaTrash } from 'react-icons/fa';
+import { FaSignOutAlt, FaMoon, FaSun, FaExclamationTriangle, FaTrash, FaMobileAlt } from 'react-icons/fa';
+import { QRCodeSVG } from 'qrcode.react';
 import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
@@ -309,6 +310,38 @@ const SettingsPage = () => {
           </div>
           <p style={styles.passwordHint}>
             If you didn't set a custom password, the default password is 111111
+          </p>
+        </div>
+
+        <div style={styles.card}>
+          <h2 style={styles.sectionHeading}>
+            <FaMobileAlt style={{ marginRight: 8, verticalAlign: 'middle' }} />
+            Mobile Login
+          </h2>
+          <p style={{ color: isDarkMode ? '#b0b0b0' : '#666', marginBottom: '1rem', lineHeight: '1.5' }}>
+            Scan this QR code with the FeedOwn mobile app to auto-fill your server URL and email.
+          </p>
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <div style={{
+              display: 'inline-block',
+              padding: '16px',
+              backgroundColor: isDarkMode ? '#ffffff' : '#ffffff',
+              borderRadius: '12px',
+            }}>
+              <QRCodeSVG
+                value={JSON.stringify({
+                  server: window.location.origin,
+                  email: user?.email || ''
+                })}
+                size={200}
+                bgColor="#ffffff"
+                fgColor="#000000"
+                level="M"
+              />
+            </div>
+          </div>
+          <p style={{ color: isDarkMode ? '#888' : '#888', fontSize: '0.9rem', textAlign: 'center', fontStyle: 'italic' }}>
+            After scanning, enter your password to complete login.
           </p>
         </div>
 

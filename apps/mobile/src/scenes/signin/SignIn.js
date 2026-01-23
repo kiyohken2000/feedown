@@ -2,7 +2,7 @@ import React, { useContext, useState, useEffect } from 'react'
 import { StyleSheet, View, Text, Image } from 'react-native'
 import Button from '../../components/Button'
 import { colors, fontSize, getThemeColors } from '../../theme'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useRoute } from '@react-navigation/native'
 import { UserContext } from '../../contexts/UserContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
@@ -20,6 +20,7 @@ export default function SignIn() {
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
   const navigation = useNavigation()
+  const route = useRoute()
 
   // Load saved server URL on mount
   useEffect(() => {
@@ -27,6 +28,16 @@ export default function SignIn() {
       setServerUrl(savedServerUrl)
     }
   }, [savedServerUrl])
+
+  // Handle QR scan data
+  useEffect(() => {
+    if (route.params?.qrServerUrl) {
+      setServerUrl(route.params.qrServerUrl)
+    }
+    if (route.params?.qrEmail) {
+      setEmail(route.params.qrEmail)
+    }
+  }, [route.params])
 
   const onSignInPress = async () => {
     if (!serverUrl.trim()) {
@@ -113,6 +124,17 @@ export default function SignIn() {
               label="Sign Up"
               onPress={() => navigation.navigate('SignUp', { serverUrl })}
               color={colors.blueSecondary}
+              disable={false}
+              labelColor={colors.white}
+              labelBold={false}
+              isLoading={false}
+            />
+          </View>
+          <View style={styles.element}>
+            <Button
+              label="Scan QR Code"
+              onPress={() => navigation.navigate('QrScanner')}
+              color={colors.primary}
               disable={false}
               labelColor={colors.white}
               labelBold={false}

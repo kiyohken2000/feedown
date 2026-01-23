@@ -5,6 +5,7 @@ import GradientHeader from '../../../components/GradientHeader'
 
 import SignIn from '../../../scenes/signin/SignIn'
 import SignUp from '../../../scenes/signup/SingUp'
+import QrScanner from '../../../scenes/signin/QrScanner'
 
 const Stack = createStackNavigator()
 
@@ -22,6 +23,11 @@ export const LoginStacks = () => {
       <Stack.Screen
         name="SignUp"
         component={SignUp}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="QrScanner"
+        component={QrScanner}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

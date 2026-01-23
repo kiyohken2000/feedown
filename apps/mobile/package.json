@@ -25,6 +25,7 @@
     "axios": "^0.21.2",
     "expo": "~54.0.31",
     "expo-asset": "~12.0.8",
+    "expo-camera": "~17.0.10",
     "expo-font": "~14.0.8",
     "expo-linear-gradient": "~15.0.7",
     "expo-updates": "~29.0.16",
