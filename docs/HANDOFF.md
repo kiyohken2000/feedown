@@ -1,6 +1,6 @@
 # FeedOwn 引継ぎドキュメント
 
-**最終更新**: 2026-01-18
+**最終更新**: 2026-01-24
 **ステータス**: Phase 13進行中、App Store / Google Play 公開済み
 
 ---
@@ -30,6 +30,7 @@ FeedOwnはセルフホスト可能なRSSリーダーです。Web版とモバイ�
 - **OPMLインポート/エクスポート（Web版）**: FeedsPageでOPML形式のインポート・エクスポートに対応
 - **記事の共有機能（Mobile版）**: ArticleDetailヘッダーにShareボタン追加
 - **フォントサイズ変更（Mobile版）**: Reader Modeのフォントサイズを設定画面から変更可能
+- **QRコードログイン機能**: Web版Settings画面にQRコードを表示、Mobile版でスキャンしてログイン情報を自動入力
 
 ### デプロイ情報
 - **本番URL（Web）**: https://feedown.pages.dev

@@ -1,8 +1,8 @@
 # FeedOwn - 実装進行表
 
-**最終更新**: 2026-01-16
-**現在のフェーズ**: ✅ Phase 12 完了（ランディングページ改善）
-**ステータス**: 全フェーズ完了、App Store / Google Play 公開済み
+**最終更新**: 2026-01-24
+**現在のフェーズ**: Phase 13 進行中（機能拡張）
+**ステータス**: App Store / Google Play 公開済み
 
 ---
 
@@ -384,6 +384,12 @@ npm test
 - [x] Mobile: Profile画面に設定UI追加（Small/Medium/Large/Extra Large）
 - Web: 不要と判断
 - フォント変更: 不要と判断（Mobile/Web両方）
+
+### 5. QRコードログイン ✅ 完了
+- [x] Web: SettingsPageにQRコード表示セクション追加（qrcode.react）
+- [x] Mobile: QrScanner画面を新規作成（expo-camera）
+- [x] Mobile: SignIn画面に「Scan QR Code」ボタン追加
+- [x] QRコードにサーバーURLとメールアドレスを含め、パスワードは手動入力
 
 ---
 
