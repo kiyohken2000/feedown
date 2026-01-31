@@ -190,102 +190,89 @@ export default function ArticleDetail() {
         />
       ) : (
         /* Default Article View */
-        <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={styles.contentContainer}>
-          {/* Article Image */}
-          {article.imageUrl && (
-            <Image
-              source={{ uri: article.imageUrl }}
-              style={styles.heroImage}
-              resizeMode="cover"
-            />
-          )}
+        <>
+          <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={styles.contentContainer}>
+            {/* Article Image */}
+            {article.imageUrl && (
+              <Image
+                source={{ uri: article.imageUrl }}
+                style={styles.heroImage}
+                resizeMode="cover"
+              />
+            )}
 
-          {/* Article Meta */}
-          <View style={styles.metaContainer}>
-            <Text style={styles.feedTitle}>{article.feedTitle || 'Unknown Feed'}</Text>
-            <Text style={[styles.publishDate, { color: theme.textMuted }]}>{getRelativeTime(article.publishedAt)}</Text>
-          </View>
+            {/* Article Meta */}
+            <View style={styles.metaContainer}>
+              <Text style={styles.feedTitle}>{article.feedTitle || 'Unknown Feed'}</Text>
+              <Text style={[styles.publishDate, { color: theme.textMuted }]}>{getRelativeTime(article.publishedAt)}</Text>
+            </View>
 
-          {/* Article Title */}
-          <Text style={[styles.title, { color: theme.text }]}>{article.title}</Text>
+            {/* Article Title */}
+            <Text style={[styles.title, { color: theme.text }]}>{article.title}</Text>
 
-          {/* Article Description */}
-          {article.description && (
-            <Text style={[styles.description, { color: theme.textSecondary }]}>{article.description}</Text>
-          )}
+            {/* Article Description */}
+            {article.description && (
+              <Text style={[styles.description, { color: theme.textSecondary }]}>{article.description}</Text>
+            )}
 
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
+            {/* URL Info */}
+            <View style={[styles.urlContainer, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.urlLabel, { color: theme.textMuted }]}>Source</Text>
+              <Text style={[styles.urlText, { color: theme.textMuted }]} numberOfLines={2}>{article.url}</Text>
+            </View>
+          </ScrollView>
+
+          {/* Fixed Bottom Action Bar */}
+          <View style={[styles.bottomBar, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
+            {/* Row 1: Favorite and Visit buttons */}
+            <View style={styles.bottomButtonRow}>
+              <TouchableOpacity
+                style={[
+                  styles.bottomButton,
+                  styles.favoriteBottomButton,
+                  { backgroundColor: isDarkMode ? theme.card : colors.white },
+                  isFavorited && styles.favoriteBottomButtonActive,
+                ]}
+                onPress={handleToggleFavorite}
+                disabled={isTogglingFavorite}
+              >
+                {isTogglingFavorite ? (
+                  <ActivityIndicator size="small" color={isFavorited ? colors.white : colors.primary} />
+                ) : (
+                  <Text style={[styles.bottomButtonText, isFavorited && styles.bottomButtonTextActive]}>
+                    {isFavorited ? '★ In Favorites' : '☆ Add to Favorites'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.bottomButton, styles.visitBottomButton]}
+                onPress={handleVisitOriginal}
+              >
+                <Text style={styles.visitBottomButtonText}>Visit Original →</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Row 2: Reader Mode button */}
             <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.favoriteButton,
-                { backgroundColor: isDarkMode ? theme.card : colors.white },
-                isFavorited && styles.favoriteButtonActive,
-              ]}
-              onPress={handleToggleFavorite}
-              disabled={isTogglingFavorite}
-            >
-              {isTogglingFavorite ? (
-                <ActivityIndicator size="small" color={isFavorited ? colors.white : colors.primary} />
-              ) : (
-                <Text
-                  style={[
-                    styles.actionButtonText,
-                    isFavorited && styles.actionButtonTextActive,
-                  ]}
-                >
-                  {isFavorited ? '★ In Favorites' : '☆ Add to Favorites'}
-                </Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionButton, styles.visitButton]}
-              onPress={handleVisitOriginal}
-            >
-              <Text style={styles.visitButtonText}>Visit Original →</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Reader Mode Button */}
-          <View style={styles.readerButtonContainer}>
-            <TouchableOpacity
-              style={[
-                styles.readerButton,
-                { backgroundColor: isDarkMode ? theme.card : colors.white, borderColor: theme.border },
-                isLoadingReader && styles.readerButtonLoading,
-              ]}
+              style={[styles.readerBottomButton, { backgroundColor: isDarkMode ? theme.card : colors.white }]}
               onPress={handleReaderMode}
               disabled={isLoadingReader}
             >
               {isLoadingReader ? (
                 <View style={styles.readerButtonContent}>
-                  <ActivityIndicator size="small" color={colors.bluePrimary} />
-                  <Text style={[styles.readerButtonText, { color: colors.bluePrimary, marginLeft: 8 }]}>
-                    Loading...
-                  </Text>
+                  <ActivityIndicator size="small" color={colors.bluePrimary || '#007AFF'} />
+                  <Text style={[styles.readerBottomButtonText, { marginLeft: 8 }]}>Loading...</Text>
                 </View>
               ) : (
                 <View style={styles.readerButtonContent}>
                   <Text style={styles.readerIcon}>📖</Text>
-                  <Text style={[styles.readerButtonText, { color: colors.bluePrimary }]}>
-                    Reader Mode
-                  </Text>
+                  <Text style={styles.readerBottomButtonText}>Reader Mode</Text>
                 </View>
               )}
             </TouchableOpacity>
-            <Text style={[styles.readerHint, { color: theme.textMuted }]}>
-              Read article in a clean, distraction-free format
-            </Text>
           </View>
-
-          {/* URL Info */}
-          <View style={[styles.urlContainer, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.urlLabel, { color: theme.textMuted }]}>Source</Text>
-            <Text style={[styles.urlText, { color: theme.textMuted }]} numberOfLines={2}>{article.url}</Text>
-          </View>
-        </ScrollView>
+        </>
       )}
     </ScreenTemplate>
   )
@@ -340,7 +327,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   contentContainer: {
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
   heroImage: {
     width: '100%',
@@ -379,57 +366,53 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     marginBottom: 24,
   },
-  actionButtons: {
-    flexDirection: 'row',
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 28,
     gap: 12,
-    marginBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.grayLight,
+    backgroundColor: colors.white,
   },
-  actionButton: {
+  bottomButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  bottomButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  favoriteButton: {
+  favoriteBottomButton: {
     backgroundColor: colors.white,
     borderWidth: 2,
     borderColor: colors.primary,
   },
-  favoriteButtonActive: {
+  favoriteBottomButtonActive: {
     backgroundColor: colors.primary,
   },
-  actionButtonText: {
+  bottomButtonText: {
     fontSize: fontSize.normal,
     fontWeight: '600',
     color: colors.primary,
   },
-  actionButtonTextActive: {
+  bottomButtonTextActive: {
     color: colors.white,
   },
-  visitButton: {
-    backgroundColor: colors.primary,
-  },
-  visitButtonText: {
-    fontSize: fontSize.normal,
-    fontWeight: '600',
-    color: colors.white,
-  },
-  readerButtonContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
-  readerButton: {
+  readerBottomButton: {
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.grayLight,
-  },
-  readerButtonLoading: {
-    opacity: 0.7,
+    borderWidth: 2,
+    borderColor: '#007AFF',
   },
   readerButtonContent: {
     flexDirection: 'row',
@@ -439,14 +422,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginRight: 8,
   },
-  readerButtonText: {
+  readerBottomButtonText: {
     fontSize: fontSize.normal,
     fontWeight: '600',
+    color: colors.bluePrimary || '#007AFF',
   },
-  readerHint: {
-    fontSize: fontSize.small,
-    textAlign: 'center',
-    marginTop: 8,
+  visitBottomButton: {
+    backgroundColor: colors.primary,
+  },
+  visitBottomButtonText: {
+    fontSize: fontSize.normal,
+    fontWeight: '600',
+    color: colors.white,
   },
   urlContainer: {
     marginHorizontal: 16,

@@ -119,6 +119,7 @@ export default function Favorites() {
       <TouchableOpacity
         style={[styles.favoriteCard, { backgroundColor: theme.card }]}
         onPress={() => handleArticlePress(favorite)}
+        onLongPress={() => handleRemoveFavorite(favorite)}
         activeOpacity={0.7}
         disabled={isRemoving}
       >
@@ -144,23 +145,15 @@ export default function Favorites() {
           <Text style={[styles.favoriteTitle, { color: theme.text }]} numberOfLines={2}>
             {favorite.title}
           </Text>
-          {favorite.description && (
-            <Text style={[styles.favoriteDescription, { color: theme.textSecondary }]} numberOfLines={2}>
-              {favorite.description}
-            </Text>
-          )}
+          <Text style={[styles.favoriteDescription, { color: theme.textSecondary }]} numberOfLines={2}>
+            {favorite.description || ''}
+          </Text>
         </View>
-        <TouchableOpacity
-          style={styles.removeButton}
-          onPress={() => handleRemoveFavorite(favorite)}
-          disabled={isRemoving}
-        >
-          {isRemoving ? (
-            <ActivityIndicator size="small" color={colors.white} />
-          ) : (
-            <Text style={styles.removeButtonText}>Remove</Text>
-          )}
-        </TouchableOpacity>
+        {isRemoving && (
+          <View style={styles.removingOverlay}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        )}
       </TouchableOpacity>
     )
   }
@@ -257,25 +250,42 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    flexDirection: 'row',
+    padding: 12,
   },
   thumbnail: {
-    width: '100%',
-    height: 140,
+    width: 90,
+    height: 90,
     backgroundColor: colors.grayLight,
+    borderRadius: 8,
   },
   noThumbnail: {
-    width: '100%',
-    height: 70,
+    width: 90,
+    height: 90,
     backgroundColor: colors.grayLight,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   noThumbnailText: {
     color: colors.gray,
-    fontSize: fontSize.small,
+    fontSize: fontSize.xSmall,
   },
   favoriteContent: {
-    padding: 12,
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
+  },
+  removingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
   },
   favoriteMeta: {
     flexDirection: 'row',
@@ -304,20 +314,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   favoriteDescription: {
-    fontSize: fontSize.normal,
+    fontSize: fontSize.small,
     color: colors.gray,
-    lineHeight: 20,
-  },
-  removeButton: {
-    backgroundColor: colors.redSecondary || '#dc3545',
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  removeButtonText: {
-    color: colors.white,
-    fontSize: fontSize.normal,
-    fontWeight: '600',
+    lineHeight: 18,
   },
   emptyContainer: {
     flex: 1,

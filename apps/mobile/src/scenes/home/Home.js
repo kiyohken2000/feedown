@@ -42,11 +42,22 @@ export default function Home() {
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false)
   const isFirstFocus = useRef(true)
   const fetchArticlesRef = useRef(fetchArticles)
+  const flatListRef = useRef(null)
 
   // Keep ref updated with latest fetchArticles
   useEffect(() => {
     fetchArticlesRef.current = fetchArticles
   }, [fetchArticles])
+
+  // Scroll to top when tab is tapped while already focused
+  useEffect(() => {
+    const unsubscribe = navigation.getParent()?.addListener('tabPress', (e) => {
+      if (navigation.isFocused()) {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true })
+      }
+    })
+    return unsubscribe
+  }, [navigation])
 
   // Initial load
   useEffect(() => {
@@ -219,18 +230,6 @@ export default function Home() {
           <Text style={[styles.articleDescription, { color: theme.textSecondary }]} numberOfLines={2}>
             {article.description || ''}
           </Text>
-          {!isRead && (
-            <TouchableOpacity
-              style={[styles.markReadButton, { backgroundColor: theme.border }]}
-              onPress={(e) => {
-                e.stopPropagation()
-                markAsRead(article.id)
-              }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={[styles.markReadButtonText, { color: theme.textMuted }]}>Mark as Read</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </TouchableOpacity>
     )
@@ -314,11 +313,11 @@ export default function Home() {
             value={selectedFeedId}
             onChange={item => setSelectedFeedId(item.value)}
           />
-          {unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{unreadCount} unread</Text>
-            </View>
-          )}
+          <View style={[styles.unreadBadge, unreadCount === 0 && styles.allReadBadge]}>
+            <Text style={styles.unreadText}>
+              {unreadCount > 0 ? `${unreadCount} unread` : 'All read'}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -365,6 +364,7 @@ export default function Home() {
       </View>
 
       <FlatList
+        ref={flatListRef}
         data={filteredArticles}
         renderItem={renderArticle}
         keyExtractor={(item) => item.id}
@@ -436,6 +436,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+  },
+  allReadBadge: {
+    backgroundColor: '#28a745',
   },
   unreadText: {
     color: colors.white,
@@ -509,28 +512,34 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    flexDirection: 'row',
+    padding: 12,
   },
   articleCardRead: {
     opacity: 0.6,
   },
   thumbnail: {
-    width: '100%',
-    height: 160,
+    width: 90,
+    height: 90,
     backgroundColor: colors.grayLight,
+    borderRadius: 8,
   },
   noThumbnail: {
-    width: '100%',
-    height: 80,
+    width: 90,
+    height: 90,
     backgroundColor: colors.grayLight,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   noThumbnailText: {
     color: colors.gray,
-    fontSize: fontSize.small,
+    fontSize: fontSize.xSmall,
   },
   articleContent: {
-    padding: 12,
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
   },
   articleMeta: {
     flexDirection: 'row',
@@ -565,22 +574,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   articleDescription: {
-    fontSize: fontSize.normal,
-    color: colors.gray,
-    lineHeight: 20,
-  },
-  markReadButton: {
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: colors.grayLight,
-    borderRadius: 4,
-  },
-  markReadButtonText: {
     fontSize: fontSize.small,
     color: colors.gray,
-    fontWeight: '500',
+    lineHeight: 18,
   },
   footer: {
     paddingVertical: 20,
