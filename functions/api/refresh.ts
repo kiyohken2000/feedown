@@ -80,17 +80,26 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     console.log(`[Refresh] Starting refresh for ${feeds.length} feeds`);
 
-    // Get all existing article IDs once
-    const { data: existingArticles, error: articlesError } = await supabase
-      .from('articles')
-      .select('id')
-      .eq('user_id', uid);
+    // Get all existing article IDs (paginate to exceed Supabase's default 1000-row limit)
+    const existingArticleIds = new Set<string>();
+    const pageSize = 1000;
+    let page = 0;
+    while (true) {
+      const { data: existingArticles, error: articlesError } = await supabase
+        .from('articles')
+        .select('id')
+        .eq('user_id', uid)
+        .range(page * pageSize, (page + 1) * pageSize - 1);
 
-    if (articlesError) {
-      console.error('Get existing articles error:', articlesError.message);
+      if (articlesError) {
+        console.error('Get existing articles error:', articlesError.message);
+        break;
+      }
+      if (!existingArticles || existingArticles.length === 0) break;
+      for (const a of existingArticles) existingArticleIds.add(a.id);
+      if (existingArticles.length < pageSize) break;
+      page++;
     }
-
-    const existingArticleIds = new Set((existingArticles || []).map(a => a.id));
     console.log(`[Refresh] Found ${existingArticleIds.size} existing articles`);
 
     // Process each feed sequentially
@@ -497,10 +506,11 @@ async function storeArticles(
 
   console.log(`[storeArticles] Inserting ${newArticles.length} new articles for feed ${feedId}`);
 
-  // Insert all articles in one batch
+  // Upsert all articles in one batch; ignoreDuplicates ensures a single conflict
+  // does not silently discard the entire batch
   const { error } = await supabase
     .from('articles')
-    .insert(newArticles);
+    .upsert(newArticles, { onConflict: 'id', ignoreDuplicates: true });
 
   if (error) {
     console.error(`[storeArticles] Insert error:`, error.message);
