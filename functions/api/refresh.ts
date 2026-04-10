@@ -506,11 +506,10 @@ async function storeArticles(
 
   console.log(`[storeArticles] Inserting ${newArticles.length} new articles for feed ${feedId}`);
 
-  // Upsert all articles in one batch; ignoreDuplicates ensures a single conflict
-  // does not silently discard the entire batch
+  // Insert all articles in one batch
   const { error } = await supabase
     .from('articles')
-    .upsert(newArticles, { onConflict: 'id', ignoreDuplicates: true });
+    .insert(newArticles);
 
   if (error) {
     console.error(`[storeArticles] Insert error:`, error.message);
