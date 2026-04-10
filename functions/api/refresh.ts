@@ -37,11 +37,13 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     const supabase = createSupabaseClient(env, accessToken);
 
-    // Get all user's feeds
+    // Get all user's feeds, prioritizing never-fetched feeds so newly added
+    // feeds are not skipped when the function approaches its time limit
     const { data: feeds, error: feedsError } = await supabase
       .from('feeds')
       .select('*')
       .eq('user_id', uid)
+      .order('last_fetched_at', { ascending: true, nullsFirst: true })
       .limit(100);
 
     if (feedsError) {
