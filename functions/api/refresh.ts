@@ -120,7 +120,9 @@ export async function onRequestPost(context: any): Promise<Response> {
           method: 'GET',
           signal: controller.signal,
           headers: {
-            'User-Agent': 'FeedOwn/1.0 (RSS Reader)',
+            'User-Agent': 'Mozilla/5.0 (compatible; FeedOwn/1.0; +https://github.com/kiyohken2000/feedown)',
+            'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
           },
         });
 
