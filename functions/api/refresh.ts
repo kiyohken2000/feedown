@@ -37,12 +37,22 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     const supabase = createSupabaseClient(env, accessToken);
 
-    // Get all user's feeds
-    const { data: feeds, error: feedsError } = await supabase
+    // Support batched refresh to stay within Cloudflare's 50 subrequest limit.
+    // Each feed uses ~3-4 subrequests (fetch + Supabase ops), so process 5 feeds per batch.
+    const BATCH_SIZE = 5;
+    const url = new URL(request.url);
+    const batchOffset = parseInt(url.searchParams.get('offset') || '0', 10);
+
+    // Get all user's feeds, prioritizing never-fetched and least-recently-fetched feeds
+    const { data: allFeeds, error: feedsError } = await supabase
       .from('feeds')
       .select('*')
       .eq('user_id', uid)
+      .order('last_fetched_at', { ascending: true, nullsFirst: true })
       .limit(100);
+
+    const totalFeedCount = allFeeds?.length || 0;
+    const feeds = allFeeds?.slice(batchOffset, batchOffset + BATCH_SIZE) || [];
 
     if (feedsError) {
       console.error('Get feeds error:', feedsError.message);
@@ -57,11 +67,12 @@ export async function onRequestPost(context: any): Promise<Response> {
         JSON.stringify({
           message: 'No feeds to refresh',
           stats: {
-            totalFeeds: 0,
+            totalFeeds: totalFeedCount,
             successfulFeeds: 0,
             failedFeeds: 0,
             newArticles: 0,
           },
+          remaining: 0,
         }),
         {
           status: 200,
@@ -70,27 +81,45 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
+    const remaining = Math.max(0, totalFeedCount - batchOffset - BATCH_SIZE);
+
     const stats: RefreshStats = {
-      totalFeeds: feeds.length,
+      totalFeeds: totalFeedCount,
       successfulFeeds: 0,
       failedFeeds: 0,
       newArticles: 0,
       failedFeedDetails: [],
     };
 
-    console.log(`[Refresh] Starting refresh for ${feeds.length} feeds`);
+    console.log(`[Refresh] Starting batch at offset ${batchOffset}: ${feeds.length} feeds (${remaining} remaining)`);
 
-    // Get all existing article IDs once
-    const { data: existingArticles, error: articlesError } = await supabase
-      .from('articles')
-      .select('id')
-      .eq('user_id', uid);
+    // Get all existing article IDs with pagination to bypass Supabase 1000-row default limit
+    const existingArticleIds = new Set<string>();
+    const PAGE_SIZE = 1000;
+    let offset = 0;
 
-    if (articlesError) {
-      console.error('Get existing articles error:', articlesError.message);
+    while (true) {
+      const { data: page, error: pageError } = await supabase
+        .from('articles')
+        .select('id')
+        .eq('user_id', uid)
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (pageError) {
+        console.error('Get existing articles error:', pageError.message);
+        break;
+      }
+
+      if (!page || page.length === 0) break;
+
+      for (const a of page) {
+        existingArticleIds.add(a.id);
+      }
+
+      if (page.length < PAGE_SIZE) break;
+      offset += PAGE_SIZE;
     }
 
-    const existingArticleIds = new Set((existingArticles || []).map(a => a.id));
     console.log(`[Refresh] Found ${existingArticleIds.size} existing articles`);
 
     // Process each feed sequentially
@@ -109,7 +138,9 @@ export async function onRequestPost(context: any): Promise<Response> {
           method: 'GET',
           signal: controller.signal,
           headers: {
-            'User-Agent': 'FeedOwn/1.0 (RSS Reader)',
+            'User-Agent': 'Mozilla/5.0 (compatible; FeedOwn/1.0; +https://github.com/kiyohken2000/feedown)',
+            'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
           },
         });
 
@@ -207,10 +238,12 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     return new Response(
       JSON.stringify({
-        message: 'Refresh complete',
+        message: remaining > 0 ? 'Batch complete' : 'Refresh complete',
         stats,
         feeds: transformedFeeds,
         shouldRefreshArticles: stats.newArticles > 0,
+        remaining,
+        nextOffset: remaining > 0 ? batchOffset + BATCH_SIZE : undefined,
       }),
       {
         status: 200,
@@ -497,10 +530,10 @@ async function storeArticles(
 
   console.log(`[storeArticles] Inserting ${newArticles.length} new articles for feed ${feedId}`);
 
-  // Insert all articles in one batch
+  // Upsert articles — ignoreDuplicates skips conflicts per-row instead of failing the entire batch
   const { error } = await supabase
     .from('articles')
-    .insert(newArticles);
+    .upsert(newArticles, { onConflict: 'id', ignoreDuplicates: true });
 
   if (error) {
     console.error(`[storeArticles] Insert error:`, error.message);

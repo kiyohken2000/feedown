@@ -303,8 +303,9 @@ class RefreshAPI {
     this.client = client
   }
 
-  async refreshAll() {
-    return this.client.post('/api/refresh')
+  async refreshAll(offset) {
+    const query = offset ? `?offset=${offset}` : ''
+    return this.client.post(`/api/refresh${query}`)
   }
 
   async refreshFeed(feedId) {

@@ -105,33 +105,54 @@ export const FeedsContextProvider = ({ children }) => {
     }
   }, [getApi, articles.length, readArticles])
 
-  // Refresh all feeds (fetch RSS and update articles)
+  // Refresh all feeds in batches to stay within Cloudflare's 50 subrequest limit
   const refreshAll = useCallback(async () => {
     try {
       setIsRefreshing(true)
       setError(null)
 
       const api = getApi()
-      const refreshResponse = await api.refresh.refreshAll()
+      let offset = 0
+      let totalNewArticles = 0
+      let totalSuccessful = 0
+      let totalFeeds = 0
+      let latestFeeds = null
 
-      if (refreshResponse.success) {
-        const stats = refreshResponse.data.stats
-        console.log(`Refresh complete: ${stats?.successfulFeeds}/${stats?.totalFeeds} feeds, ${stats?.newArticles} new articles`)
-
-        // Update feeds if returned
-        if (refreshResponse.data.feeds) {
-          setFeeds(refreshResponse.data.feeds)
-        } else {
-          await fetchFeeds()
+      while (true) {
+        const refreshResponse = await api.refresh.refreshAll(offset || undefined)
+        if (!refreshResponse.success) {
+          console.error('Refresh batch failed at offset', offset)
+          break
         }
 
-        // Fetch articles after refresh
-        await fetchArticles(true)
+        const { stats, remaining, nextOffset } = refreshResponse.data
+        totalFeeds = stats?.totalFeeds || 0
+        totalSuccessful += stats?.successfulFeeds || 0
+        totalNewArticles += stats?.newArticles || 0
 
-        return { success: true, stats }
-      } else {
-        throw new Error(refreshResponse.error)
+        if (refreshResponse.data.feeds) {
+          latestFeeds = refreshResponse.data.feeds
+        }
+
+        console.log(`Batch at offset ${offset}: ${stats?.successfulFeeds} ok, ${stats?.newArticles} new, ${remaining ?? 0} remaining`)
+
+        if (!remaining || remaining <= 0 || !nextOffset) break
+        offset = nextOffset
       }
+
+      console.log(`Refresh complete: ${totalSuccessful}/${totalFeeds} feeds, ${totalNewArticles} new articles`)
+
+      // Update feeds if returned
+      if (latestFeeds) {
+        setFeeds(latestFeeds)
+      } else {
+        await fetchFeeds()
+      }
+
+      // Fetch articles after refresh
+      await fetchArticles(true)
+
+      return { success: true, stats: { totalFeeds, successfulFeeds: totalSuccessful, newArticles: totalNewArticles } }
     } catch (err) {
       console.error('Failed to refresh:', err)
       setError(err.message)

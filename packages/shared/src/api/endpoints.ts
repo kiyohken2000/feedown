@@ -103,8 +103,9 @@ export class ArticlesAPI {
 export class RefreshAPI {
   constructor(private client: ApiClient) {}
 
-  async refreshAll() {
-    return this.client.post<{ refreshed: number; errors: number }>('/api/refresh');
+  async refreshAll(offset?: number) {
+    const query = offset ? `?offset=${offset}` : '';
+    return this.client.post<{ refreshed: number; errors: number }>(`/api/refresh${query}`);
   }
 
   async refreshFeed(feedId: string) {

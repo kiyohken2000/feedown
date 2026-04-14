@@ -135,36 +135,55 @@ const DashboardPage = () => {
     // Set loading state immediately for better UX
     setArticlesLoading(true);
     try {
-      // まずフィードからRSSを取得して記事を保存
-      const refreshResponse = await api.refresh.refreshAll();
-      if (refreshResponse.success) {
-        const stats = refreshResponse.data.stats;
-        console.log(`✅ Refresh complete: ${stats.successfulFeeds}/${stats.totalFeeds} feeds, ${stats.newArticles} new articles`);
+      // Refresh feeds in batches to stay within Cloudflare's 50 subrequest limit
+      let offset = 0;
+      let totalNewArticles = 0;
+      let totalSuccessful = 0;
+      let totalFailed = 0;
+      let totalFeeds = 0;
+      let latestFeeds = null;
+
+      while (true) {
+        const refreshResponse = await api.refresh.refreshAll(offset || undefined);
+        if (!refreshResponse.success) {
+          console.error('Refresh batch failed at offset', offset);
+          break;
+        }
+
+        const { stats, remaining, nextOffset } = refreshResponse.data;
+        totalFeeds = stats.totalFeeds;
+        totalSuccessful += stats.successfulFeeds;
+        totalFailed += stats.failedFeeds;
+        totalNewArticles += stats.newArticles;
+
+        if (refreshResponse.data.feeds) {
+          latestFeeds = refreshResponse.data.feeds;
+        }
 
         // Log failed feeds if any (no alert popup)
         if (stats && stats.failedFeeds > 0 && stats.failedFeedDetails) {
-          console.error(`⚠️ Failed to refresh ${stats.failedFeeds} feed(s):`);
           stats.failedFeedDetails.forEach((failed) => {
-            console.error(`  - ${failed.feedTitle} (${failed.feedUrl})`);
-            console.error(`    Error: ${failed.error}`);
+            console.error(`  - ${failed.feedTitle} (${failed.feedUrl}): ${failed.error}`);
           });
         }
 
-        // OPTIMIZATION: Use feeds returned by refresh API instead of fetching again
-        if (refreshResponse.data.feeds) {
-          setFeeds(refreshResponse.data.feeds);
-        } else {
-          // Fallback: fetch feeds if not included in response
-          await fetchFeeds();
-        }
+        console.log(`🔄 Batch at offset ${offset}: ${stats.successfulFeeds} ok, ${stats.failedFeeds} failed, ${stats.newArticles} new articles, ${remaining ?? 0} remaining`);
 
-        // Always fetch articles after refresh to ensure UI is up to date
-        await fetchArticles(true, selectedFeedId); // reset=true for full reload
-      } else {
-        // On error, fetch both feeds and articles
-        await fetchFeeds();
-        await fetchArticles(true, selectedFeedId);
+        if (!remaining || remaining <= 0 || !nextOffset) break;
+        offset = nextOffset;
       }
+
+      console.log(`✅ Refresh complete: ${totalSuccessful}/${totalFeeds} feeds, ${totalNewArticles} new articles`);
+
+      // OPTIMIZATION: Use feeds returned by refresh API instead of fetching again
+      if (latestFeeds) {
+        setFeeds(latestFeeds);
+      } else {
+        await fetchFeeds();
+      }
+
+      // Always fetch articles after refresh to ensure UI is up to date
+      await fetchArticles(true, selectedFeedId); // reset=true for full reload
     } catch (error) {
       console.error('Failed to refresh:', error);
       setArticlesError('Failed to refresh feeds.');
