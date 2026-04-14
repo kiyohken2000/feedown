@@ -55,59 +55,81 @@ export async function onRequestGet(context: any): Promise<Response> {
     const validFeedIds = new Set((feeds || []).map(feed => feed.id));
     const shouldRefresh = checkShouldRefreshFromFeeds(feeds || []);
 
-    // Build articles query
-    let articlesQuery = supabase
-      .from('articles')
-      .select(`
-        id,
-        feed_id,
-        feed_title,
-        title,
-        url,
-        description,
-        published_at,
-        fetched_at,
-        expires_at,
-        author,
-        image_url
-      `)
-      .eq('user_id', uid)
-      .gt('expires_at', new Date().toISOString())
-      .order('published_at', { ascending: false, nullsFirst: false });
+    // Fetch all articles with pagination to avoid 1000-row limit
+    const allArticles: any[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let articleOffset = 0;
+      while (true) {
+        let articlesQuery = supabase
+          .from('articles')
+          .select(`
+            id,
+            feed_id,
+            feed_title,
+            title,
+            url,
+            description,
+            published_at,
+            fetched_at,
+            expires_at,
+            author,
+            image_url
+          `)
+          .eq('user_id', uid)
+          .gt('expires_at', new Date().toISOString())
+          .order('published_at', { ascending: false, nullsFirst: false })
+          .range(articleOffset, articleOffset + PAGE_SIZE - 1);
 
-    // Filter by feed if specified
-    if (feedId) {
-      articlesQuery = articlesQuery.eq('feed_id', feedId);
-    }
+        if (feedId) {
+          articlesQuery = articlesQuery.eq('feed_id', feedId);
+        }
 
-    const { data: articles, error: articlesError } = await articlesQuery;
+        const { data: page, error: articlesError } = await articlesQuery;
 
-    if (articlesError) {
-      console.error('Get articles error:', articlesError.message);
-      return new Response(
-        JSON.stringify({ error: 'Failed to get articles' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+        if (articlesError) {
+          console.error('Get articles error:', articlesError.message);
+          return new Response(
+            JSON.stringify({ error: 'Failed to get articles' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (!page || page.length === 0) break;
+        allArticles.push(...page);
+        if (page.length < PAGE_SIZE) break;
+        articleOffset += PAGE_SIZE;
+      }
     }
 
     // Filter articles from deleted feeds (in case of orphaned articles)
-    let filteredArticles = (articles || []).filter(article =>
+    let filteredArticles = allArticles.filter(article =>
       validFeedIds.has(article.feed_id)
     );
 
-    // Get read article IDs for this user
-    const { data: readArticles, error: readError } = await supabase
-      .from('read_articles')
-      .select('article_id')
-      .eq('user_id', uid);
+    // Get read article IDs for this user (paginated to avoid 1000-row limit)
+    const readArticleIds = new Set<string>();
+    {
+      const PAGE_SIZE = 1000;
+      let readOffset = 0;
+      while (true) {
+        const { data: readPage, error: readError } = await supabase
+          .from('read_articles')
+          .select('article_id')
+          .eq('user_id', uid)
+          .range(readOffset, readOffset + PAGE_SIZE - 1);
 
-    if (readError) {
-      console.error('Get read articles error:', readError.message);
+        if (readError) {
+          console.error('Get read articles error:', readError.message);
+          break;
+        }
+        if (!readPage || readPage.length === 0) break;
+        for (const r of readPage) {
+          readArticleIds.add(r.article_id);
+        }
+        if (readPage.length < PAGE_SIZE) break;
+        readOffset += PAGE_SIZE;
+      }
     }
-
-    const readArticleIds = new Set<string>(
-      (readArticles || []).map(r => r.article_id)
-    );
 
     // Total count before pagination (for hasMore calculation)
     const totalCount = filteredArticles.length;
