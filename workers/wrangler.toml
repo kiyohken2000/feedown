@@ -1,15 +1,23 @@
 name = "feedown-worker"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
+workers_dev = false
 
 # Account ID
-account_id = "ee20aa897421e01cb195b1e36acebf02"
+account_id = "43f5c73542cedd13fc5bfc7d18082cdf"
 
 # KV Namespace for caching RSS feeds
 [[kv_namespaces]]
 binding = "CACHE"
-id = "76c3c4142838463b8a3b1656e750aa1c"
-preview_id = "737baa0c5e164e17a9c185cf7e4d4f1a"
+id = "5ee5c60faef44dfb8ced911bca04dc87"
+preview_id = "edd35df742264a1a9efe56290f85f6c0"
+
+# Queue consumer: process RSS refresh jobs (max 10 feeds per invocation)
+[[queues.consumers]]
+queue = "feedown-refresh-queue"
+max_batch_size = 10
+max_retries = 2
+dead_letter_queue = "feedown-refresh-dlq"
 
 # Observability (optional)
 [observability]

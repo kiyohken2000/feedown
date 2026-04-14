@@ -6,3 +6,8 @@ pages_build_output_dir = "apps/web/dist"
 
 # Pages specific settings will be managed through Pages dashboard
 # This file is mainly for local development and CI/CD
+
+# Queue producer: Pages Functions enqueue feed refresh jobs
+[[queues.producers]]
+queue = "feedown-refresh-queue"
+binding = "REFRESH_QUEUE"

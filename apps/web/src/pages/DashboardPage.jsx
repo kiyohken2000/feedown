@@ -139,7 +139,13 @@ const DashboardPage = () => {
       const refreshResponse = await api.refresh.refreshAll();
       if (refreshResponse.success) {
         const stats = refreshResponse.data.stats;
-        console.log(`✅ Refresh complete: ${stats.successfulFeeds}/${stats.totalFeeds} feeds, ${stats.newArticles} new articles`);
+        const isQueued = refreshResponse.data.queued === true;
+
+        if (isQueued) {
+          console.log(`🔄 Refresh queued: ${stats.totalFeeds} feeds processing in background`);
+        } else {
+          console.log(`✅ Refresh complete: ${stats.successfulFeeds}/${stats.totalFeeds} feeds, ${stats.newArticles} new articles`);
+        }
 
         // Log failed feeds if any (no alert popup)
         if (stats && stats.failedFeeds > 0 && stats.failedFeedDetails) {
@@ -156,6 +162,12 @@ const DashboardPage = () => {
         } else {
           // Fallback: fetch feeds if not included in response
           await fetchFeeds();
+        }
+
+        // When using queue-based refresh, wait for the worker to process feeds
+        // before fetching updated articles (worker typically completes in ~3s)
+        if (isQueued) {
+          await new Promise(resolve => setTimeout(resolve, 4000));
         }
 
         // Always fetch articles after refresh to ensure UI is up to date
