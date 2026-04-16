@@ -8,12 +8,12 @@ import Footer from '../components/Footer';
 import ImageZoom from '../components/ImageZoom';
 
 // Web app screenshots
-import webApp8 from '../assets/images/web_screenshots/web_app_8.PNG';
-import webApp2 from '../assets/images/web_screenshots/web_app_2.PNG';
-import webApp3 from '../assets/images/web_screenshots/web_app_3.PNG';
-import webApp4 from '../assets/images/web_screenshots/web_app_4.PNG';
-import webApp5 from '../assets/images/web_screenshots/web_app_5.PNG';
-import webApp6 from '../assets/images/web_screenshots/web_app_6.PNG';
+import webApp8 from '../assets/images/web_screenshots/web_app_8.png';
+import webApp2 from '../assets/images/web_screenshots/web_app_2.png';
+import webApp3 from '../assets/images/web_screenshots/web_app_3.png';
+import webApp4 from '../assets/images/web_screenshots/web_app_4.png';
+import webApp5 from '../assets/images/web_screenshots/web_app_5.png';
+import webApp6 from '../assets/images/web_screenshots/web_app_6.png';
 
 // Mobile app screenshots
 import mobileLogin from '../assets/images/mobile_screenshots/mobile_ss_login1.PNG';
