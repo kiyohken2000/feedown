@@ -6,6 +6,8 @@ pages_build_output_dir = "apps/web/dist"
 
 [vars]
 YARN_ENABLE_IMMUTABLE_INSTALLS = "false"
+VITE_SUPABASE_URL = "https://zbgmhqaznskaobreupcu.supabase.co"
+VITE_SUPABASE_ANON_KEY = "ここにPublishable keyを貼り付け"
 
 # Pages specific settings will be managed through Pages dashboard
 # This file is mainly for local development and CI/CD
