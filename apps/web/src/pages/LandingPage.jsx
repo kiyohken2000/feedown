@@ -491,7 +491,6 @@ export default function LandingPage() {
               onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.opacity = '0.85'; }}
               onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.opacity = '1'; }}
             >
-              <img src={appStoreBadge} alt="Download on the App Store" style={styles.storeBadge} />
             </a>
             <a
               href="https://play.google.com/store/apps/details?id=net.votepurchase.feedown"
@@ -501,7 +500,6 @@ export default function LandingPage() {
               onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.opacity = '0.85'; }}
               onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.opacity = '1'; }}
             >
-              <img src={googlePlayBadge} alt="Get it on Google Play" style={styles.storeBadge} />
             </a>
           </div>
         </div>
