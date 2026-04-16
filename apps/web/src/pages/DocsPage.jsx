@@ -8,21 +8,21 @@ import Footer from '../components/Footer';
 import ImageZoom from '../components/ImageZoom';
 
 // Web app screenshots
-import webApp8 from '../assets/images/web_screenshots/web_app_8.png';
-import webApp2 from '../assets/images/web_screenshots/web_app_2.png';
-import webApp3 from '../assets/images/web_screenshots/web_app_3.png';
-import webApp4 from '../assets/images/web_screenshots/web_app_4.png';
-import webApp5 from '../assets/images/web_screenshots/web_app_5.png';
-import webApp6 from '../assets/images/web_screenshots/web_app_6.png';
+import webApp8 from '../assets/images/web_screenshots/web_app_8.PNG';
+import webApp2 from '../assets/images/web_screenshots/web_app_2.PNG';
+import webApp3 from '../assets/images/web_screenshots/web_app_3.PNG';
+import webApp4 from '../assets/images/web_screenshots/web_app_4.PNG';
+import webApp5 from '../assets/images/web_screenshots/web_app_5.PNG';
+import webApp6 from '../assets/images/web_screenshots/web_app_6.PNG';
 
 // Mobile app screenshots
-import mobileLogin from '../assets/images/mobile_screenshots/mobile_ss_login1.png';
-import mobileSignup from '../assets/images/mobile_screenshots/mobile_ss_signup1.png';
-import mobileArticles1 from '../assets/images/mobile_screenshots/mobile_ss_articles1.png';
-import mobileArticle from '../assets/images/mobile_screenshots/mobile_ss_article1.png';
-import mobileReader from '../assets/images/mobile_screenshots/mobile_ss_reader1.png';
-import mobileFeeds from '../assets/images/mobile_screenshots/mobile_ss_feeds.png';
-import mobileSettings from '../assets/images/mobile_screenshots/mobile_ss_settings1.png';
+import mobileLogin from '../assets/images/mobile_screenshots/mobile_ss_login1.PNG';
+import mobileSignup from '../assets/images/mobile_screenshots/mobile_ss_signup1.PNG';
+import mobileArticles1 from '../assets/images/mobile_screenshots/mobile_ss_articles1.PNG';
+import mobileArticle from '../assets/images/mobile_screenshots/mobile_ss_article1.PNG';
+import mobileReader from '../assets/images/mobile_screenshots/mobile_ss_reader1.PNG';
+import mobileFeeds from '../assets/images/mobile_screenshots/mobile_ss_feeds.PNG';
+import mobileSettings from '../assets/images/mobile_screenshots/mobile_ss_settings1.PNG';
 
 export default function DocsPage() {
   const { isDarkMode } = useTheme();
