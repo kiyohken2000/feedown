@@ -382,7 +382,6 @@ export default function LandingPage() {
           <h2 style={styles.sectionTitle}>{t.screenshotTitle}</h2>
           <p style={styles.sectionSubtitle}>{t.screenshotSubtitle}</p>
           <img
-            src={screenshotImage}
             alt="FeedOwn Dashboard"
             style={{
               width: '100%',
