@@ -402,7 +402,6 @@ export default function LandingPage() {
           <div style={styles.mobileGrid}>
             <div style={styles.mobileScreenshot}>
               <img
-                src={mobileLogin}
                 alt="Login"
                 style={styles.mobileImage}
                 onClick={() => setSelectedImage({ src: mobileLogin, alt: t.mobileLogin })}
@@ -413,7 +412,6 @@ export default function LandingPage() {
             </div>
             <div style={styles.mobileScreenshot}>
               <img
-                src={mobileSignup}
                 alt="Sign Up"
                 style={styles.mobileImage}
                 onClick={() => setSelectedImage({ src: mobileSignup, alt: t.mobileSignup })}
@@ -424,7 +422,6 @@ export default function LandingPage() {
             </div>
             <div style={styles.mobileScreenshot}>
               <img
-                src={mobileArticles1}
                 alt="Articles"
                 style={styles.mobileImage}
                 onClick={() => setSelectedImage({ src: mobileArticles1, alt: t.mobileArticles1 })}
@@ -435,7 +432,6 @@ export default function LandingPage() {
             </div>
             <div style={styles.mobileScreenshot}>
               <img
-                src={mobileArticles2}
                 alt="Dark Mode"
                 style={styles.mobileImage}
                 onClick={() => setSelectedImage({ src: mobileArticles2, alt: t.mobileArticles2 })}
@@ -446,7 +442,6 @@ export default function LandingPage() {
             </div>
             <div style={styles.mobileScreenshot}>
               <img
-                src={mobileArticle}
                 alt="Article Detail"
                 style={styles.mobileImage}
                 onClick={() => setSelectedImage({ src: mobileArticle, alt: t.mobileArticle })}
@@ -457,7 +452,6 @@ export default function LandingPage() {
             </div>
             <div style={styles.mobileScreenshot}>
               <img
-                src={mobileReader}
                 alt="Reader Mode"
                 style={styles.mobileImage}
                 onClick={() => setSelectedImage({ src: mobileReader, alt: t.mobileReader })}
@@ -468,7 +462,6 @@ export default function LandingPage() {
             </div>
             <div style={styles.mobileScreenshot}>
               <img
-                src={mobileFeeds}
                 alt="Feed Management"
                 style={styles.mobileImage}
                 onClick={() => setSelectedImage({ src: mobileFeeds, alt: t.mobileFeeds })}
@@ -479,7 +472,6 @@ export default function LandingPage() {
             </div>
             <div style={styles.mobileScreenshot}>
               <img
-                src={mobileSettings}
                 alt="Settings"
                 style={styles.mobileImage}
                 onClick={() => setSelectedImage({ src: mobileSettings, alt: t.mobileSettings })}
