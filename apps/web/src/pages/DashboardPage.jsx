@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { FaCheck, FaSync, FaArrowUp, FaList, FaTh, FaRss, FaThumbtack, FaBookmark } from 'react-icons/fa';
-import { getAccessToken } from '../lib/supabase';
+import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import ArticleModal from '../components/ArticleModal';
@@ -9,7 +9,6 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useArticles } from '../contexts/ArticlesContext';
 import { usePersistedState } from '../hooks/usePersistedState';
 
-// ── カテゴリセクション（折りたたみ対応・トップレベルコンポーネント） ──
 const CategorySection = ({ label, feedList, feedUnreadCounts, selectedFeedId, setSelectedFeedId, textPrimary, textSecondary, isDarkMode }) => {
   const [collapsed, setCollapsed] = useState(false);
   const categoryUnread = feedList.reduce((sum, f) => sum + (feedUnreadCounts[f.id] || 0), 0);
@@ -72,7 +71,6 @@ const CategorySection = ({ label, feedList, feedUnreadCounts, selectedFeedId, se
   );
 };
 
-// ── メインコンポーネント ──
 const DashboardPage = () => {
   const [filteredArticles, setFilteredArticles] = useState([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
@@ -171,10 +169,22 @@ const DashboardPage = () => {
     catch (e) { console.error(e); }
   }, [api, setReadArticles]);
 
+  // feedsのcategoryをSupabaseから取得してマージ
   const fetchFeeds = useCallback(async () => {
     try {
       const res = await api.feeds.list();
-      if (res.success) setFeeds(res.data.feeds || []);
+      if (res.success) {
+        let feedsData = res.data.feeds || [];
+        const { data: catData } = await supabase
+          .from('feeds')
+          .select('id, category');
+        if (catData) {
+          const catMap = {};
+          catData.forEach(f => { catMap[f.id] = f.category; });
+          feedsData = feedsData.map(f => ({ ...f, category: catMap[f.id] || null }));
+        }
+        setFeeds(feedsData);
+      }
     } catch (e) { console.error(e); }
   }, [api]);
 
@@ -217,8 +227,16 @@ const DashboardPage = () => {
         if (!r.data.remaining || r.data.remaining <= 0 || !r.data.nextOffset) break;
         offset = r.data.nextOffset;
       }
-      if (latestFeeds) setFeeds(latestFeeds);
-      else await fetchFeeds();
+      if (latestFeeds) {
+        // Refreshでもcategoryをマージ
+        const { data: catData } = await supabase.from('feeds').select('id, category');
+        if (catData) {
+          const catMap = {};
+          catData.forEach(f => { catMap[f.id] = f.category; });
+          latestFeeds = latestFeeds.map(f => ({ ...f, category: catMap[f.id] || null }));
+        }
+        setFeeds(latestFeeds);
+      } else await fetchFeeds();
       await fetchArticles(true, selectedFeedId);
     } catch (e) {
       setArticlesError('Failed to refresh feeds.');
@@ -406,7 +424,6 @@ const DashboardPage = () => {
     if (!sidebarPinned) hoverTimeoutRef.current = setTimeout(() => setSidebarHovered(false), 300);
   };
 
-  // カテゴリグループ化
   const { grouped, noCategory } = useMemo(() => {
     const grouped = {};
     const noCategory = [];
@@ -441,7 +458,6 @@ const DashboardPage = () => {
 
       <div style={{ display: 'flex', height: 'calc(100vh - 52px)', position: 'relative' }}>
 
-        {/* ホバートリガー */}
         {!sidebarOpen && (
           <div
             onMouseEnter={() => { if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current); setSidebarHovered(true); }}
@@ -477,7 +493,6 @@ const DashboardPage = () => {
         >
           {sidebarOpen && (
             <>
-              {/* ピンボタン */}
               <div style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   onClick={() => setSidebarPinned(v => !v)}
@@ -494,7 +509,6 @@ const DashboardPage = () => {
                 </button>
               </div>
 
-              {/* All Feeds */}
               <div
                 onClick={() => setSelectedFeedId('')}
                 style={{
@@ -520,11 +534,9 @@ const DashboardPage = () => {
 
               {/* Feed list - カテゴリグループ */}
               <div style={{ marginTop: '0.5rem' }}>
-                {/* カテゴリあり */}
                 {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([cat, feedList]) => (
                   <CategorySection key={cat} label={cat} feedList={feedList} {...categorySectionProps} />
                 ))}
-                {/* カテゴリなし */}
                 {noCategory.length > 0 && (
                   hasCategories
                     ? <CategorySection label="Others" feedList={noCategory} {...categorySectionProps} />
