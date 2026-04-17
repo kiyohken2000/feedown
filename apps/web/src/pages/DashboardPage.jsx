@@ -619,11 +619,6 @@ const DashboardPage = () => {
             )}
           </div>
 
-          {/* スワイプヒント */}
-          <div style={{ padding: '0.4rem 1.5rem', fontSize: '0.75rem', color: textSecondary, opacity: 0.7 }}>
-            💡 右スワイプ：既読　／　左スワイプ：Read Later
-          </div>
-
           {/* Articles */}
           <div style={{ padding: '0.5rem 1.5rem 1rem', flex: 1 }}>
             {articlesError && <p style={{ color: 'red', textAlign: 'center' }}>{articlesError}</p>}
