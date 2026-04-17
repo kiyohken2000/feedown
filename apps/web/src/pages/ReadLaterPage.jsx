@@ -3,6 +3,7 @@ import { FaBookmark, FaTrash, FaExternalLinkAlt, FaRss, FaCheck } from 'react-ic
 import { getAccessToken } from '../lib/supabase';
 import Navigation from '../components/Navigation';
 import { useTheme } from '../contexts/ThemeContext';
+import { usePersistedState } from '../hooks/usePersistedState';
 
 const ReadLaterPage = () => {
   const [articles, setArticles] = useState([]);
@@ -11,6 +12,7 @@ const ReadLaterPage = () => {
   const [checkedIds, setCheckedIds] = useState(new Set());
   const [filter, setFilter] = useState('all'); // 'all', 'unread'
   const { isDarkMode } = useTheme();
+  const [viewMode, setViewMode] = usePersistedState('readlater_viewMode', 'list');
 
   const bg = isDarkMode ? '#1a1a1a' : '#f0f0f0';
   const cardBg = isDarkMode ? '#2d2d2d' : '#ffffff';
