@@ -7,16 +7,17 @@ import Navigation from '../components/Navigation';
 import ArticleModal from '../components/ArticleModal';
 import { useTheme } from '../contexts/ThemeContext';
 import { useArticles } from '../contexts/ArticlesContext';
+import { usePersistedState } from '../hooks/usePersistedState';
 
 const DashboardPage = () => {
   const [filteredArticles, setFilteredArticles] = useState([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [articlesError, setArticlesError] = useState(null);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = usePersistedState('dashboard_filter', 'all');
   const [selectedFeedId, setSelectedFeedId] = useState('');
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [viewMode, setViewMode] = useState('card');
+  const [viewMode, setViewMode] = usePersistedState('dashboard_viewMode', 'card');
   const [checkedArticles, setCheckedArticles] = useState(new Set());
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarHovered, setSidebarHovered] = useState(false);
