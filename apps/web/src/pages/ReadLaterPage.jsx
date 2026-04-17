@@ -10,10 +10,11 @@ import { usePersistedState } from '../hooks/usePersistedState';
 const ReadLaterPage = () => {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [favoritedIds, setFavoritedIds] = useState(new Set());
-  const [readIds, setReadIds] = useState(new Set()); // セッション内既読
+  const [readIds, setReadIds] = useState(new Set()); // 開いた記事（薄く表示）
   const { isDarkMode } = useTheme();
   const [viewMode, setViewMode] = usePersistedState('readlater_viewMode', 'list');
 
@@ -39,11 +40,10 @@ const ReadLaterPage = () => {
     return res.json();
   }, []);
 
+  // 初回取得
   const fetchArticles = useCallback(async () => {
     setLoading(true);
     setError(null);
-    // リフレッシュ時に既読セットをリセット→既読記事が消える
-    setReadIds(new Set());
     try {
       const data = await callReadLaterAPI('GET');
       if (data.success) setArticles(data.data.articles || []);
@@ -54,6 +54,28 @@ const ReadLaterPage = () => {
       setLoading(false);
     }
   }, [callReadLaterAPI]);
+
+  // Refresh: 既読記事を除外してから再取得
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setError(null);
+    const currentReadIds = new Set(readIds); // 現在の既読セットを保存
+    try {
+      const data = await callReadLaterAPI('GET');
+      if (data.success) {
+        // 既読のものを除外して更新
+        const fresh = (data.data.articles || []).filter(
+          a => !currentReadIds.has(a.article_id)
+        );
+        setArticles(fresh);
+        setReadIds(new Set()); // 既読セットをリセット
+      }
+    } catch (e) {
+      setError('Failed to refresh.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [callReadLaterAPI, readIds]);
 
   const fetchFavorites = useCallback(async () => {
     try {
@@ -67,7 +89,7 @@ const ReadLaterPage = () => {
     fetchFavorites();
   }, [fetchArticles, fetchFavorites]);
 
-  // 記事を開く → 既読マーク（ローカル）+ API
+  // 記事を開く → 既読セットに追加（リストには残る・薄く表示）
   const handleArticleClick = useCallback((article) => {
     const formatted = {
       id: article.article_id,
@@ -79,9 +101,7 @@ const ReadLaterPage = () => {
       imageUrl: article.image_url || null,
     };
     setSelectedArticle(formatted);
-    // 既読セットに追加
     setReadIds(prev => new Set([...prev, article.article_id]));
-    // APIで既読マーク（エラーは無視）
     api.articles.markAsRead(article.article_id).catch(console.error);
   }, [api]);
 
@@ -138,8 +158,6 @@ const ReadLaterPage = () => {
     return new Date(d).toLocaleDateString();
   };
 
-  // 既読を除外した表示記事
-  const visibleArticles = articles.filter(a => !readIds.has(a.article_id));
   const readCount = readIds.size;
 
   return (
@@ -153,7 +171,7 @@ const ReadLaterPage = () => {
             <FaBookmark style={{ color: '#FF6B35', fontSize: '1.4rem' }} />
             <h1 style={{ color: textPrimary, fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>Read Later</h1>
             <span style={{ backgroundColor: '#FF6B35', color: 'white', borderRadius: '12px', padding: '0.15rem 0.6rem', fontSize: '0.82rem', fontWeight: '700' }}>
-              {visibleArticles.length}
+              {articles.length}
             </span>
             {readCount > 0 && (
               <span style={{ color: textSecondary, fontSize: '0.82rem' }}>
@@ -163,20 +181,20 @@ const ReadLaterPage = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {/* Refreshボタン */}
             <button
-              onClick={fetchArticles}
-              disabled={loading}
+              onClick={handleRefresh}
+              disabled={refreshing || loading}
               style={{
                 padding: '0.35rem 0.9rem', backgroundColor: '#FF6B35', color: 'white',
                 border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600',
                 display: 'flex', alignItems: 'center', gap: '0.3rem',
+                opacity: (refreshing || loading) ? 0.7 : 1,
               }}
             >
-              <FaSync style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
+              <FaSync style={{ animation: (refreshing || loading) ? 'spin 1s linear infinite' : 'none' }} />
+              Refresh
             </button>
 
-            {/* Card/Listトグル */}
             <button
               onClick={() => setViewMode(v => v === 'card' ? 'list' : 'card')}
               style={{
@@ -191,7 +209,7 @@ const ReadLaterPage = () => {
           </div>
         </div>
 
-        {loading && (
+        {(loading || refreshing) && (
           <div style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ width: '32px', height: '32px', border: '4px solid #f3f3f3', borderTop: '4px solid #FF6B35', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
           </div>
@@ -199,20 +217,19 @@ const ReadLaterPage = () => {
 
         {error && <p style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
 
-        {!loading && visibleArticles.length === 0 && (
+        {!loading && !refreshing && articles.length === 0 && (
           <div style={{ textAlign: 'center', padding: '4rem', color: textSecondary }}>
             <FaBookmark style={{ fontSize: '3rem', opacity: 0.2, marginBottom: '1rem' }} />
-            <p style={{ fontSize: '1.1rem' }}>
-              {readCount > 0 ? '全て既読にしました！Refreshで一覧を更新できます' : 'Read Laterに保存した記事はありません'}
-            </p>
+            <p style={{ fontSize: '1.1rem' }}>Read Laterに保存した記事はありません</p>
           </div>
         )}
 
         {/* CARD VIEW */}
-        {!loading && visibleArticles.length > 0 && viewMode === 'card' && (
+        {!loading && !refreshing && articles.length > 0 && viewMode === 'card' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-            {visibleArticles.map(article => {
+            {articles.map(article => {
               const isFav = favoritedIds.has(article.article_id);
+              const isRead = readIds.has(article.article_id);
               return (
                 <div
                   key={article.id}
@@ -222,11 +239,17 @@ const ReadLaterPage = () => {
                     border: `1px solid ${border}`,
                     boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)',
                     cursor: 'pointer', position: 'relative',
+                    opacity: isRead ? 0.55 : 1, // 開いた記事は薄く
                     transition: 'transform 0.2s, box-shadow 0.2s',
                   }}
                   onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)'; }}
                   onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)'; }}
                 >
+                  {isRead && (
+                    <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 2, backgroundColor: '#28a745', borderRadius: '6px', padding: '0.15rem 0.4rem', fontSize: '0.7rem', color: 'white', fontWeight: '600' }}>
+                      ✓ Read
+                    </div>
+                  )}
                   {article.image_url ? (
                     <img src={article.image_url} alt="" style={{ width: '100%', height: '150px', objectFit: 'cover' }} />
                   ) : (
@@ -249,7 +272,6 @@ const ReadLaterPage = () => {
                       </p>
                     )}
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      {/* 星ボタン */}
                       <button
                         onClick={e => handleToggleFavoriteById(e, article)}
                         style={{
@@ -263,7 +285,6 @@ const ReadLaterPage = () => {
                       >
                         <FaStar /> {isFav ? 'Favorited' : 'Favorite'}
                       </button>
-                      {/* 削除ボタン */}
                       <button
                         onClick={e => { e.stopPropagation(); handleRemove(article.article_id); }}
                         style={{
@@ -284,10 +305,11 @@ const ReadLaterPage = () => {
         )}
 
         {/* LIST VIEW */}
-        {!loading && visibleArticles.length > 0 && viewMode === 'list' && (
+        {!loading && !refreshing && articles.length > 0 && viewMode === 'list' && (
           <div style={{ backgroundColor: cardBg, borderRadius: '10px', border: `1px solid ${border}`, overflow: 'hidden' }}>
-            {visibleArticles.map((article, idx) => {
+            {articles.map((article, idx) => {
               const isFav = favoritedIds.has(article.article_id);
+              const isRead = readIds.has(article.article_id);
               return (
                 <div
                   key={article.id}
@@ -295,8 +317,9 @@ const ReadLaterPage = () => {
                   style={{
                     display: 'flex', alignItems: 'center', gap: '0.75rem',
                     padding: '0.65rem 1rem',
-                    borderBottom: idx < visibleArticles.length - 1 ? `1px solid ${border}` : 'none',
+                    borderBottom: idx < articles.length - 1 ? `1px solid ${border}` : 'none',
                     cursor: 'pointer',
+                    opacity: isRead ? 0.55 : 1, // 開いた記事は薄く
                   }}
                   onMouseOver={e => { e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#f9f9f9'; }}
                   onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
@@ -313,17 +336,16 @@ const ReadLaterPage = () => {
                     <FaStar />
                   </button>
 
-                  {/* フィード名 */}
+                  {isRead && <span style={{ color: '#28a745', fontSize: '0.75rem', flexShrink: 0 }}>✓</span>}
+
                   <span style={{ color: '#FF6B35', fontSize: '0.82rem', fontWeight: '600', minWidth: '100px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
                     {article.feed_title || 'Feed'}
                   </span>
 
-                  {/* タイトル */}
                   <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {article.title}
                   </span>
 
-                  {/* 時刻 + 削除 */}
                   <span style={{ color: textSecondary, fontSize: '0.8rem', flexShrink: 0 }}>
                     {getRelativeTime(article.saved_at)}
                   </span>
