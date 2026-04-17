@@ -9,6 +9,70 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useArticles } from '../contexts/ArticlesContext';
 import { usePersistedState } from '../hooks/usePersistedState';
 
+// ── カテゴリセクション（折りたたみ対応・トップレベルコンポーネント） ──
+const CategorySection = ({ label, feedList, feedUnreadCounts, selectedFeedId, setSelectedFeedId, textPrimary, textSecondary, isDarkMode }) => {
+  const [collapsed, setCollapsed] = useState(false);
+  const categoryUnread = feedList.reduce((sum, f) => sum + (feedUnreadCounts[f.id] || 0), 0);
+  return (
+    <div>
+      <div
+        onClick={() => setCollapsed(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '0.4rem',
+          padding: '0.3rem 1rem', cursor: 'pointer',
+          fontSize: '0.72rem', fontWeight: '700',
+          color: textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em',
+          userSelect: 'none',
+        }}
+      >
+        <span style={{ fontSize: '0.65rem' }}>{collapsed ? '▶' : '▼'}</span>
+        <span style={{ flex: 1 }}>{label}</span>
+        {categoryUnread > 0 && (
+          <span style={{ backgroundColor: '#FF6B35', color: 'white', borderRadius: '12px', padding: '0.1rem 0.4rem', fontSize: '0.7rem', fontWeight: '700' }}>
+            {categoryUnread}
+          </span>
+        )}
+      </div>
+      {!collapsed && feedList.map(feed => {
+        const unread = feedUnreadCounts[feed.id] || 0;
+        const isActive = selectedFeedId === feed.id;
+        return (
+          <div
+            key={feed.id}
+            onClick={() => setSelectedFeedId(feed.id)}
+            style={{
+              padding: '0.5rem 1rem', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              backgroundColor: isActive ? '#FF6B35' : 'transparent',
+              color: isActive ? 'white' : textPrimary,
+              borderRadius: '6px', margin: '0.1rem 0.5rem',
+              fontSize: '0.87rem', whiteSpace: 'nowrap', overflow: 'hidden',
+            }}
+            onMouseOver={e => { if (!isActive) e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#eee'; }}
+            onMouseOut={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}
+          >
+            {feed.faviconUrl ? (
+              <img src={feed.faviconUrl} alt="" style={{ width: '16px', height: '16px', borderRadius: '3px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+            ) : (
+              <FaRss style={{ flexShrink: 0, fontSize: '0.8rem', opacity: 0.5 }} />
+            )}
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{feed.title || feed.url}</span>
+            {unread > 0 && (
+              <span style={{
+                backgroundColor: isActive ? 'white' : '#FF6B35',
+                color: isActive ? '#FF6B35' : 'white',
+                borderRadius: '12px', padding: '0.1rem 0.4rem',
+                fontSize: '0.72rem', fontWeight: '700', flexShrink: 0,
+              }}>{unread}</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ── メインコンポーネント ──
 const DashboardPage = () => {
   const [filteredArticles, setFilteredArticles] = useState([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
@@ -22,7 +86,7 @@ const DashboardPage = () => {
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const [readLaterArticles, setReadLaterArticles] = useState(new Set());
-  const [swipeToast, setSwipeToast] = useState(null); // { msg, type }
+  const [swipeToast, setSwipeToast] = useState(null);
   const sidebarOpen = sidebarPinned || sidebarHovered;
   const hoverTimeoutRef = useRef(null);
   const toastTimeoutRef = useRef(null);
@@ -45,13 +109,9 @@ const DashboardPage = () => {
   const fullyViewedArticles = useRef(new Set());
   const handleRefreshRef = useRef(null);
 
-  const apiClient = useMemo(() => createApiClient(
-    import.meta.env.VITE_API_BASE_URL || '',
-    getAccessToken
-  ), []);
+  const apiClient = useMemo(() => createApiClient(import.meta.env.VITE_API_BASE_URL || '', getAccessToken), []);
   const api = useMemo(() => new FeedOwnAPI(apiClient), [apiClient]);
 
-  // Read Later API calls
   const callReadLaterAPI = useCallback(async (method, body = null, query = '') => {
     const token = await getAccessToken();
     const res = await fetch(`/api/read-later${query}`, {
@@ -62,13 +122,10 @@ const DashboardPage = () => {
     return res.json();
   }, []);
 
-  // Read Later一覧取得（IDのSetを作る）
   const fetchReadLater = useCallback(async () => {
     try {
       const data = await callReadLaterAPI('GET');
-      if (data.success) {
-        setReadLaterArticles(new Set(data.data.articles.map(a => a.article_id)));
-      }
+      if (data.success) setReadLaterArticles(new Set(data.data.articles.map(a => a.article_id)));
     } catch (e) { console.error(e); }
   }, [callReadLaterAPI]);
 
@@ -83,19 +140,12 @@ const DashboardPage = () => {
   const handleAddToReadLater = useCallback(async (article) => {
     try {
       await callReadLaterAPI('POST', {
-        articleId: article.id,
-        title: article.title,
-        url: article.url,
-        description: article.description,
-        feedTitle: article.feedTitle,
-        imageUrl: article.imageUrl,
+        articleId: article.id, title: article.title, url: article.url,
+        description: article.description, feedTitle: article.feedTitle, imageUrl: article.imageUrl,
       });
       setReadLaterArticles(prev => new Set([...prev, article.id]));
       showToast('📌 Read Laterに追加しました');
-    } catch (e) {
-      console.error(e);
-      showToast('エラーが発生しました', 'error');
-    }
+    } catch (e) { showToast('エラーが発生しました', 'error'); }
   }, [callReadLaterAPI]);
 
   const handleRemoveFromReadLater = useCallback(async (articleId) => {
@@ -188,9 +238,7 @@ const DashboardPage = () => {
   }, [location.pathname, fetchArticles, selectedFeedId]);
 
   useEffect(() => {
-    const handler = () => {
-      if (document.visibilityState === 'visible') fetchArticles(true, selectedFeedId);
-    };
+    const handler = () => { if (document.visibilityState === 'visible') fetchArticles(true, selectedFeedId); };
     document.addEventListener('visibilitychange', handler);
     return () => document.removeEventListener('visibilitychange', handler);
   }, [fetchArticles, selectedFeedId]);
@@ -203,17 +251,11 @@ const DashboardPage = () => {
     return () => clearInterval(id);
   }, [lastArticleFetchTime]);
 
-  const unreadCount = useMemo(() =>
-    articles.filter(a => !readArticles.has(a.id)).length,
-    [articles, readArticles]
-  );
+  const unreadCount = useMemo(() => articles.filter(a => !readArticles.has(a.id)).length, [articles, readArticles]);
 
   const feedUnreadCounts = useMemo(() => {
     const counts = {};
-    articles.forEach(a => {
-      if (!readArticles.has(a.id))
-        counts[a.feedId] = (counts[a.feedId] || 0) + 1;
-    });
+    articles.forEach(a => { if (!readArticles.has(a.id)) counts[a.feedId] = (counts[a.feedId] || 0) + 1; });
     return counts;
   }, [articles, readArticles]);
 
@@ -241,8 +283,7 @@ const DashboardPage = () => {
       entries.forEach((entry) => {
         const id = entry.target.dataset.articleId;
         if (!id || readArticles.has(id)) return;
-        if (entry.isIntersecting && entry.intersectionRatio >= 1.0)
-          fullyViewedArticles.current.add(id);
+        if (entry.isIntersecting && entry.intersectionRatio >= 1.0) fullyViewedArticles.current.add(id);
         if (entry.isIntersecting && entry.intersectionRatio <= 0.5 && fullyViewedArticles.current.has(id)) {
           fullyViewedArticles.current.delete(id); markAsRead(id);
         }
@@ -251,9 +292,7 @@ const DashboardPage = () => {
         }
       });
     }, { threshold: [0, 0.5, 1.0] });
-    Object.values(articleRefs.current).forEach(ref => {
-      if (ref) observerRef.current.observe(ref);
-    });
+    Object.values(articleRefs.current).forEach(ref => { if (ref) observerRef.current.observe(ref); });
     return () => { if (observerRef.current) observerRef.current.disconnect(); };
   }, [filteredArticles, readArticles, markAsRead, filter]);
 
@@ -298,13 +337,9 @@ const DashboardPage = () => {
     });
   };
 
-  // 全選択/全解除
   const handleSelectAll = () => {
-    if (checkedArticles.size === filteredArticles.length) {
-      setCheckedArticles(new Set());
-    } else {
-      setCheckedArticles(new Set(filteredArticles.map(a => a.id)));
-    }
+    if (checkedArticles.size === filteredArticles.length) setCheckedArticles(new Set());
+    else setCheckedArticles(new Set(filteredArticles.map(a => a.id)));
   };
 
   const allChecked = filteredArticles.length > 0 && checkedArticles.size === filteredArticles.length;
@@ -324,8 +359,7 @@ const DashboardPage = () => {
       } else {
         await api.articles.addToFavorites(selectedArticle.id, {
           title: selectedArticle.title, url: selectedArticle.url,
-          description: selectedArticle.description, feedTitle: selectedArticle.feedTitle,
-          imageUrl: selectedArticle.imageUrl,
+          description: selectedArticle.description, feedTitle: selectedArticle.feedTitle, imageUrl: selectedArticle.imageUrl,
         });
         setFavoritedArticles(prev => new Set([...prev, selectedArticle.id]));
       }
@@ -344,28 +378,15 @@ const DashboardPage = () => {
 
   const getFeedFavicon = (feedId) => feeds.find(f => f.id === feedId)?.faviconUrl || null;
 
-  // スワイプハンドラー
   const touchStartX = useRef({});
-  const handleTouchStart = (e, articleId) => {
-    touchStartX.current[articleId] = e.touches[0].clientX;
-  };
+  const handleTouchStart = (e, articleId) => { touchStartX.current[articleId] = e.touches[0].clientX; };
   const handleTouchEnd = (e, article) => {
     const startX = touchStartX.current[article.id];
     if (startX === undefined) return;
     const delta = e.changedTouches[0].clientX - startX;
     if (Math.abs(delta) > 60) {
-      if (delta > 0) {
-        // 右スワイプ → 既読
-        markAsRead(article.id);
-        showToast('✓ 既読にしました');
-      } else {
-        // 左スワイプ → Read Later
-        if (readLaterArticles.has(article.id)) {
-          handleRemoveFromReadLater(article.id);
-        } else {
-          handleAddToReadLater(article);
-        }
-      }
+      if (delta > 0) { markAsRead(article.id); showToast('✓ 既読にしました'); }
+      else { readLaterArticles.has(article.id) ? handleRemoveFromReadLater(article.id) : handleAddToReadLater(article); }
     }
     delete touchStartX.current[article.id];
   };
@@ -382,24 +403,37 @@ const DashboardPage = () => {
     setSidebarHovered(true);
   };
   const handleSidebarMouseLeave = () => {
-    if (!sidebarPinned) {
-      hoverTimeoutRef.current = setTimeout(() => setSidebarHovered(false), 300);
-    }
+    if (!sidebarPinned) hoverTimeoutRef.current = setTimeout(() => setSidebarHovered(false), 300);
   };
+
+  // カテゴリグループ化
+  const { grouped, noCategory } = useMemo(() => {
+    const grouped = {};
+    const noCategory = [];
+    feeds.forEach(feed => {
+      if (feed.category) {
+        if (!grouped[feed.category]) grouped[feed.category] = [];
+        grouped[feed.category].push(feed);
+      } else {
+        noCategory.push(feed);
+      }
+    });
+    return { grouped, noCategory };
+  }, [feeds]);
+  const hasCategories = Object.keys(grouped).length > 0;
+  const categorySectionProps = { feedUnreadCounts, selectedFeedId, setSelectedFeedId, textPrimary, textSecondary, isDarkMode };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: bg }}>
       <Navigation unreadCount={unreadCount} />
 
-      {/* スワイプトースト */}
       {swipeToast && (
         <div style={{
           position: 'fixed', bottom: '2rem', left: '50%', transform: 'translateX(-50%)',
           backgroundColor: swipeToast.type === 'error' ? '#dc3545' : '#333',
           color: 'white', padding: '0.6rem 1.5rem', borderRadius: '20px',
           fontSize: '0.9rem', fontWeight: '600', zIndex: 200,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          animation: 'fadeIn 0.2s ease',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)', animation: 'fadeIn 0.2s ease',
         }}>
           {swipeToast.msg}
         </div>
@@ -443,6 +477,7 @@ const DashboardPage = () => {
         >
           {sidebarOpen && (
             <>
+              {/* ピンボタン */}
               <div style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   onClick={() => setSidebarPinned(v => !v)}
@@ -459,6 +494,7 @@ const DashboardPage = () => {
                 </button>
               </div>
 
+              {/* All Feeds */}
               <div
                 onClick={() => setSelectedFeedId('')}
                 style={{
@@ -482,110 +518,61 @@ const DashboardPage = () => {
                 )}
               </div>
 
+              {/* Feed list - カテゴリグループ */}
               <div style={{ marginTop: '0.5rem' }}>
-                {(() => {
-              // カテゴリでグループ化
-              const grouped = {};
-              const noCategory = [];
-              feeds.forEach(feed => {
-                if (feed.category) {
-                  if (!grouped[feed.category]) grouped[feed.category] = [];
-                  grouped[feed.category].push(feed);
-                } else {
-                  noCategory.push(feed);
-                }
-              });
-              
-              const renderFeedItem = (feed) => {
-                const unread = feedUnreadCounts[feed.id] || 0;
-                const isActive = selectedFeedId === feed.id;
-                return (
-                  <div
-                    key={feed.id}
-                    onClick={() => setSelectedFeedId(feed.id)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: '0.6rem',
-                      backgroundColor: isActive ? '#FF6B35' : 'transparent',
-                      color: isActive ? 'white' : textPrimary,
-                      borderRadius: '6px', margin: '0.1rem 0.5rem',
-                      fontSize: '0.87rem', whiteSpace: 'nowrap', overflow: 'hidden',
-                    }}
-                    onMouseOver={e => { if (!isActive) e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#eee'; }}
-                    onMouseOut={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}
-                    >
-                    {feed.faviconUrl ? (
-                      <img src={feed.faviconUrl} alt="" style={{ width: '16px', height: '16px', borderRadius: '3px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
-                    ) : (
-                      <FaRss style={{ flexShrink: 0, fontSize: '0.8rem', opacity: 0.5 }} />
-                    )}
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{feed.title || feed.url}</span>
-                    {unread > 0 && (
-                      <span style={{
-                        backgroundColor: isActive ? 'white' : '#FF6B35',
-                        color: isActive ? '#FF6B35' : 'white',
-                        borderRadius: '12px', padding: '0.1rem 0.4rem',
-                        fontSize: '0.72rem', fontWeight: '700', flexShrink: 0,
-                      }}>{unread}</span>
-                    )}
-                  </div>
-                );
-              };
-              
-              const CategorySection = ({ label, feedList }) => {
-                const [collapsed, setCollapsed] = React.useState(false);
-                const categoryUnread = feedList.reduce((sum, f) => sum + (feedUnreadCounts[f.id] || 0), 0);
-                return (
-                  <div>
-                    <div
-                      onClick={() => setCollapsed(v => !v)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '0.4rem',
-                        padding: '0.3rem 1rem', cursor: 'pointer',
-                        fontSize: '0.72rem', fontWeight: '700',
-                        color: textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em',
-                        userSelect: 'none',
-                      }}
-                      >
-                      <span style={{ fontSize: '0.65rem' }}>{collapsed ? '▶' : '▼'}</span>
-                      <span style={{ flex: 1 }}>{label}</span>
-                      {categoryUnread > 0 && (
-                        <span style={{
-                          backgroundColor: '#FF6B35', color: 'white',
-                          borderRadius: '12px', padding: '0.1rem 0.4rem',
-                          fontSize: '0.7rem', fontWeight: '700',
-                        }}>{categoryUnread}</span>
-                      )}
-                    </div>
-                    {!collapsed && feedList.map(feed => renderFeedItem(feed))}
-                  </div>
-                );
-              };
-              
-              return (
-                <>
-                  {/* カテゴリあり */}
-                  {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([cat, feedList]) => (
-                  <CategorySection key={cat} label={cat} feedList={feedList} />
+                {/* カテゴリあり */}
+                {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([cat, feedList]) => (
+                  <CategorySection key={cat} label={cat} feedList={feedList} {...categorySectionProps} />
                 ))}
-                  {/* カテゴリなし */}
-                  {noCategory.length > 0 && (
-                  Object.keys(grouped).length > 0 ? (
-                    <CategorySection label="Others" feedList={noCategory} />
-                  ) : (
-                    <>
-                      <div style={{ padding: '0.4rem 1rem', fontSize: '0.72rem', color: textSecondary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        Feeds
-                      </div>
-                      {noCategory.map(feed => renderFeedItem(feed))}
-                    </>
-                  )
+                {/* カテゴリなし */}
+                {noCategory.length > 0 && (
+                  hasCategories
+                    ? <CategorySection label="Others" feedList={noCategory} {...categorySectionProps} />
+                    : <>
+                        <div style={{ padding: '0.4rem 1rem', fontSize: '0.72rem', color: textSecondary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          Feeds
+                        </div>
+                        {noCategory.map(feed => {
+                          const unread = feedUnreadCounts[feed.id] || 0;
+                          const isActive = selectedFeedId === feed.id;
+                          return (
+                            <div
+                              key={feed.id}
+                              onClick={() => setSelectedFeedId(feed.id)}
+                              style={{
+                                padding: '0.5rem 1rem', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: '0.6rem',
+                                backgroundColor: isActive ? '#FF6B35' : 'transparent',
+                                color: isActive ? 'white' : textPrimary,
+                                borderRadius: '6px', margin: '0.1rem 0.5rem',
+                                fontSize: '0.87rem', whiteSpace: 'nowrap', overflow: 'hidden',
+                              }}
+                              onMouseOver={e => { if (!isActive) e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#eee'; }}
+                              onMouseOut={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                            >
+                              {feed.faviconUrl ? (
+                                <img src={feed.faviconUrl} alt="" style={{ width: '16px', height: '16px', borderRadius: '3px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+                              ) : (
+                                <FaRss style={{ flexShrink: 0, fontSize: '0.8rem', opacity: 0.5 }} />
+                              )}
+                              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{feed.title || feed.url}</span>
+                              {unread > 0 && (
+                                <span style={{
+                                  backgroundColor: isActive ? 'white' : '#FF6B35',
+                                  color: isActive ? '#FF6B35' : 'white',
+                                  borderRadius: '12px', padding: '0.1rem 0.4rem',
+                                  fontSize: '0.72rem', fontWeight: '700', flexShrink: 0,
+                                }}>{unread}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </>
                 )}
-                </>
-              );
-            })()}
               </div>
+            </>
+          )}
+        </div>
 
         {/* MAIN CONTENT */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', marginLeft: sidebarPinned ? '0' : '12px' }}>
@@ -599,7 +586,6 @@ const DashboardPage = () => {
             padding: '0.6rem 1.5rem',
             display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap',
           }}>
-            {/* 全選択チェックボックス */}
             <input
               type="checkbox"
               checked={allChecked}
@@ -623,7 +609,6 @@ const DashboardPage = () => {
 
             <div style={{ flex: 1 }} />
 
-            {/* 選択時のアクションボタン */}
             {checkedArticles.size > 0 && (
               <>
                 <button onClick={handleBatchAddToReadLater} style={{
@@ -712,8 +697,7 @@ const DashboardPage = () => {
                         boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)',
                         border: isChecked ? '2px solid #FF6B35' : `1px solid ${border}`,
                         cursor: 'pointer', opacity: isRead ? 0.65 : 1,
-                        transition: 'transform 0.2s, box-shadow 0.2s',
-                        position: 'relative',
+                        transition: 'transform 0.2s, box-shadow 0.2s', position: 'relative',
                       }}
                       onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)'; }}
                       onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)'; }}
@@ -755,12 +739,10 @@ const DashboardPage = () => {
                             {article.description}
                           </p>
                         )}
-                        {/* Read Laterボタン */}
                         <button
                           onClick={e => { e.stopPropagation(); isReadLater ? handleRemoveFromReadLater(article.id) : handleAddToReadLater(article); }}
                           style={{
-                            marginTop: '0.6rem',
-                            padding: '0.25rem 0.6rem',
+                            marginTop: '0.6rem', padding: '0.25rem 0.6rem',
                             backgroundColor: isReadLater ? '#6f42c1' : 'transparent',
                             color: isReadLater ? 'white' : textSecondary,
                             border: `1px solid ${isReadLater ? '#6f42c1' : border}`,
@@ -814,7 +796,7 @@ const DashboardPage = () => {
                           background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px',
                           color: isReadLater ? '#6f42c1' : textSecondary, fontSize: '0.85rem', flexShrink: 0,
                         }}
-                        >
+                      >
                         <FaBookmark />
                       </button>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: '140px', maxWidth: '180px', flexShrink: 0 }}>
