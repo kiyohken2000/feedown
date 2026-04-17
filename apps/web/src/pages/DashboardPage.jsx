@@ -178,7 +178,7 @@ const DashboardPage = () => {
 
   handleRefreshRef.current = handleRefresh;
 
-  useEffect(() => { handleRefreshRef.current?.(); }, [location.key]);
+  useEffect(() => { fetchArticles(true, selectedFeedId); }, [location.key]);
 
   const prevPathRef = useRef(location.pathname);
   useEffect(() => {
@@ -198,7 +198,7 @@ const DashboardPage = () => {
   useEffect(() => {
     const id = setInterval(() => {
       if (lastArticleFetchTime && Date.now() - lastArticleFetchTime >= 15 * 60 * 1000)
-        handleRefreshRef.current?.();
+        fetchArticles(true, selectedFeedId);
     }, 60 * 1000);
     return () => clearInterval(id);
   }, [lastArticleFetchTime]);
