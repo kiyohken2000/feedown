@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FaCheck, FaSync, FaArrowUp, FaList, FaTh, FaRss, FaThumbtack, FaBookmark } from 'react-icons/fa';
+import { FaCheck, FaSync, FaArrowUp, FaList, FaTh, FaRss, FaThumbtack, FaBookmark, FaNewspaper } from 'react-icons/fa';
 import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
@@ -9,9 +9,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useArticles } from '../contexts/ArticlesContext';
 import { usePersistedState } from '../hooks/usePersistedState';
 
-// ── カテゴリサイドバーセクション ──
+// ── カテゴリサイドバーセクション（初期折りたたみ） ──
 const CategorySection = ({ label, feedList, feedUnreadCounts, selectedFeedId, setSelectedFeedId, textPrimary, textSecondary, isDarkMode }) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true); // 初期は折りたたみ
   const categoryUnread = feedList.reduce((sum, f) => sum + (feedUnreadCounts[f.id] || 0), 0);
   return (
     <div>
@@ -23,8 +23,9 @@ const CategorySection = ({ label, feedList, feedUnreadCounts, selectedFeedId, se
       }}>
         <span style={{ fontSize: '0.65rem' }}>{collapsed ? '▶' : '▼'}</span>
         <span style={{ flex: 1 }}>{label}</span>
+        {/* モノトーンバッジ */}
         {categoryUnread > 0 && (
-          <span style={{ backgroundColor: '#FF6B35', color: 'white', borderRadius: '12px', padding: '0.1rem 0.4rem', fontSize: '0.7rem', fontWeight: '700' }}>
+          <span style={{ backgroundColor: isDarkMode ? '#555' : '#bbb', color: isDarkMode ? '#eee' : '#fff', borderRadius: '12px', padding: '0.1rem 0.4rem', fontSize: '0.7rem', fontWeight: '700' }}>
             {categoryUnread}
           </span>
         )}
@@ -50,7 +51,7 @@ const CategorySection = ({ label, feedList, feedUnreadCounts, selectedFeedId, se
             }
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{feed.title || feed.url}</span>
             {unread > 0 && (
-              <span style={{ backgroundColor: isActive ? 'white' : '#FF6B35', color: isActive ? '#FF6B35' : 'white', borderRadius: '12px', padding: '0.1rem 0.4rem', fontSize: '0.72rem', fontWeight: '700', flexShrink: 0 }}>{unread}</span>
+              <span style={{ backgroundColor: isActive ? 'white' : (isDarkMode ? '#555' : '#bbb'), color: isActive ? '#FF6B35' : (isDarkMode ? '#eee' : '#fff'), borderRadius: '12px', padding: '0.1rem 0.4rem', fontSize: '0.72rem', fontWeight: '700', flexShrink: 0 }}>{unread}</span>
             )}
           </div>
         );
@@ -59,7 +60,6 @@ const CategorySection = ({ label, feedList, feedUnreadCounts, selectedFeedId, se
   );
 };
 
-// ── メイン ──
 const DashboardPage = () => {
   const [filteredArticles, setFilteredArticles] = useState([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
@@ -68,7 +68,7 @@ const DashboardPage = () => {
   const [selectedFeedId, setSelectedFeedId] = useState('');
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [viewMode, setViewMode] = usePersistedState('dashboard_viewMode', 'card');
+  const [viewMode, setViewMode] = usePersistedState('dashboard_viewMode', 'card'); // 'card' | 'list' | 'magazine'
   const [checkedArticles, setCheckedArticles] = useState(new Set());
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarHovered, setSidebarHovered] = useState(false);
@@ -153,7 +153,6 @@ const DashboardPage = () => {
     try { await api.articles.markAsRead(articleId); } catch (e) { console.error(e); }
   }, [api, setReadArticles]);
 
-  // カテゴリをSupabaseからマージ
   const fetchFeeds = useCallback(async () => {
     try {
       const res = await api.feeds.list();
@@ -224,7 +223,6 @@ const DashboardPage = () => {
 
   handleRefreshRef.current = handleRefresh;
 
-  // 初回ロード時にfetchFeedsも呼ぶ
   useEffect(() => {
     fetchFeeds();
     fetchArticles(true, selectedFeedId);
@@ -233,18 +231,14 @@ const DashboardPage = () => {
   const prevPathRef = useRef(location.pathname);
   useEffect(() => {
     if (location.pathname === '/dashboard' && prevPathRef.current !== '/dashboard') {
-      fetchFeeds();
-      fetchArticles(true, selectedFeedId);
+      fetchFeeds(); fetchArticles(true, selectedFeedId);
     }
     prevPathRef.current = location.pathname;
   }, [location.pathname]);
 
   useEffect(() => {
     const handler = () => {
-      if (document.visibilityState === 'visible') {
-        fetchFeeds();
-        fetchArticles(true, selectedFeedId);
-      }
+      if (document.visibilityState === 'visible') { fetchFeeds(); fetchArticles(true, selectedFeedId); }
     };
     document.addEventListener('visibilitychange', handler);
     return () => document.removeEventListener('visibilitychange', handler);
@@ -259,7 +253,6 @@ const DashboardPage = () => {
   }, [lastArticleFetchTime]);
 
   const unreadCount = useMemo(() => articles.filter(a => !readArticles.has(a.id)).length, [articles, readArticles]);
-
   const feedUnreadCounts = useMemo(() => {
     const counts = {};
     articles.forEach(a => { if (!readArticles.has(a.id)) counts[a.feedId] = (counts[a.feedId] || 0) + 1; });
@@ -375,7 +368,7 @@ const DashboardPage = () => {
   };
 
   const getFeedFavicon = (feedId) => feeds.find(f => f.id === feedId)?.faviconUrl || null;
-  const getFeedCategory = (feedId) => feeds.find(f => f.id === feedId)?.category || null;
+  const getFeedCategory = useCallback((feedId) => feeds.find(f => f.id === feedId)?.category || null, [feeds]);
 
   const touchStartX = useRef({});
   const handleTouchStart = (e, articleId) => { touchStartX.current[articleId] = e.touches[0].clientX; };
@@ -400,7 +393,6 @@ const DashboardPage = () => {
   const handleSidebarMouseEnter = () => { if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current); setSidebarHovered(true); };
   const handleSidebarMouseLeave = () => { if (!sidebarPinned) hoverTimeoutRef.current = setTimeout(() => setSidebarHovered(false), 300); };
 
-  // サイドバー用カテゴリグループ
   const { grouped, noCategory } = useMemo(() => {
     const grouped = {};
     const noCategory = [];
@@ -415,39 +407,40 @@ const DashboardPage = () => {
   const hasCategories = Object.keys(grouped).length > 0;
   const categorySectionProps = { feedUnreadCounts, selectedFeedId, setSelectedFeedId, textPrimary, textSecondary, isDarkMode };
 
-  // 記事をカテゴリでグループ化（アルファベット順）
+  // 記事カテゴリグループ
   const groupedArticles = useMemo(() => {
     if (!filteredArticles.length) return [];
     const catMap = {};
     const uncategorized = [];
     filteredArticles.forEach(article => {
       const cat = getFeedCategory(article.feedId);
-      if (cat) {
-        if (!catMap[cat]) catMap[cat] = [];
-        catMap[cat].push(article);
-      } else uncategorized.push(article);
+      if (cat) { if (!catMap[cat]) catMap[cat] = []; catMap[cat].push(article); }
+      else uncategorized.push(article);
     });
     const sorted = Object.entries(catMap).sort(([a], [b]) => a.localeCompare(b, 'ja'));
     if (uncategorized.length > 0) sorted.push(['__uncategorized__', uncategorized]);
     return sorted;
-  }, [filteredArticles, feeds]);
+  }, [filteredArticles, feeds, getFeedCategory]);
 
-  // カテゴリが1つもない場合はフラット表示
   const useCategoryGroups = useMemo(() =>
     groupedArticles.length > 1 || (groupedArticles.length === 1 && groupedArticles[0][0] !== '__uncategorized__'),
     [groupedArticles]
   );
 
-  // 記事カードのレンダリング
-  const renderArticleCard = (article) => {
+  // ビュー切替（card → list → magazine）
+  const cycleViewMode = () => {
+    setViewMode(v => v === 'card' ? 'list' : v === 'list' ? 'magazine' : 'card');
+  };
+  const viewModeLabel = viewMode === 'card' ? <><FaList /> List</> : viewMode === 'list' ? <><FaNewspaper /> Magazine</> : <><FaTh /> Card</>;
+
+  // ── 記事レンダラー ──
+
+  const renderCard = (article) => {
     const isRead = readArticles.has(article.id);
     const isChecked = checkedArticles.has(article.id);
     const isReadLater = readLaterArticles.has(article.id);
     return (
-      <div
-        key={article.id}
-        ref={el => articleRefs.current[article.id] = el}
-        data-article-id={article.id}
+      <div key={article.id} ref={el => articleRefs.current[article.id] = el} data-article-id={article.id}
         onClick={() => handleArticleClick(article)}
         onTouchStart={e => handleTouchStart(e, article.id)}
         onTouchEnd={e => handleTouchEnd(e, article)}
@@ -462,11 +455,8 @@ const DashboardPage = () => {
         onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)'; }}
       >
         <div style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 2 }}>
-          <input type="checkbox" checked={isChecked}
-            onChange={e => handleCheckboxChange(e, article.id)}
-            onClick={e => e.stopPropagation()}
-            style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer' }}
-          />
+          <input type="checkbox" checked={isChecked} onChange={e => handleCheckboxChange(e, article.id)} onClick={e => e.stopPropagation()}
+            style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer' }} />
         </div>
         {isReadLater && (
           <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 2, backgroundColor: '#6f42c1', borderRadius: '6px', padding: '0.2rem 0.4rem' }}>
@@ -487,16 +477,15 @@ const DashboardPage = () => {
             <span>{getRelativeTime(article.publishedAt)}</span>
             {isRead && <span style={{ color: '#28a745', marginLeft: 'auto' }}>✓</span>}
           </div>
-          <h3 style={{ color: textPrimary, fontSize: '0.92rem', fontWeight: '600', lineHeight: '1.4', margin: '0 0 0.4rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          <h3 style={{ color: textPrimary, fontSize: '0.92rem', fontWeight: '600', lineHeight: '1.4', margin: '0 0 0.4rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}>
             {article.title}
           </h3>
           {article.description && (
-            <p style={{ color: textSecondary, fontSize: '0.8rem', lineHeight: '1.5', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            <p style={{ color: textSecondary, fontSize: '0.8rem', lineHeight: '1.5', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}>
               {article.description}
             </p>
           )}
-          <button
-            onClick={e => { e.stopPropagation(); isReadLater ? handleRemoveFromReadLater(article.id) : handleAddToReadLater(article); }}
+          <button onClick={e => { e.stopPropagation(); isReadLater ? handleRemoveFromReadLater(article.id) : handleAddToReadLater(article); }}
             style={{
               marginTop: '0.6rem', padding: '0.25rem 0.6rem',
               backgroundColor: isReadLater ? '#6f42c1' : 'transparent',
@@ -513,16 +502,12 @@ const DashboardPage = () => {
     );
   };
 
-  // 記事リスト行のレンダリング
-  const renderArticleListRow = (article, idx, total) => {
+  const renderListRow = (article, idx, total) => {
     const isRead = readArticles.has(article.id);
     const isChecked = checkedArticles.has(article.id);
     const isReadLater = readLaterArticles.has(article.id);
     return (
-      <div
-        key={article.id}
-        ref={el => articleRefs.current[article.id] = el}
-        data-article-id={article.id}
+      <div key={article.id} ref={el => articleRefs.current[article.id] = el} data-article-id={article.id}
         onClick={() => handleArticleClick(article)}
         onTouchStart={e => handleTouchStart(e, article.id)}
         onTouchEnd={e => handleTouchEnd(e, article)}
@@ -536,28 +521,20 @@ const DashboardPage = () => {
         onMouseOver={e => { e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#f9f9f9'; }}
         onMouseOut={e => { e.currentTarget.style.backgroundColor = isChecked ? (isDarkMode ? '#3a3a2a' : '#fffbe6') : 'transparent'; }}
       >
-        <input type="checkbox" checked={isChecked}
-          onChange={e => handleCheckboxChange(e, article.id)}
-          onClick={e => e.stopPropagation()}
-          style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer', flexShrink: 0 }}
-        />
-        <button
-          onClick={e => { e.stopPropagation(); isReadLater ? handleRemoveFromReadLater(article.id) : handleAddToReadLater(article); }}
+        <input type="checkbox" checked={isChecked} onChange={e => handleCheckboxChange(e, article.id)} onClick={e => e.stopPropagation()}
+          style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer', flexShrink: 0 }} />
+        <button onClick={e => { e.stopPropagation(); isReadLater ? handleRemoveFromReadLater(article.id) : handleAddToReadLater(article); }}
           title={isReadLater ? 'Read Laterから削除' : 'Read Laterに追加'}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: isReadLater ? '#6f42c1' : textSecondary, fontSize: '0.85rem', flexShrink: 0 }}
-        >
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: isReadLater ? '#6f42c1' : textSecondary, fontSize: '0.85rem', flexShrink: 0 }}>
           <FaBookmark />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: '140px', maxWidth: '180px', flexShrink: 0 }}>
-          {getFeedFavicon(article.feedId)
-            ? <img src={getFeedFavicon(article.feedId)} alt="" style={{ width: '14px', height: '14px', borderRadius: '2px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
-            : <FaRss style={{ fontSize: '0.75rem', color: '#FF6B35', flexShrink: 0 }} />
-          }
-          <span style={{ color: '#FF6B35', fontSize: '0.82rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {getFeedFavicon(article.feedId) ? <img src={getFeedFavicon(article.feedId)} alt="" style={{ width: '14px', height: '14px', borderRadius: '2px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} /> : <FaRss style={{ fontSize: '0.75rem', color: '#FF6B35', flexShrink: 0 }} />}
+          <span style={{ color: '#FF6B35', fontSize: '0.82rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
             {article.feedTitle || 'Feed'}
           </span>
         </div>
-        <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
           {article.title}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, fontSize: '0.8rem', color: textSecondary }}>
@@ -565,6 +542,92 @@ const DashboardPage = () => {
           {isRead && <span style={{ color: '#28a745' }}>✓</span>}
           <span>{getRelativeTime(article.publishedAt)}</span>
         </div>
+      </div>
+    );
+  };
+
+  // マガジンビュー
+  const renderMagazineRow = (article, idx, total) => {
+    const isRead = readArticles.has(article.id);
+    const isChecked = checkedArticles.has(article.id);
+    const isReadLater = readLaterArticles.has(article.id);
+    return (
+      <div key={article.id} ref={el => articleRefs.current[article.id] = el} data-article-id={article.id}
+        onClick={() => handleArticleClick(article)}
+        onTouchStart={e => handleTouchStart(e, article.id)}
+        onTouchEnd={e => handleTouchEnd(e, article)}
+        style={{
+          display: 'flex', gap: '1rem', padding: '1rem',
+          borderBottom: idx < total - 1 ? `1px solid ${border}` : 'none',
+          cursor: 'pointer', opacity: isRead ? 0.65 : 1,
+          backgroundColor: isChecked ? (isDarkMode ? '#3a3a2a' : '#fffbe6') : 'transparent',
+          alignItems: 'flex-start',
+        }}
+        onMouseOver={e => { e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#f5f5f5'; }}
+        onMouseOut={e => { e.currentTarget.style.backgroundColor = isChecked ? (isDarkMode ? '#3a3a2a' : '#fffbe6') : 'transparent'; }}
+      >
+        {/* チェックボックス */}
+        <input type="checkbox" checked={isChecked} onChange={e => handleCheckboxChange(e, article.id)} onClick={e => e.stopPropagation()}
+          style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer', flexShrink: 0, marginTop: '4px' }} />
+
+        {/* サムネイル */}
+        {article.imageUrl
+          ? <img src={article.imageUrl} alt="" style={{ width: '160px', height: '110px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+          : <div style={{ width: '160px', height: '110px', backgroundColor: isDarkMode ? '#333' : '#eee', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FaRss style={{ color: '#FF6B35', opacity: 0.3, fontSize: '1.5rem' }} />
+            </div>
+        }
+
+        {/* コンテンツ */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem', fontSize: '0.8rem', color: textSecondary }}>
+            {isReadLater && <FaBookmark style={{ color: '#6f42c1', fontSize: '0.72rem' }} />}
+            {getFeedFavicon(article.feedId) && <img src={getFeedFavicon(article.feedId)} alt="" style={{ width: '14px', height: '14px', borderRadius: '2px' }} onError={e => e.target.style.display = 'none'} />}
+            <span style={{ color: '#FF6B35', fontWeight: '600', textAlign: 'left' }}>{article.feedTitle || 'Feed'}</span>
+            <span>·</span>
+            <span>{getRelativeTime(article.publishedAt)}</span>
+            {isRead && <span style={{ color: '#28a745' }}>✓</span>}
+          </div>
+          <h3 style={{ color: textPrimary, fontSize: '1rem', fontWeight: '700', lineHeight: '1.5', margin: '0 0 0.5rem', textAlign: 'left' }}>
+            {article.title}
+          </h3>
+          {article.description && (
+            <p style={{ color: textSecondary, fontSize: '0.85rem', lineHeight: '1.6', margin: '0 0 0.6rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}>
+              {article.description}
+            </p>
+          )}
+          <button onClick={e => { e.stopPropagation(); isReadLater ? handleRemoveFromReadLater(article.id) : handleAddToReadLater(article); }}
+            style={{
+              padding: '0.2rem 0.55rem',
+              backgroundColor: isReadLater ? '#6f42c1' : 'transparent',
+              color: isReadLater ? 'white' : textSecondary,
+              border: `1px solid ${isReadLater ? '#6f42c1' : border}`,
+              borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem',
+              display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+            }}
+          >
+            <FaBookmark /> {isReadLater ? 'Read Later ✓' : 'Read Later'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderArticlesByMode = (artList) => {
+    if (viewMode === 'card') return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+        {artList.map(a => renderCard(a))}
+      </div>
+    );
+    if (viewMode === 'list') return (
+      <div style={{ backgroundColor: cardBg, borderRadius: '10px', border: `1px solid ${border}`, overflow: 'hidden' }}>
+        {artList.map((a, i) => renderListRow(a, i, artList.length))}
+      </div>
+    );
+    // magazine
+    return (
+      <div style={{ backgroundColor: cardBg, borderRadius: '10px', border: `1px solid ${border}`, overflow: 'hidden' }}>
+        {artList.map((a, i) => renderMagazineRow(a, i, artList.length))}
       </div>
     );
   };
@@ -587,28 +650,17 @@ const DashboardPage = () => {
       <div style={{ display: 'flex', height: 'calc(100vh - 52px)', position: 'relative' }}>
 
         {!sidebarOpen && (
-          <div
-            onMouseEnter={() => { if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current); setSidebarHovered(true); }}
-            style={{
-              position: 'absolute', left: 0, top: 0, bottom: 0, width: '12px', zIndex: 60,
-              cursor: 'pointer',
-              backgroundColor: isDarkMode ? 'rgba(255,107,53,0.15)' : 'rgba(255,107,53,0.1)',
-              borderRight: '2px solid rgba(255,107,53,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
+          <div onMouseEnter={() => { if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current); setSidebarHovered(true); }}
+            style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '12px', zIndex: 60, cursor: 'pointer', backgroundColor: isDarkMode ? 'rgba(255,107,53,0.15)' : 'rgba(255,107,53,0.1)', borderRight: '2px solid rgba(255,107,53,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ width: '4px', height: '40px', backgroundColor: 'rgba(255,107,53,0.5)', borderRadius: '2px' }} />
           </div>
         )}
 
         {/* SIDEBAR */}
-        <div
-          onMouseEnter={handleSidebarMouseEnter}
-          onMouseLeave={handleSidebarMouseLeave}
+        <div onMouseEnter={handleSidebarMouseEnter} onMouseLeave={handleSidebarMouseLeave}
           style={{
             width: sidebarOpen ? '240px' : '0px', minWidth: sidebarOpen ? '240px' : '0px',
-            backgroundColor: sidebarBg,
-            borderRight: sidebarOpen ? `1px solid ${border}` : 'none',
+            backgroundColor: sidebarBg, borderRight: sidebarOpen ? `1px solid ${border}` : 'none',
             overflowY: sidebarOpen ? 'auto' : 'hidden', overflowX: 'hidden',
             transition: 'width 0.25s ease, min-width 0.25s ease',
             display: 'flex', flexDirection: 'column',
@@ -620,13 +672,8 @@ const DashboardPage = () => {
           {sidebarOpen && (
             <>
               <div style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'flex-end' }}>
-                <button onClick={() => setSidebarPinned(v => !v)} title={sidebarPinned ? 'ピン解除' : '固定'} style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: sidebarPinned ? '#FF6B35' : textSecondary,
-                  fontSize: '0.95rem', padding: '0.25rem',
-                  transform: sidebarPinned ? 'rotate(0deg)' : 'rotate(45deg)',
-                  transition: 'transform 0.2s, color 0.2s',
-                }}>
+                <button onClick={() => setSidebarPinned(v => !v)} title={sidebarPinned ? 'ピン解除' : '固定'}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: sidebarPinned ? '#FF6B35' : textSecondary, fontSize: '0.95rem', padding: '0.25rem', transform: sidebarPinned ? 'rotate(0deg)' : 'rotate(45deg)', transition: 'transform 0.2s, color 0.2s' }}>
                   <FaThumbtack />
                 </button>
               </div>
@@ -641,8 +688,9 @@ const DashboardPage = () => {
               }}>
                 <FaRss style={{ flexShrink: 0, fontSize: '0.85rem' }} />
                 <span style={{ flex: 1 }}>All Feeds</span>
+                {/* モノトーンバッジ */}
                 {unreadCount > 0 && (
-                  <span style={{ backgroundColor: selectedFeedId === '' ? 'white' : '#FF6B35', color: selectedFeedId === '' ? '#FF6B35' : 'white', borderRadius: '12px', padding: '0.1rem 0.45rem', fontSize: '0.75rem', fontWeight: '700' }}>{unreadCount}</span>
+                  <span style={{ backgroundColor: selectedFeedId === '' ? 'rgba(255,255,255,0.3)' : (isDarkMode ? '#555' : '#bbb'), color: 'white', borderRadius: '12px', padding: '0.1rem 0.45rem', fontSize: '0.75rem', fontWeight: '700' }}>{unreadCount}</span>
                 )}
               </div>
 
@@ -672,7 +720,7 @@ const DashboardPage = () => {
                             >
                               {feed.faviconUrl ? <img src={feed.faviconUrl} alt="" style={{ width: '16px', height: '16px', borderRadius: '3px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} /> : <FaRss style={{ flexShrink: 0, fontSize: '0.8rem', opacity: 0.5 }} />}
                               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{feed.title || feed.url}</span>
-                              {unread > 0 && <span style={{ backgroundColor: isActive ? 'white' : '#FF6B35', color: isActive ? '#FF6B35' : 'white', borderRadius: '12px', padding: '0.1rem 0.4rem', fontSize: '0.72rem', fontWeight: '700', flexShrink: 0 }}>{unread}</span>}
+                              {unread > 0 && <span style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.3)' : (isDarkMode ? '#555' : '#bbb'), color: 'white', borderRadius: '12px', padding: '0.1rem 0.4rem', fontSize: '0.72rem', fontWeight: '700', flexShrink: 0 }}>{unread}</span>}
                             </div>
                           );
                         })}
@@ -694,12 +742,9 @@ const DashboardPage = () => {
             padding: '0.6rem 1.5rem',
             display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap',
           }}>
-            <input type="checkbox" checked={allChecked}
-              ref={el => { if (el) el.indeterminate = someChecked; }}
-              onChange={handleSelectAll}
-              style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer' }}
-              title="全選択/全解除"
-            />
+            <input type="checkbox" checked={allChecked} ref={el => { if (el) el.indeterminate = someChecked; }} onChange={handleSelectAll}
+              style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer' }} title="全選択/全解除" />
+
             {['all', 'unread', 'read'].map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{
                 padding: '0.3rem 0.85rem', border: `2px solid #FF6B35`, borderRadius: '20px',
@@ -727,8 +772,9 @@ const DashboardPage = () => {
             <button onClick={handleRefresh} disabled={articlesLoading} style={{ padding: '0.3rem 0.85rem', backgroundColor: '#FF6B35', color: 'white', border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '0.83rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               <FaSync /> Refresh
             </button>
-            <button onClick={() => setViewMode(v => v === 'card' ? 'list' : 'card')} style={{ padding: '0.3rem 0.85rem', border: `1px solid ${border}`, borderRadius: '20px', backgroundColor: 'transparent', color: textSecondary, cursor: 'pointer', fontSize: '0.83rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              {viewMode === 'card' ? <><FaList /> List</> : <><FaTh /> Card</>}
+            {/* 3択ビュートグル */}
+            <button onClick={cycleViewMode} style={{ padding: '0.3rem 0.85rem', border: `1px solid ${border}`, borderRadius: '20px', backgroundColor: 'transparent', color: textSecondary, cursor: 'pointer', fontSize: '0.83rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              {viewModeLabel}
             </button>
             <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{ padding: '0.3rem 0.7rem', backgroundColor: 'transparent', border: `1px solid ${border}`, borderRadius: '20px', color: textSecondary, cursor: 'pointer', fontSize: '0.83rem' }}>
               <FaArrowUp />
@@ -750,48 +796,18 @@ const DashboardPage = () => {
             {/* カテゴリグループ表示 */}
             {!articlesError && filteredArticles.length > 0 && useCategoryGroups && groupedArticles.map(([cat, artList]) => (
               <div key={cat} style={{ marginBottom: '2rem' }}>
-                {/* カテゴリヘッダー */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '0.75rem',
-                  marginBottom: '0.75rem', paddingBottom: '0.5rem',
-                  borderBottom: `2px solid ${isDarkMode ? '#444' : '#e0e0e0'}`,
-                }}>
-                  <span style={{ fontSize: '1rem', fontWeight: '700', color: cat === '__uncategorized__' ? textSecondary : '#FF6B35' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: `2px solid ${isDarkMode ? '#444' : '#e0e0e0'}` }}>
+                  <span style={{ fontSize: '1rem', fontWeight: '700', color: cat === '__uncategorized__' ? textSecondary : '#FF6B35', textAlign: 'left' }}>
                     {cat === '__uncategorized__' ? 'Others' : cat}
                   </span>
-                  <span style={{ fontSize: '0.78rem', color: textSecondary }}>
-                    {artList.length}件
-                  </span>
+                  <span style={{ fontSize: '0.78rem', color: textSecondary }}>{artList.length}件</span>
                 </div>
-
-                {viewMode === 'card' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-                    {artList.map(article => renderArticleCard(article))}
-                  </div>
-                )}
-                {viewMode === 'list' && (
-                  <div style={{ backgroundColor: cardBg, borderRadius: '10px', border: `1px solid ${border}`, overflow: 'hidden' }}>
-                    {artList.map((article, idx) => renderArticleListRow(article, idx, artList.length))}
-                  </div>
-                )}
+                {renderArticlesByMode(artList)}
               </div>
             ))}
 
-            {/* カテゴリなしのフラット表示 */}
-            {!articlesError && filteredArticles.length > 0 && !useCategoryGroups && (
-              <>
-                {viewMode === 'card' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-                    {filteredArticles.map(article => renderArticleCard(article))}
-                  </div>
-                )}
-                {viewMode === 'list' && (
-                  <div style={{ backgroundColor: cardBg, borderRadius: '10px', border: `1px solid ${border}`, overflow: 'hidden' }}>
-                    {filteredArticles.map((article, idx) => renderArticleListRow(article, idx, filteredArticles.length))}
-                  </div>
-                )}
-              </>
-            )}
+            {/* フラット表示 */}
+            {!articlesError && filteredArticles.length > 0 && !useCategoryGroups && renderArticlesByMode(filteredArticles)}
 
             {filteredArticles.length > 0 && hasMore && (
               <div ref={loadMoreRef} style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
