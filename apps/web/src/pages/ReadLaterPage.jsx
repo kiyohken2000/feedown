@@ -103,6 +103,7 @@ const ReadLaterPage = () => {
     setSelectedArticle(formatted);
     setReadIds(prev => new Set([...prev, article.article_id]));
     api.articles.markAsRead(article.article_id).catch(console.error);
+    callReadLaterAPI('DELETE', null, `?articleId=${encodeURIComponent(article.article_id)}`).catch(console.error);
   }, [api]);
 
   const handleRemove = async (articleId) => {
