@@ -1,12 +1,11 @@
 import React, { useContext, useEffect, useState, useCallback } from 'react'
 import {
   StyleSheet, Text, View, FlatList, TouchableOpacity,
-  Image, ActivityIndicator,
+  Image, ActivityIndicator, RefreshControl,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { colors, fontSize, getThemeColors } from '../../theme'
 import { UserContext } from '../../contexts/UserContext'
-import { FeedsContext } from '../../contexts/FeedsContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
@@ -15,17 +14,15 @@ import { useAsyncStorageState } from '../../utils/useAsyncStorageState'
 export default function ReadLater() {
   const navigation = useNavigation()
   const { getAccessToken } = useContext(UserContext)
-  const { api } = useContext(FeedsContext)
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
 
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectionMode, setSelectionMode] = useState(false)
-  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [refreshing, setRefreshing] = useState(false)
   const [favoritedIds, setFavoritedIds] = useState(new Set())
+  const [readIds, setReadIds] = useState(new Set()) // セッション内既読
 
-  // 永続化された設定
   const [viewMode, setViewMode] = useAsyncStorageState('@readlater_viewMode', 'list')
 
   const callAPI = useCallback(async (method, body = null, query = '') => {
@@ -38,8 +35,11 @@ export default function ReadLater() {
     return res.json()
   }, [getAccessToken])
 
-  const fetchArticles = useCallback(async () => {
-    setLoading(true)
+  const fetchArticles = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
+    else setLoading(true)
+    // Refreshで既読リセット → 既読記事が消える
+    setReadIds(new Set())
     try {
       const data = await callAPI('GET')
       if (data.success) setArticles(data.data.articles || [])
@@ -47,16 +47,14 @@ export default function ReadLater() {
       showErrorToast({ title: 'Error', body: 'Failed to load Read Later' })
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [callAPI])
 
-  // Favorites一覧取得
   const fetchFavorites = useCallback(async () => {
     try {
       const token = await getAccessToken()
-      const res = await fetch('/api/favorites', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
+      const res = await fetch('/api/favorites', { headers: { 'Authorization': `Bearer ${token}` } })
       const data = await res.json()
       if (data.success) setFavoritedIds(new Set(data.data.favorites.map(f => f.articleId)))
     } catch (e) { console.error(e) }
@@ -71,27 +69,19 @@ export default function ReadLater() {
     try {
       await callAPI('DELETE', null, `?articleId=${encodeURIComponent(articleId)}`)
       setArticles(prev => prev.filter(a => a.article_id !== articleId))
-      setSelectedIds(prev => { const s = new Set(prev); s.delete(articleId); return s })
       showToast({ title: '削除しました', body: '' })
     } catch (e) {
       showErrorToast({ title: 'Error', body: 'Failed to remove' })
     }
   }, [callAPI])
 
-  const handleRemoveSelected = useCallback(async () => {
-    for (const id of [...selectedIds]) await handleRemove(id)
-    setSelectionMode(false)
-    setSelectedIds(new Set())
-  }, [selectedIds, handleRemove])
-
-  const handleToggleFavorite = useCallback(async (e, article) => {
+  const handleToggleFavorite = useCallback(async (article) => {
     const isFav = favoritedIds.has(article.article_id)
     try {
       const token = await getAccessToken()
       if (isFav) {
         await fetch(`/api/favorites/${article.article_id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` },
+          method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` },
         })
         setFavoritedIds(prev => { const s = new Set(prev); s.delete(article.article_id); return s })
         showToast({ title: 'Favorites削除', body: '' })
@@ -100,36 +90,34 @@ export default function ReadLater() {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            articleId: article.article_id,
-            title: article.title,
-            url: article.url,
-            description: article.description,
-            feedTitle: article.feed_title,
-            imageUrl: article.image_url,
+            articleId: article.article_id, title: article.title, url: article.url,
+            description: article.description, feedTitle: article.feed_title, imageUrl: article.image_url,
           }),
         })
         setFavoritedIds(prev => new Set([...prev, article.article_id]))
         showToast({ title: '⭐ Favorites追加', body: '' })
       }
-    } catch (e) {
-      showErrorToast({ title: 'Error', body: 'Failed' })
-    }
+    } catch (e) { showErrorToast({ title: 'Error', body: 'Failed' }) }
   }, [favoritedIds, getAccessToken])
 
-  const handleToggleCheck = useCallback((articleId) => {
-    setSelectedIds(prev => {
-      const s = new Set(prev)
-      s.has(articleId) ? s.delete(articleId) : s.add(articleId)
-      return s
+  // 記事を開く → 既読マーク
+  const handleArticlePress = useCallback((article) => {
+    setReadIds(prev => new Set([...prev, article.article_id]))
+    // APIで既読マーク
+    getAccessToken().then(token => {
+      fetch('/api/articles/read', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleId: article.article_id }),
+      }).catch(console.error)
     })
-  }, [])
-
-  const handleSelectAll = useCallback(() => {
-    if (selectedIds.size === articles.length) setSelectedIds(new Set())
-    else setSelectedIds(new Set(articles.map(a => a.article_id)))
-  }, [selectedIds, articles])
-
-  const allSelected = articles.length > 0 && selectedIds.size === articles.length
+    navigation.navigate('ArticleDetail', {
+      article: {
+        id: article.article_id, title: article.title, url: article.url,
+        description: article.description, feedTitle: article.feed_title, imageUrl: article.image_url,
+      }
+    })
+  }, [getAccessToken, navigation])
 
   const getRelativeTime = (d) => {
     if (!d) return ''
@@ -139,44 +127,25 @@ export default function ReadLater() {
     return `${Math.floor(diff / 86400)}d ago`
   }
 
-  const renderItem = ({ item, index }) => {
-    const isChecked = selectedIds.has(item.article_id)
+  // 既読を除外
+  const visibleArticles = articles.filter(a => !readIds.has(a.article_id))
+  const readCount = readIds.size
+
+  const isListMode = viewMode === 'list'
+
+  const renderItem = ({ item }) => {
     const isFav = favoritedIds.has(item.article_id)
-    const isListMode = viewMode === 'list'
 
     return (
       <TouchableOpacity
         style={[
           isListMode ? styles.listRow : styles.card,
           { backgroundColor: theme.card },
-          isChecked && styles.cardChecked,
           isListMode && { borderBottomColor: theme.border, borderBottomWidth: 1 },
         ]}
-        onPress={() => selectionMode
-          ? handleToggleCheck(item.article_id)
-          : navigation.navigate('ArticleDetail', {
-              article: {
-                id: item.article_id, title: item.title, url: item.url,
-                description: item.description, feedTitle: item.feed_title, imageUrl: item.image_url,
-              }
-            })
-        }
-        onLongPress={() => { setSelectionMode(true); setSelectedIds(new Set([item.article_id])) }}
+        onPress={() => handleArticlePress(item)}
+        activeOpacity={0.7}
       >
-        {selectionMode && (
-          <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
-            {isChecked && <Text style={styles.checkmark}>✓</Text>}
-          </View>
-        )}
-
-        {/* 星ボタン（常に表示） */}
-        <TouchableOpacity
-          onPress={() => handleToggleFavorite(null, item)}
-          style={styles.starBtn}
-        >
-          <Text style={{ fontSize: 18, color: isFav ? '#FFD700' : theme.textMuted }}>★</Text>
-        </TouchableOpacity>
-
         {!isListMode && item.image_url && (
           <Image source={{ uri: item.image_url }} style={styles.thumbnail} resizeMode="cover" />
         )}
@@ -195,11 +164,15 @@ export default function ReadLater() {
           )}
         </View>
 
-        {!selectionMode && (
-          <TouchableOpacity onPress={() => handleRemove(item.article_id)} style={styles.deleteBtn}>
-            <Text style={[styles.deleteBtnText, { color: theme.textMuted }]}>✕</Text>
-          </TouchableOpacity>
-        )}
+        {/* 星ボタン */}
+        <TouchableOpacity onPress={() => handleToggleFavorite(item)} style={styles.starBtn}>
+          <Text style={{ fontSize: 20, color: isFav ? '#FFD700' : theme.textMuted }}>★</Text>
+        </TouchableOpacity>
+
+        {/* 削除ボタン */}
+        <TouchableOpacity onPress={() => handleRemove(item.article_id)} style={styles.deleteBtn}>
+          <Text style={[styles.deleteBtnText, { color: theme.textMuted }]}>✕</Text>
+        </TouchableOpacity>
       </TouchableOpacity>
     )
   }
@@ -208,8 +181,18 @@ export default function ReadLater() {
     <ScreenTemplate>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Text style={styles.headerTitle}>📌 Read Later</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>📌 Read Later</Text>
+          <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+            <Text style={styles.badgeText}>{visibleArticles.length}</Text>
+          </View>
+          {readCount > 0 && (
+            <Text style={[styles.readCountText, { color: theme.textMuted }]}>
+              {readCount}件既読
+            </Text>
+          )}
+        </View>
+        <View style={styles.headerRight}>
           {/* 表示切替 */}
           <TouchableOpacity
             style={[styles.viewToggleBtn, { borderColor: theme.border }]}
@@ -219,51 +202,36 @@ export default function ReadLater() {
               {viewMode === 'card' ? '☰' : '⊞'}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.count, { color: theme.textMuted }]}>{articles.length}件</Text>
         </View>
       </View>
 
-      {/* 選択モードバー */}
-      {selectionMode && (
-        <View style={[styles.selectionBar, { backgroundColor: isDarkMode ? '#2d2d2d' : '#fff3e0', borderBottomColor: theme.border }]}>
-          <TouchableOpacity onPress={handleSelectAll} style={styles.selectAllBtn}>
-            <View style={[styles.checkbox, allSelected && styles.checkboxChecked]}>
-              {allSelected && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <Text style={[styles.selectAllText, { color: theme.text }]}>
-              {selectedIds.size > 0 ? `${selectedIds.size}件選択` : '全選択'}
-            </Text>
-          </TouchableOpacity>
-          <View style={styles.selectionActions}>
-            <TouchableOpacity
-              onPress={handleRemoveSelected}
-              disabled={selectedIds.size === 0}
-              style={[styles.deleteSelectedBtn, selectedIds.size === 0 && { opacity: 0.5 }]}
-            >
-              <Text style={styles.deleteSelectedText}>削除 ({selectedIds.size})</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedIds(new Set()) }} style={styles.cancelBtn}>
-              <Text style={[styles.cancelText, { color: theme.textMuted }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
       {loading ? (
-        <View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /></View>
-      ) : articles.length === 0 ? (
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : visibleArticles.length === 0 ? (
         <View style={styles.empty}>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            📌 Read Laterに保存した記事はありません{'\n'}
-            記事を左スワイプして追加しましょう
+            {readCount > 0
+              ? `${readCount}件を読みました！\nPull to refreshで一覧を更新`
+              : '📌 Read Laterに保存した記事はありません\n記事を左スワイプして追加しましょう'
+            }
           </Text>
         </View>
       ) : (
         <FlatList
-          data={articles}
+          data={visibleArticles}
           renderItem={renderItem}
           keyExtractor={item => item.id}
-          contentContainerStyle={[styles.list, viewMode === 'list' && { padding: 0 }]}
+          contentContainerStyle={[styles.list, isListMode && { padding: 0 }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => fetchArticles(true)}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -273,34 +241,25 @@ export default function ReadLater() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: { fontSize: fontSize.xLarge, fontWeight: '700', color: colors.primary },
-  count: { fontSize: fontSize.normal },
+  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
+  badgeText: { color: 'white', fontSize: fontSize.small, fontWeight: '700' },
+  readCountText: { fontSize: fontSize.small },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   viewToggleBtn: { width: 34, height: 34, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   viewToggleText: { fontSize: 18 },
-
-  selectionBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, gap: 8 },
-  selectAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  selectAllText: { fontSize: fontSize.small, fontWeight: '600' },
-  checkbox: { width: 22, height: 22, borderRadius: 4, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
-  checkmark: { color: 'white', fontSize: 13, fontWeight: '700' },
-  selectionActions: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 },
-  deleteSelectedBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#dc3545' },
-  deleteSelectedText: { color: 'white', fontSize: fontSize.small, fontWeight: '700' },
-  cancelBtn: { padding: 6 },
-  cancelText: { fontSize: 18, fontWeight: '700' },
 
   list: { padding: 12, flexGrow: 1 },
   card: { borderRadius: 12, marginVertical: 6, padding: 12, flexDirection: 'row', alignItems: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
   listRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
-  cardChecked: { borderWidth: 2, borderColor: colors.primary },
-  starBtn: { paddingHorizontal: 6, paddingVertical: 2, justifyContent: 'center' },
   thumbnail: { width: 70, height: 70, borderRadius: 8, marginRight: 10 },
   content: { flex: 1, marginLeft: 4 },
   feedTitle: { fontSize: fontSize.small, fontWeight: '600', marginBottom: 4 },
   title: { fontSize: fontSize.normal, fontWeight: '600', lineHeight: 20, marginBottom: 4 },
   description: { fontSize: fontSize.small, lineHeight: 18 },
-  deleteBtn: { padding: 6, marginLeft: 8 },
+  starBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  deleteBtn: { padding: 6, marginLeft: 4 },
   deleteBtnText: { fontSize: 16 },
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
