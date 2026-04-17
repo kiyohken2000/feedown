@@ -21,7 +21,7 @@ export default function ReadLater() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [favoritedIds, setFavoritedIds] = useState(new Set())
-  const [readIds, setReadIds] = useState(new Set()) // セッション内既読
+  const [readIds, setReadIds] = useState(new Set()) // 開いた記事（薄く表示）
 
   const [viewMode, setViewMode] = useAsyncStorageState('@readlater_viewMode', 'list')
 
@@ -35,11 +35,9 @@ export default function ReadLater() {
     return res.json()
   }, [getAccessToken])
 
-  const fetchArticles = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true)
-    else setLoading(true)
-    // Refreshで既読リセット → 既読記事が消える
-    setReadIds(new Set())
+  // 初回取得
+  const fetchArticles = useCallback(async () => {
+    setLoading(true)
     try {
       const data = await callAPI('GET')
       if (data.success) setArticles(data.data.articles || [])
@@ -47,9 +45,29 @@ export default function ReadLater() {
       showErrorToast({ title: 'Error', body: 'Failed to load Read Later' })
     } finally {
       setLoading(false)
-      setRefreshing(false)
     }
   }, [callAPI])
+
+  // Pull-to-refresh: 既読を除外して再取得
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    const currentReadIds = new Set(readIds) // 現在の既読を保存
+    try {
+      const data = await callAPI('GET')
+      if (data.success) {
+        // 既読のものを除外
+        const fresh = (data.data.articles || []).filter(
+          a => !currentReadIds.has(a.article_id)
+        )
+        setArticles(fresh)
+        setReadIds(new Set()) // 既読セットをリセット
+      }
+    } catch (e) {
+      showErrorToast({ title: 'Error', body: 'Failed to refresh' })
+    } finally {
+      setRefreshing(false)
+    }
+  }, [callAPI, readIds])
 
   const fetchFavorites = useCallback(async () => {
     try {
@@ -100,7 +118,7 @@ export default function ReadLater() {
     } catch (e) { showErrorToast({ title: 'Error', body: 'Failed' }) }
   }, [favoritedIds, getAccessToken])
 
-  // 記事を開く → 既読マーク
+  // 記事を開く → 既読セットに追加（リストには残る・薄く表示）
   const handleArticlePress = useCallback((article) => {
     setReadIds(prev => new Set([...prev, article.article_id]))
     // APIで既読マーク
@@ -127,14 +145,12 @@ export default function ReadLater() {
     return `${Math.floor(diff / 86400)}d ago`
   }
 
-  // 既読を除外
-  const visibleArticles = articles.filter(a => !readIds.has(a.article_id))
   const readCount = readIds.size
-
   const isListMode = viewMode === 'list'
 
   const renderItem = ({ item }) => {
     const isFav = favoritedIds.has(item.article_id)
+    const isRead = readIds.has(item.article_id)
 
     return (
       <TouchableOpacity
@@ -142,6 +158,7 @@ export default function ReadLater() {
           isListMode ? styles.listRow : styles.card,
           { backgroundColor: theme.card },
           isListMode && { borderBottomColor: theme.border, borderBottomWidth: 1 },
+          isRead && styles.readItem, // 既読は薄く
         ]}
         onPress={() => handleArticlePress(item)}
         activeOpacity={0.7}
@@ -153,6 +170,7 @@ export default function ReadLater() {
         <View style={[styles.content, isListMode && { marginLeft: 0 }]}>
           <Text style={[styles.feedTitle, { color: colors.primary }]} numberOfLines={1}>
             {item.feed_title || 'Feed'} · {getRelativeTime(item.saved_at)}
+            {isRead ? ' · ✓ Read' : ''}
           </Text>
           <Text style={[styles.title, { color: theme.text }]} numberOfLines={isListMode ? 1 : 2}>
             {item.title}
@@ -184,7 +202,7 @@ export default function ReadLater() {
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>📌 Read Later</Text>
           <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-            <Text style={styles.badgeText}>{visibleArticles.length}</Text>
+            <Text style={styles.badgeText}>{articles.length}</Text>
           </View>
           {readCount > 0 && (
             <Text style={[styles.readCountText, { color: theme.textMuted }]}>
@@ -192,42 +210,46 @@ export default function ReadLater() {
             </Text>
           )}
         </View>
-        <View style={styles.headerRight}>
-          {/* 表示切替 */}
-          <TouchableOpacity
-            style={[styles.viewToggleBtn, { borderColor: theme.border }]}
-            onPress={() => setViewMode(v => v === 'card' ? 'list' : 'card')}
-          >
-            <Text style={[styles.viewToggleText, { color: theme.text }]}>
-              {viewMode === 'card' ? '☰' : '⊞'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* 表示切替 */}
+        <TouchableOpacity
+          style={[styles.viewToggleBtn, { borderColor: theme.border }]}
+          onPress={() => setViewMode(v => v === 'card' ? 'list' : 'card')}
+        >
+          <Text style={[styles.viewToggleText, { color: theme.text }]}>
+            {viewMode === 'card' ? '☰' : '⊞'}
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      {readCount > 0 && (
+        <View style={[styles.refreshHint, { backgroundColor: isDarkMode ? '#2d2d2d' : '#f0f9f0' }]}>
+          <Text style={[styles.refreshHintText, { color: theme.textMuted }]}>
+            ↓ Pull to refresh で既読記事を消去
+          </Text>
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : visibleArticles.length === 0 ? (
+      ) : articles.length === 0 ? (
         <View style={styles.empty}>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            {readCount > 0
-              ? `${readCount}件を読みました！\nPull to refreshで一覧を更新`
-              : '📌 Read Laterに保存した記事はありません\n記事を左スワイプして追加しましょう'
-            }
+            📌 Read Laterに保存した記事はありません{'\n'}
+            記事を左スワイプして追加しましょう
           </Text>
         </View>
       ) : (
         <FlatList
-          data={visibleArticles}
+          data={articles}
           renderItem={renderItem}
           keyExtractor={item => item.id}
           contentContainerStyle={[styles.list, isListMode && { padding: 0 }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => fetchArticles(true)}
+              onRefresh={handleRefresh}
               tintColor={colors.primary}
               colors={[colors.primary]}
             />
@@ -246,13 +268,15 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
   badgeText: { color: 'white', fontSize: fontSize.small, fontWeight: '700' },
   readCountText: { fontSize: fontSize.small },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   viewToggleBtn: { width: 34, height: 34, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   viewToggleText: { fontSize: 18 },
+  refreshHint: { paddingVertical: 6, paddingHorizontal: 16, alignItems: 'center' },
+  refreshHintText: { fontSize: fontSize.small },
 
   list: { padding: 12, flexGrow: 1 },
   card: { borderRadius: 12, marginVertical: 6, padding: 12, flexDirection: 'row', alignItems: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
   listRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
+  readItem: { opacity: 0.5 }, // 既読は薄く
   thumbnail: { width: 70, height: 70, borderRadius: 8, marginRight: 10 },
   content: { flex: 1, marginLeft: 4 },
   feedTitle: { fontSize: fontSize.small, fontWeight: '600', marginBottom: 4 },
