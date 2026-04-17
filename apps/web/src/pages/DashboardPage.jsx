@@ -1,0 +1,604 @@
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
+import { FaCheck, FaSync, FaArrowUp, FaList, FaTh, FaRss } from 'react-icons/fa';
+import { getAccessToken } from '../lib/supabase';
+import { createApiClient, FeedOwnAPI } from '@feedown/shared';
+import Navigation from '../components/Navigation';
+import ArticleModal from '../components/ArticleModal';
+import { useTheme } from '../contexts/ThemeContext';
+import { useArticles } from '../contexts/ArticlesContext';
+
+const DashboardPage = () => {
+  const [filteredArticles, setFilteredArticles] = useState([]);
+  const [articlesLoading, setArticlesLoading] = useState(false);
+  const [articlesError, setArticlesError] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [selectedFeedId, setSelectedFeedId] = useState('');
+  const [selectedArticle, setSelectedArticle] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [viewMode, setViewMode] = useState('card');
+  const [checkedArticles, setCheckedArticles] = useState(new Set());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const location = useLocation();
+  const { isDarkMode } = useTheme();
+  const {
+    articles, setArticles,
+    readArticles, setReadArticles,
+    favoritedArticles, setFavoritedArticles,
+    feeds, setFeeds,
+    lastArticleFetchTime, setLastArticleFetchTime,
+    hasMore, setHasMore,
+  } = useArticles();
+
+  const observerRef = useRef(null);
+  const articleRefs = useRef({});
+  const loadMoreRef = useRef(null);
+  const loadMoreObserverRef = useRef(null);
+  const fullyViewedArticles = useRef(new Set());
+  const handleRefreshRef = useRef(null);
+
+  const apiClient = useMemo(() => createApiClient(
+    import.meta.env.VITE_API_BASE_URL || '',
+    getAccessToken
+  ), []);
+  const api = useMemo(() => new FeedOwnAPI(apiClient), [apiClient]);
+
+  const markAsRead = useCallback(async (articleId) => {
+    setReadArticles(prev => new Set([...prev, articleId]));
+    try { await api.articles.markAsRead(articleId); }
+    catch (e) { console.error('Failed to mark as read:', e); }
+  }, [api, setReadArticles]);
+
+  const fetchFeeds = useCallback(async () => {
+    try {
+      const res = await api.feeds.list();
+      if (res.success) setFeeds(res.data.feeds || []);
+    } catch (e) { console.error('Failed to fetch feeds:', e); }
+  }, [api]);
+
+  const fetchArticles = useCallback(async (reset = true, feedId = null) => {
+    if (reset) { setArticlesLoading(true); setHasMore(true); }
+    else setLoadingMore(true);
+    setArticlesError(null);
+    try {
+      const offset = reset ? 0 : articles.length;
+      const limit = 50;
+      const res = await api.articles.list({ limit, offset, feedId: feedId || undefined });
+      if (res.success) {
+        const newArticles = res.data.articles || [];
+        const hasMoreData = res.data.hasMore ?? (newArticles.length === limit);
+        if (reset) setArticles(newArticles);
+        else setArticles(prev => [...prev, ...newArticles]);
+        setHasMore(hasMoreData);
+        const readSet = reset ? new Set() : new Set(readArticles);
+        newArticles.forEach(a => { if (a.isRead) readSet.add(a.id); });
+        setReadArticles(readSet);
+        if (reset) setLastArticleFetchTime(Date.now());
+      } else throw new Error(res.error);
+    } catch (e) {
+      console.error('Failed to fetch articles:', e);
+      setArticlesError('Failed to load articles.');
+    } finally {
+      if (reset) setArticlesLoading(false);
+      else setLoadingMore(false);
+    }
+  }, [api, articles.length]);
+
+  const handleRefresh = useCallback(async () => {
+    setArticlesLoading(true);
+    try {
+      let offset = 0;
+      let latestFeeds = null;
+      while (true) {
+        const r = await api.refresh.refreshAll(offset || undefined);
+        if (!r.success) break;
+        if (r.data.feeds) latestFeeds = r.data.feeds;
+        if (!r.data.remaining || r.data.remaining <= 0 || !r.data.nextOffset) break;
+        offset = r.data.nextOffset;
+      }
+      if (latestFeeds) setFeeds(latestFeeds);
+      else await fetchFeeds();
+      await fetchArticles(true, selectedFeedId);
+    } catch (e) {
+      console.error('Failed to refresh:', e);
+      setArticlesError('Failed to refresh feeds.');
+      setArticlesLoading(false);
+    }
+  }, [api, fetchFeeds, fetchArticles, setFeeds, selectedFeedId]);
+
+  handleRefreshRef.current = handleRefresh;
+
+  useEffect(() => { handleRefreshRef.current?.(); }, [location.key]);
+
+  const prevPathRef = useRef(location.pathname);
+  useEffect(() => {
+    if (location.pathname === '/dashboard' && prevPathRef.current !== '/dashboard')
+      fetchArticles(true, selectedFeedId);
+    prevPathRef.current = location.pathname;
+  }, [location.pathname, fetchArticles, selectedFeedId]);
+
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') fetchArticles(true, selectedFeedId);
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, [fetchArticles, selectedFeedId]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (lastArticleFetchTime && Date.now() - lastArticleFetchTime >= 15 * 60 * 1000)
+        handleRefreshRef.current?.();
+    }, 60 * 1000);
+    return () => clearInterval(id);
+  }, [lastArticleFetchTime]);
+
+  const unreadCount = useMemo(() =>
+    articles.filter(a => !readArticles.has(a.id)).length,
+    [articles, readArticles]
+  );
+
+  const feedUnreadCounts = useMemo(() => {
+    const counts = {};
+    articles.forEach(a => {
+      if (!readArticles.has(a.id))
+        counts[a.feedId] = (counts[a.feedId] || 0) + 1;
+    });
+    return counts;
+  }, [articles, readArticles]);
+
+  useEffect(() => {
+    if (filter === 'all') setFilteredArticles(articles);
+    else if (filter === 'unread') setFilteredArticles(articles.filter(a => !readArticles.has(a.id)));
+    else setFilteredArticles(articles.filter(a => readArticles.has(a.id)));
+  }, [articles, filter, readArticles]);
+
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [filter]);
+
+  const prevFeedIdRef = useRef(selectedFeedId);
+  useEffect(() => {
+    if (prevFeedIdRef.current !== selectedFeedId) {
+      fetchArticles(true, selectedFeedId);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    prevFeedIdRef.current = selectedFeedId;
+  }, [selectedFeedId, fetchArticles]);
+
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
+    if (filter === 'unread') return;
+    observerRef.current = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        const id = entry.target.dataset.articleId;
+        if (!id || readArticles.has(id)) return;
+        if (entry.isIntersecting && entry.intersectionRatio >= 1.0)
+          fullyViewedArticles.current.add(id);
+        if (entry.isIntersecting && entry.intersectionRatio <= 0.5 && fullyViewedArticles.current.has(id)) {
+          fullyViewedArticles.current.delete(id); markAsRead(id);
+        }
+        if (!entry.isIntersecting && fullyViewedArticles.current.has(id)) {
+          fullyViewedArticles.current.delete(id); markAsRead(id);
+        }
+      });
+    }, { threshold: [0, 0.5, 1.0] });
+    Object.values(articleRefs.current).forEach(ref => {
+      if (ref) observerRef.current.observe(ref);
+    });
+    return () => { if (observerRef.current) observerRef.current.disconnect(); };
+  }, [filteredArticles, readArticles, markAsRead, filter]);
+
+  useEffect(() => {
+    if (loadMoreObserverRef.current) loadMoreObserverRef.current.disconnect();
+    loadMoreObserverRef.current = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && hasMore && !loadingMore && !articlesLoading)
+        fetchArticles(false, selectedFeedId);
+    }, { threshold: 0.1 });
+    if (loadMoreRef.current) loadMoreObserverRef.current.observe(loadMoreRef.current);
+    return () => { if (loadMoreObserverRef.current) loadMoreObserverRef.current.disconnect(); };
+  }, [hasMore, loadingMore, articlesLoading, selectedFeedId]);
+
+  const handleMarkAllAsRead = async () => {
+    if (articlesLoading) return;
+    const ids = articles.filter(a => !readArticles.has(a.id)).map(a => a.id);
+    if (!ids.length) return;
+    setReadArticles(prev => { const s = new Set(prev); ids.forEach(id => s.add(id)); return s; });
+    try {
+      await api.articles.batchMarkAsRead(ids);
+      await fetchArticles(true, selectedFeedId);
+    } catch (e) {
+      setReadArticles(prev => { const s = new Set(prev); ids.forEach(id => s.delete(id)); return s; });
+    }
+  };
+
+  const handleMarkCheckedAsRead = async () => {
+    if (!checkedArticles.size) return;
+    const ids = [...checkedArticles];
+    setReadArticles(prev => { const s = new Set(prev); ids.forEach(id => s.add(id)); return s; });
+    setCheckedArticles(new Set());
+    try { await api.articles.batchMarkAsRead(ids); }
+    catch (e) { console.error(e); }
+  };
+
+  const handleCheckboxChange = (e, articleId) => {
+    e.stopPropagation();
+    setCheckedArticles(prev => {
+      const s = new Set(prev);
+      s.has(articleId) ? s.delete(articleId) : s.add(articleId);
+      return s;
+    });
+  };
+
+  const handleArticleClick = (article) => {
+    setSelectedArticle(article);
+    if (!readArticles.has(article.id)) markAsRead(article.id);
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!selectedArticle) return;
+    try {
+      if (favoritedArticles.has(selectedArticle.id)) {
+        await api.articles.removeFromFavorites(selectedArticle.id);
+        setFavoritedArticles(prev => { const s = new Set(prev); s.delete(selectedArticle.id); return s; });
+      } else {
+        await api.articles.addToFavorites(selectedArticle.id, {
+          title: selectedArticle.title, url: selectedArticle.url,
+          description: selectedArticle.description, feedTitle: selectedArticle.feedTitle,
+          imageUrl: selectedArticle.imageUrl,
+        });
+        setFavoritedArticles(prev => new Set([...prev, selectedArticle.id]));
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const getRelativeTime = (d) => {
+    if (!d) return '';
+    const diff = Math.floor((Date.now() - new Date(d)) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+    return new Date(d).toLocaleDateString();
+  };
+
+  const getFeedFavicon = (feedId) => feeds.find(f => f.id === feedId)?.faviconUrl || null;
+
+  const bg = isDarkMode ? '#1a1a1a' : '#f0f0f0';
+  const cardBg = isDarkMode ? '#2d2d2d' : '#ffffff';
+  const border = isDarkMode ? '#444' : '#e0e0e0';
+  const textPrimary = isDarkMode ? '#e0e0e0' : '#222';
+  const textSecondary = isDarkMode ? '#aaa' : '#888';
+  const sidebarBg = isDarkMode ? '#242424' : '#fafafa';
+
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: bg }}>
+      <Navigation unreadCount={unreadCount} />
+
+      <div style={{ display: 'flex', height: 'calc(100vh - 52px)' }}>
+
+        {/* LEFT SIDEBAR */}
+        <div style={{
+          width: sidebarCollapsed ? '52px' : '240px',
+          minWidth: sidebarCollapsed ? '52px' : '240px',
+          backgroundColor: sidebarBg,
+          borderRight: `1px solid ${border}`,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          transition: 'width 0.2s',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
+          <div style={{ padding: '0.75rem', display: 'flex', justifyContent: sidebarCollapsed ? 'center' : 'flex-end' }}>
+            <button
+              onClick={() => setSidebarCollapsed(v => !v)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: textSecondary, fontSize: '1rem', padding: '0.25rem' }}
+            >
+              {sidebarCollapsed ? '▶' : '◀'}
+            </button>
+          </div>
+
+          {/* All Feeds */}
+          <div
+            onClick={() => setSelectedFeedId('')}
+            style={{
+              padding: sidebarCollapsed ? '0.6rem' : '0.6rem 1rem',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              backgroundColor: selectedFeedId === '' ? '#FF6B35' : 'transparent',
+              color: selectedFeedId === '' ? 'white' : textPrimary,
+              borderRadius: '6px', margin: '0 0.5rem',
+              fontWeight: '600', fontSize: '0.9rem',
+              whiteSpace: 'nowrap', overflow: 'hidden',
+            }}
+          >
+            <FaRss style={{ flexShrink: 0, fontSize: '0.85rem' }} />
+            {!sidebarCollapsed && (
+              <>
+                <span style={{ flex: 1 }}>All Feeds</span>
+                {unreadCount > 0 && (
+                  <span style={{
+                    backgroundColor: selectedFeedId === '' ? 'white' : '#FF6B35',
+                    color: selectedFeedId === '' ? '#FF6B35' : 'white',
+                    borderRadius: '12px', padding: '0.1rem 0.45rem',
+                    fontSize: '0.75rem', fontWeight: '700',
+                  }}>{unreadCount}</span>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Feed list */}
+          <div style={{ marginTop: '0.5rem' }}>
+            {!sidebarCollapsed && (
+              <div style={{ padding: '0.4rem 1rem', fontSize: '0.72rem', color: textSecondary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Feeds
+              </div>
+            )}
+            {feeds.map(feed => {
+              const unread = feedUnreadCounts[feed.id] || 0;
+              const isActive = selectedFeedId === feed.id;
+              return (
+                <div
+                  key={feed.id}
+                  onClick={() => setSelectedFeedId(feed.id)}
+                  style={{
+                    padding: sidebarCollapsed ? '0.6rem' : '0.5rem 1rem',
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '0.6rem',
+                    backgroundColor: isActive ? '#FF6B35' : 'transparent',
+                    color: isActive ? 'white' : textPrimary,
+                    borderRadius: '6px', margin: '0.1rem 0.5rem',
+                    fontSize: '0.87rem', whiteSpace: 'nowrap', overflow: 'hidden',
+                  }}
+                  onMouseOver={e => { if (!isActive) e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#eee'; }}
+                  onMouseOut={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  {feed.faviconUrl ? (
+                    <img src={feed.faviconUrl} alt="" style={{ width: '16px', height: '16px', borderRadius: '3px', flexShrink: 0 }}
+                      onError={e => e.target.style.display = 'none'} />
+                  ) : (
+                    <FaRss style={{ flexShrink: 0, fontSize: '0.8rem', opacity: 0.5 }} />
+                  )}
+                  {!sidebarCollapsed && (
+                    <>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {feed.title || feed.url}
+                      </span>
+                      {unread > 0 && (
+                        <span style={{
+                          backgroundColor: isActive ? 'white' : '#FF6B35',
+                          color: isActive ? '#FF6B35' : 'white',
+                          borderRadius: '12px', padding: '0.1rem 0.4rem',
+                          fontSize: '0.72rem', fontWeight: '700', flexShrink: 0,
+                        }}>{unread}</span>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* MAIN CONTENT */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+
+          {/* Toolbar */}
+          <div style={{
+            position: 'sticky', top: 0, zIndex: 50,
+            backgroundColor: isDarkMode ? 'rgba(26,26,26,0.92)' : 'rgba(240,240,240,0.92)',
+            backdropFilter: 'blur(8px)',
+            borderBottom: `1px solid ${border}`,
+            padding: '0.6rem 1.5rem',
+            display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap',
+          }}>
+            {['all', 'unread', 'read'].map(f => (
+              <button key={f} onClick={() => setFilter(f)} style={{
+                padding: '0.3rem 0.85rem',
+                border: `2px solid #FF6B35`, borderRadius: '20px',
+                backgroundColor: filter === f ? '#FF6B35' : 'transparent',
+                color: filter === f ? 'white' : '#FF6B35',
+                cursor: 'pointer', fontSize: '0.83rem', fontWeight: '600',
+              }}>
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+
+            <div style={{ flex: 1 }} />
+
+            {checkedArticles.size > 0 && (
+              <button onClick={handleMarkCheckedAsRead} style={{
+                padding: '0.3rem 0.85rem', backgroundColor: '#17a2b8', color: 'white',
+                border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '0.83rem', fontWeight: '600',
+                display: 'flex', alignItems: 'center', gap: '0.3rem',
+              }}>
+                <FaCheck /> 選択を既読 ({checkedArticles.size})
+              </button>
+            )}
+
+            <button onClick={handleMarkAllAsRead} disabled={articlesLoading || unreadCount === 0} style={{
+              padding: '0.3rem 0.85rem', backgroundColor: '#28a745', color: 'white',
+              border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '0.83rem', fontWeight: '600',
+              display: 'flex', alignItems: 'center', gap: '0.3rem', opacity: unreadCount === 0 ? 0.5 : 1,
+            }}>
+              <FaCheck /> All Read
+            </button>
+
+            <button onClick={handleRefresh} disabled={articlesLoading} style={{
+              padding: '0.3rem 0.85rem', backgroundColor: '#FF6B35', color: 'white',
+              border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '0.83rem', fontWeight: '600',
+              display: 'flex', alignItems: 'center', gap: '0.3rem',
+            }}>
+              <FaSync /> Refresh
+            </button>
+
+            <button onClick={() => setViewMode(v => v === 'card' ? 'list' : 'card')} style={{
+              padding: '0.3rem 0.85rem', border: `1px solid ${border}`, borderRadius: '20px',
+              backgroundColor: 'transparent', color: textSecondary,
+              cursor: 'pointer', fontSize: '0.83rem',
+              display: 'flex', alignItems: 'center', gap: '0.3rem',
+            }}>
+              {viewMode === 'card' ? <><FaList /> List</> : <><FaTh /> Card</>}
+            </button>
+
+            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{
+              padding: '0.3rem 0.7rem', backgroundColor: 'transparent',
+              border: `1px solid ${border}`, borderRadius: '20px',
+              color: textSecondary, cursor: 'pointer', fontSize: '0.83rem',
+            }}>
+              <FaArrowUp />
+            </button>
+
+            {articlesLoading && (
+              <div style={{ width: '18px', height: '18px', border: '3px solid #f3f3f3', borderTop: '3px solid #FF6B35', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            )}
+          </div>
+
+          {/* Articles */}
+          <div style={{ padding: '1rem 1.5rem', flex: 1 }}>
+            {articlesError && <p style={{ color: 'red', textAlign: 'center' }}>{articlesError}</p>}
+
+            {!articlesError && filteredArticles.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '4rem', color: textSecondary }}>
+                <FaRss style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.3 }} />
+                <p>No articles found.</p>
+              </div>
+            )}
+
+            {!articlesError && filteredArticles.length > 0 && viewMode === 'card' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+                {filteredArticles.map(article => {
+                  const isRead = readArticles.has(article.id);
+                  const isChecked = checkedArticles.has(article.id);
+                  return (
+                    <div
+                      key={article.id}
+                      ref={el => articleRefs.current[article.id] = el}
+                      data-article-id={article.id}
+                      onClick={() => handleArticleClick(article)}
+                      style={{
+                        backgroundColor: cardBg, borderRadius: '10px', overflow: 'hidden',
+                        boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)',
+                        border: isChecked ? '2px solid #FF6B35' : `1px solid ${border}`,
+                        cursor: 'pointer', opacity: isRead ? 0.65 : 1,
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        position: 'relative',
+                      }}
+                      onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)'; }}
+                      onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)'; }}
+                    >
+                      <div style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 2 }}>
+                        <input type="checkbox" checked={isChecked}
+                          onChange={e => handleCheckboxChange(e, article.id)}
+                          onClick={e => e.stopPropagation()}
+                          style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer' }}
+                        />
+                      </div>
+
+                      {article.imageUrl ? (
+                        <img src={article.imageUrl} alt="" style={{ width: '100%', height: '150px', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ width: '100%', height: '60px', backgroundColor: isDarkMode ? '#333' : '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <FaRss style={{ color: '#FF6B35', opacity: 0.3, fontSize: '1.2rem' }} />
+                        </div>
+                      )}
+
+                      <div style={{ padding: '0.85rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem', fontSize: '0.78rem', color: textSecondary }}>
+                          {getFeedFavicon(article.feedId) && (
+                            <img src={getFeedFavicon(article.feedId)} alt="" style={{ width: '13px', height: '13px', borderRadius: '2px' }} onError={e => e.target.style.display = 'none'} />
+                          )}
+                          <span style={{ color: '#FF6B35', fontWeight: '600' }}>{article.feedTitle || 'Feed'}</span>
+                          <span>·</span>
+                          <span>{getRelativeTime(article.publishedAt)}</span>
+                          {isRead && <span style={{ color: '#28a745', marginLeft: 'auto' }}>✓</span>}
+                        </div>
+                        <h3 style={{ color: textPrimary, fontSize: '0.92rem', fontWeight: '600', lineHeight: '1.4', margin: '0 0 0.4rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {article.title}
+                        </h3>
+                        {article.description && (
+                          <p style={{ color: textSecondary, fontSize: '0.8rem', lineHeight: '1.5', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            {article.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!articlesError && filteredArticles.length > 0 && viewMode === 'list' && (
+              <div style={{ backgroundColor: cardBg, borderRadius: '10px', border: `1px solid ${border}`, overflow: 'hidden' }}>
+                {filteredArticles.map((article, idx) => {
+                  const isRead = readArticles.has(article.id);
+                  const isChecked = checkedArticles.has(article.id);
+                  return (
+                    <div
+                      key={article.id}
+                      ref={el => articleRefs.current[article.id] = el}
+                      data-article-id={article.id}
+                      onClick={() => handleArticleClick(article)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.75rem',
+                        padding: '0.65rem 1rem',
+                        borderBottom: idx < filteredArticles.length - 1 ? `1px solid ${border}` : 'none',
+                        cursor: 'pointer', opacity: isRead ? 0.6 : 1,
+                        backgroundColor: isChecked ? (isDarkMode ? '#3a3a2a' : '#fffbe6') : 'transparent',
+                      }}
+                      onMouseOver={e => { e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#f9f9f9'; }}
+                      onMouseOut={e => { e.currentTarget.style.backgroundColor = isChecked ? (isDarkMode ? '#3a3a2a' : '#fffbe6') : 'transparent'; }}
+                    >
+                      <input type="checkbox" checked={isChecked}
+                        onChange={e => handleCheckboxChange(e, article.id)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer', flexShrink: 0 }}
+                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: '140px', maxWidth: '180px', flexShrink: 0 }}>
+                        {getFeedFavicon(article.feedId) ? (
+                          <img src={getFeedFavicon(article.feedId)} alt="" style={{ width: '14px', height: '14px', borderRadius: '2px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+                        ) : <FaRss style={{ fontSize: '0.75rem', color: '#FF6B35', flexShrink: 0 }} />}
+                        <span style={{ color: '#FF6B35', fontSize: '0.82rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {article.feedTitle || 'Feed'}
+                        </span>
+                      </div>
+                      <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {article.title}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, fontSize: '0.8rem', color: textSecondary }}>
+                        {isRead && <span style={{ color: '#28a745' }}>✓</span>}
+                        <span>{getRelativeTime(article.publishedAt)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {filteredArticles.length > 0 && hasMore && (
+              <div ref={loadMoreRef} style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {loadingMore && <div style={{ width: '32px', height: '32px', border: '4px solid #f3f3f3', borderTop: '4px solid #FF6B35', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />}
+              </div>
+            )}
+            {filteredArticles.length > 0 && !hasMore && (
+              <p style={{ textAlign: 'center', color: textSecondary, fontSize: '0.85rem', padding: '2rem' }}>No more articles</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {selectedArticle && (
+        <ArticleModal
+          article={selectedArticle}
+          onClose={() => setSelectedArticle(null)}
+          onMarkAsRead={() => { if (selectedArticle) markAsRead(selectedArticle.id); }}
+          onToggleFavorite={handleToggleFavorite}
+          isRead={readArticles.has(selectedArticle?.id)}
+          isFavorited={favoritedArticles.has(selectedArticle?.id)}
+        />
+      )}
+    </div>
+  );
+};
+
+export default DashboardPage;
