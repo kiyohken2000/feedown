@@ -483,48 +483,109 @@ const DashboardPage = () => {
               </div>
 
               <div style={{ marginTop: '0.5rem' }}>
-                <div style={{ padding: '0.4rem 1rem', fontSize: '0.72rem', color: textSecondary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Feeds
-                </div>
-                {feeds.map(feed => {
-                  const unread = feedUnreadCounts[feed.id] || 0;
-                  const isActive = selectedFeedId === feed.id;
-                  return (
-                    <div
-                      key={feed.id}
-                      onClick={() => setSelectedFeedId(feed.id)}
-                      style={{
-                        padding: '0.5rem 1rem', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: '0.6rem',
-                        backgroundColor: isActive ? '#FF6B35' : 'transparent',
-                        color: isActive ? 'white' : textPrimary,
-                        borderRadius: '6px', margin: '0.1rem 0.5rem',
-                        fontSize: '0.87rem', whiteSpace: 'nowrap', overflow: 'hidden',
-                      }}
-                      onMouseOver={e => { if (!isActive) e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#eee'; }}
-                      onMouseOut={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                {(() => {
+              // カテゴリでグループ化
+              const grouped = {};
+              const noCategory = [];
+              feeds.forEach(feed => {
+                if (feed.category) {
+                  if (!grouped[feed.category]) grouped[feed.category] = [];
+                  grouped[feed.category].push(feed);
+                } else {
+                  noCategory.push(feed);
+                }
+              });
+              
+              const renderFeedItem = (feed) => {
+                const unread = feedUnreadCounts[feed.id] || 0;
+                const isActive = selectedFeedId === feed.id;
+                return (
+                  <div
+                    key={feed.id}
+                    onClick={() => setSelectedFeedId(feed.id)}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '0.6rem',
+                      backgroundColor: isActive ? '#FF6B35' : 'transparent',
+                      color: isActive ? 'white' : textPrimary,
+                      borderRadius: '6px', margin: '0.1rem 0.5rem',
+                      fontSize: '0.87rem', whiteSpace: 'nowrap', overflow: 'hidden',
+                    }}
+                    onMouseOver={e => { if (!isActive) e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#eee'; }}
+                    onMouseOut={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}
                     >
-                      {feed.faviconUrl ? (
-                        <img src={feed.faviconUrl} alt="" style={{ width: '16px', height: '16px', borderRadius: '3px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
-                      ) : (
-                        <FaRss style={{ flexShrink: 0, fontSize: '0.8rem', opacity: 0.5 }} />
-                      )}
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{feed.title || feed.url}</span>
-                      {unread > 0 && (
+                    {feed.faviconUrl ? (
+                      <img src={feed.faviconUrl} alt="" style={{ width: '16px', height: '16px', borderRadius: '3px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+                    ) : (
+                      <FaRss style={{ flexShrink: 0, fontSize: '0.8rem', opacity: 0.5 }} />
+                    )}
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{feed.title || feed.url}</span>
+                    {unread > 0 && (
+                      <span style={{
+                        backgroundColor: isActive ? 'white' : '#FF6B35',
+                        color: isActive ? '#FF6B35' : 'white',
+                        borderRadius: '12px', padding: '0.1rem 0.4rem',
+                        fontSize: '0.72rem', fontWeight: '700', flexShrink: 0,
+                      }}>{unread}</span>
+                    )}
+                  </div>
+                );
+              };
+              
+              const CategorySection = ({ label, feedList }) => {
+                const [collapsed, setCollapsed] = React.useState(false);
+                const categoryUnread = feedList.reduce((sum, f) => sum + (feedUnreadCounts[f.id] || 0), 0);
+                return (
+                  <div>
+                    <div
+                      onClick={() => setCollapsed(v => !v)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.4rem',
+                        padding: '0.3rem 1rem', cursor: 'pointer',
+                        fontSize: '0.72rem', fontWeight: '700',
+                        color: textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em',
+                        userSelect: 'none',
+                      }}
+                      >
+                      <span style={{ fontSize: '0.65rem' }}>{collapsed ? '▶' : '▼'}</span>
+                      <span style={{ flex: 1 }}>{label}</span>
+                      {categoryUnread > 0 && (
                         <span style={{
-                          backgroundColor: isActive ? 'white' : '#FF6B35',
-                          color: isActive ? '#FF6B35' : 'white',
+                          backgroundColor: '#FF6B35', color: 'white',
                           borderRadius: '12px', padding: '0.1rem 0.4rem',
-                          fontSize: '0.72rem', fontWeight: '700', flexShrink: 0,
-                        }}>{unread}</span>
+                          fontSize: '0.7rem', fontWeight: '700',
+                        }}>{categoryUnread}</span>
                       )}
                     </div>
-                  );
-                })}
+                    {!collapsed && feedList.map(feed => renderFeedItem(feed))}
+                  </div>
+                );
+              };
+              
+              return (
+                <>
+                  {/* カテゴリあり */}
+                  {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([cat, feedList]) => (
+                  <CategorySection key={cat} label={cat} feedList={feedList} />
+                ))}
+                  {/* カテゴリなし */}
+                  {noCategory.length > 0 && (
+                  Object.keys(grouped).length > 0 ? (
+                    <CategorySection label="Others" feedList={noCategory} />
+                  ) : (
+                    <>
+                      <div style={{ padding: '0.4rem 1rem', fontSize: '0.72rem', color: textSecondary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Feeds
+                      </div>
+                      {noCategory.map(feed => renderFeedItem(feed))}
+                    </>
+                  )
+                )}
+                </>
+              );
+            })()}
               </div>
-            </>
-          )}
-        </div>
 
         {/* MAIN CONTENT */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', marginLeft: sidebarPinned ? '0' : '12px' }}>
