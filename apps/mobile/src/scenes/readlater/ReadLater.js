@@ -129,6 +129,7 @@ export default function ReadLater() {
         body: JSON.stringify({ articleId: article.article_id }),
       }).catch(console.error)
     })
+    callAPI('DELETE', null, `?articleId=${encodeURIComponent(article.article_id)}`).catch(console.error)
     navigation.navigate('ArticleDetail', {
       article: {
         id: article.article_id, title: article.title, url: article.url,
