@@ -4,6 +4,7 @@ import { getAccessToken } from '../lib/supabase';
 import Navigation from '../components/Navigation';
 import { useTheme } from '../contexts/ThemeContext';
 import { usePersistedState } from '../hooks/usePersistedState';
+import { FaBookmark, FaTrash, FaExternalLinkAlt, FaRss, FaList, FaTh } from 'react-icons/fa';
 
 const ReadLaterPage = () => {
   const [articles, setArticles] = useState([]);
@@ -131,6 +132,19 @@ const ReadLaterPage = () => {
           <span style={{ color: textSecondary, fontSize: '0.85rem' }}>
             {checkedIds.size > 0 ? `${checkedIds.size}件選択中` : '全選択'}
           </span>
+
+          {/* ↓ 右端に追加 */}
+          <button
+            onClick={() => setViewMode(v => v === 'card' ? 'list' : 'card')}
+            style={{
+              padding: '0.35rem 0.9rem', border: `1px solid ${border}`, borderRadius: '20px',
+              backgroundColor: 'transparent', color: textSecondary,
+              cursor: 'pointer', fontSize: '0.85rem',
+              display: 'flex', alignItems: 'center', gap: '0.3rem',
+            }}
+            >
+            {viewMode === 'card' ? <><FaList /> List</> : <><FaTh /> Card</>}
+          </button>
 
           <div style={{ flex: 1 }} />
 
