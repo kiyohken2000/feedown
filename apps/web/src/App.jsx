@@ -19,6 +19,9 @@ import { ToastProvider } from './components/ToastContainer';
 import ScrollToTop from './components/ScrollToTop';
 
 import './App.css';
+import ReadLaterPage from './pages/ReadLaterPage'
+// ルートに追加
+<Route path="/read-later" element={<ReadLaterPage />} />
 
 // Protected Route wrapper component
 const ProtectedRoute = ({ children, user, authLoading }) => {
