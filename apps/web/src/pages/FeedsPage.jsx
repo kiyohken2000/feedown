@@ -19,6 +19,7 @@ const escapeXml = (str) => {
 };
 
 const FeedsPage = () => {
+  const [editingCategory, setEditingCategory] = useState({}); // { feedId: categoryValue }
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [feeds, setFeeds] = useState([]);
@@ -125,6 +126,16 @@ const FeedsPage = () => {
       showToast('Failed to add feed: ' + error.message, 'error');
     } finally {
       setAddingFeed(false);
+    }
+  };
+
+  const handleCategoryChange = async (feedId, category) => {
+    try {
+      await api.feeds.update(feedId, { category: category || null });
+      setFeeds(prev => prev.map(f => f.id === feedId ? { ...f, category } : f));
+      showToast('Category saved', 'success');
+    } catch (e) {
+    showToast('Failed to save category', 'error');
     }
   };
 
@@ -635,6 +646,33 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
                       <div style={styles.feedContent}>
                         <div style={styles.feedTitle}>{feed.title || 'Untitled Feed'}</div>
                         <div style={styles.feedUrl}>{feed.url}</div>
+                        {/* カテゴリ入力 */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem' }}>
+                          <input
+                            type="text"
+                            defaultValue={feed.category || ''}
+                            placeholder="カテゴリ（例: News, Tech）"
+                            onBlur={e => {
+                              const val = e.target.value.trim();
+                              if (val !== (feed.category || '')) {
+                                handleCategoryChange(feed.id, val);
+                              }
+                            }}
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                              padding: '0.2rem 0.5rem',
+                              fontSize: '0.78rem',
+                              border: isDarkMode ? '1px solid #555' : '1px solid #ddd',
+                              borderRadius: '4px',
+                              backgroundColor: isDarkMode ? '#2d2d2d' : '#fff',
+                              color: isDarkMode ? '#ccc' : '#555',
+                              width: '160px',
+                            }}
+                            />
+                          <span style={{ fontSize: '0.72rem', color: isDarkMode ? '#666' : '#bbb' }}>
+                            入力後フォーカスアウトで保存
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <button
