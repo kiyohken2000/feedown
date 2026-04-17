@@ -745,6 +745,16 @@ const DashboardPage = () => {
                         onClick={e => e.stopPropagation()}
                         style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer', flexShrink: 0 }}
                       />
+                      <button
+                        onClick={e => { e.stopPropagation(); isReadLater ? handleRemoveFromReadLater(article.id) : handleAddToReadLater(article); }}
+                        title={isReadLater ? 'Read Laterから削除' : 'Read Laterに追加'}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px',
+                          color: isReadLater ? '#6f42c1' : textSecondary, fontSize: '0.85rem', flexShrink: 0,
+                        }}
+                        >
+                        <FaBookmark />
+                      </button>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: '140px', maxWidth: '180px', flexShrink: 0 }}>
                         {getFeedFavicon(article.feedId) ? (
                           <img src={getFeedFavicon(article.feedId)} alt="" style={{ width: '14px', height: '14px', borderRadius: '2px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
