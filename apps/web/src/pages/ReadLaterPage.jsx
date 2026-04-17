@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { FaBookmark, FaTrash, FaList, FaTh, FaRss, FaStar } from 'react-icons/fa';
+import { FaBookmark, FaTrash, FaList, FaTh, FaRss, FaStar, FaSync } from 'react-icons/fa';
 import { getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
@@ -11,9 +11,9 @@ const ReadLaterPage = () => {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [checkedIds, setCheckedIds] = useState(new Set());
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [favoritedIds, setFavoritedIds] = useState(new Set());
+  const [readIds, setReadIds] = useState(new Set()); // セッション内既読
   const { isDarkMode } = useTheme();
   const [viewMode, setViewMode] = usePersistedState('readlater_viewMode', 'list');
 
@@ -42,6 +42,8 @@ const ReadLaterPage = () => {
   const fetchArticles = useCallback(async () => {
     setLoading(true);
     setError(null);
+    // リフレッシュ時に既読セットをリセット→既読記事が消える
+    setReadIds(new Set());
     try {
       const data = await callReadLaterAPI('GET');
       if (data.success) setArticles(data.data.articles || []);
@@ -53,13 +55,10 @@ const ReadLaterPage = () => {
     }
   }, [callReadLaterAPI]);
 
-  // Favorites一覧取得（スター表示用）
   const fetchFavorites = useCallback(async () => {
     try {
       const res = await api.favorites.list();
-      if (res.success) {
-        setFavoritedIds(new Set(res.data.favorites.map(f => f.articleId)));
-      }
+      if (res.success) setFavoritedIds(new Set(res.data.favorites.map(f => f.articleId)));
     } catch (e) { console.error(e); }
   }, [api]);
 
@@ -68,50 +67,32 @@ const ReadLaterPage = () => {
     fetchFavorites();
   }, [fetchArticles, fetchFavorites]);
 
+  // 記事を開く → 既読マーク（ローカル）+ API
+  const handleArticleClick = useCallback((article) => {
+    const formatted = {
+      id: article.article_id,
+      title: article.title,
+      url: article.url,
+      description: article.description,
+      feedTitle: article.feed_title || 'Unknown Feed',
+      publishedAt: article.saved_at,
+      imageUrl: article.image_url || null,
+    };
+    setSelectedArticle(formatted);
+    // 既読セットに追加
+    setReadIds(prev => new Set([...prev, article.article_id]));
+    // APIで既読マーク（エラーは無視）
+    api.articles.markAsRead(article.article_id).catch(console.error);
+  }, [api]);
+
   const handleRemove = async (articleId) => {
     try {
       await callReadLaterAPI('DELETE', null, `?articleId=${encodeURIComponent(articleId)}`);
       setArticles(prev => prev.filter(a => a.article_id !== articleId));
-      setCheckedIds(prev => { const s = new Set(prev); s.delete(articleId); return s; });
       if (selectedArticle?.id === articleId) setSelectedArticle(null);
     } catch (e) { console.error(e); }
   };
 
-  const handleRemoveChecked = async () => {
-    for (const id of [...checkedIds]) await handleRemove(id);
-    setCheckedIds(new Set());
-  };
-
-  const handleCheckAll = () => {
-    if (checkedIds.size === articles.length) setCheckedIds(new Set());
-    else setCheckedIds(new Set(articles.map(a => a.article_id)));
-  };
-
-  const toggleCheck = (e, articleId) => {
-    e.stopPropagation();
-    setCheckedIds(prev => {
-      const s = new Set(prev);
-      s.has(articleId) ? s.delete(articleId) : s.add(articleId);
-      return s;
-    });
-  };
-
-  // Read Later記事をArticleModal用フォーマットに変換
-  const toArticleFormat = (a) => ({
-    id: a.article_id,
-    title: a.title,
-    url: a.url,
-    description: a.description,
-    feedTitle: a.feed_title || 'Unknown Feed',
-    publishedAt: a.saved_at,
-    imageUrl: a.image_url || null,
-  });
-
-  const handleArticleClick = (article) => {
-    setSelectedArticle(toArticleFormat(article));
-  };
-
-  // Favorites追加/削除
   const handleToggleFavorite = useCallback(async () => {
     if (!selectedArticle) return;
     const isFav = favoritedIds.has(selectedArticle.id);
@@ -121,10 +102,8 @@ const ReadLaterPage = () => {
         setFavoritedIds(prev => { const s = new Set(prev); s.delete(selectedArticle.id); return s; });
       } else {
         await api.articles.addToFavorites(selectedArticle.id, {
-          title: selectedArticle.title,
-          url: selectedArticle.url,
-          description: selectedArticle.description,
-          feedTitle: selectedArticle.feedTitle,
+          title: selectedArticle.title, url: selectedArticle.url,
+          description: selectedArticle.description, feedTitle: selectedArticle.feedTitle,
           imageUrl: selectedArticle.imageUrl,
         });
         setFavoritedIds(prev => new Set([...prev, selectedArticle.id]));
@@ -132,10 +111,8 @@ const ReadLaterPage = () => {
     } catch (e) { console.error(e); }
   }, [selectedArticle, favoritedIds, api]);
 
-  // リストのスターアイコンから直接Favorites追加/削除
   const handleToggleFavoriteById = useCallback(async (e, article) => {
     e.stopPropagation();
-    const articleFormatted = toArticleFormat(article);
     const isFav = favoritedIds.has(article.article_id);
     try {
       if (isFav) {
@@ -143,11 +120,8 @@ const ReadLaterPage = () => {
         setFavoritedIds(prev => { const s = new Set(prev); s.delete(article.article_id); return s; });
       } else {
         await api.articles.addToFavorites(article.article_id, {
-          title: articleFormatted.title,
-          url: articleFormatted.url,
-          description: articleFormatted.description,
-          feedTitle: articleFormatted.feedTitle,
-          imageUrl: articleFormatted.imageUrl,
+          title: article.title, url: article.url,
+          description: article.description, feedTitle: article.feed_title, imageUrl: article.image_url,
         });
         setFavoritedIds(prev => new Set([...prev, article.article_id]));
       }
@@ -164,8 +138,9 @@ const ReadLaterPage = () => {
     return new Date(d).toLocaleDateString();
   };
 
-  const allChecked = articles.length > 0 && checkedIds.size === articles.length;
-  const someChecked = checkedIds.size > 0 && checkedIds.size < articles.length;
+  // 既読を除外した表示記事
+  const visibleArticles = articles.filter(a => !readIds.has(a.article_id));
+  const readCount = readIds.size;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: bg }}>
@@ -173,52 +148,47 @@ const ReadLaterPage = () => {
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-          <FaBookmark style={{ color: '#FF6B35', fontSize: '1.4rem' }} />
-          <h1 style={{ color: textPrimary, fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>Read Later</h1>
-          <span style={{ backgroundColor: '#FF6B35', color: 'white', borderRadius: '12px', padding: '0.15rem 0.6rem', fontSize: '0.82rem', fontWeight: '700' }}>
-            {articles.length}
-          </span>
-        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <FaBookmark style={{ color: '#FF6B35', fontSize: '1.4rem' }} />
+            <h1 style={{ color: textPrimary, fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>Read Later</h1>
+            <span style={{ backgroundColor: '#FF6B35', color: 'white', borderRadius: '12px', padding: '0.15rem 0.6rem', fontSize: '0.82rem', fontWeight: '700' }}>
+              {visibleArticles.length}
+            </span>
+            {readCount > 0 && (
+              <span style={{ color: textSecondary, fontSize: '0.82rem' }}>
+                ({readCount}件既読 · Refreshで消去)
+              </span>
+            )}
+          </div>
 
-        {/* Toolbar */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.75rem',
-          padding: '0.75rem 1rem', backgroundColor: cardBg,
-          borderRadius: '10px', border: `1px solid ${border}`,
-          marginBottom: '1rem', flexWrap: 'wrap',
-        }}>
-          <input
-            type="checkbox"
-            checked={allChecked}
-            ref={el => { if (el) el.indeterminate = someChecked; }}
-            onChange={handleCheckAll}
-            style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer' }}
-          />
-          <span style={{ color: textSecondary, fontSize: '0.85rem' }}>
-            {checkedIds.size > 0 ? `${checkedIds.size}件選択中` : '全選択'}
-          </span>
-          <div style={{ flex: 1 }} />
-          {checkedIds.size > 0 && (
-            <button onClick={handleRemoveChecked} style={{
-              padding: '0.35rem 0.9rem', backgroundColor: '#dc3545', color: 'white',
-              border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '0.83rem', fontWeight: '600',
-              display: 'flex', alignItems: 'center', gap: '0.3rem',
-            }}>
-              <FaTrash /> 選択を削除 ({checkedIds.size})
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {/* Refreshボタン */}
+            <button
+              onClick={fetchArticles}
+              disabled={loading}
+              style={{
+                padding: '0.35rem 0.9rem', backgroundColor: '#FF6B35', color: 'white',
+                border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600',
+                display: 'flex', alignItems: 'center', gap: '0.3rem',
+              }}
+            >
+              <FaSync style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
             </button>
-          )}
-          <button
-            onClick={() => setViewMode(v => v === 'card' ? 'list' : 'card')}
-            style={{
-              padding: '0.35rem 0.9rem', border: `1px solid ${border}`, borderRadius: '20px',
-              backgroundColor: 'transparent', color: textSecondary,
-              cursor: 'pointer', fontSize: '0.85rem',
-              display: 'flex', alignItems: 'center', gap: '0.3rem',
-            }}
-          >
-            {viewMode === 'card' ? <><FaList /> List</> : <><FaTh /> Card</>}
-          </button>
+
+            {/* Card/Listトグル */}
+            <button
+              onClick={() => setViewMode(v => v === 'card' ? 'list' : 'card')}
+              style={{
+                padding: '0.35rem 0.9rem', border: `1px solid ${border}`, borderRadius: '20px',
+                backgroundColor: 'transparent', color: textSecondary,
+                cursor: 'pointer', fontSize: '0.85rem',
+                display: 'flex', alignItems: 'center', gap: '0.3rem',
+              }}
+            >
+              {viewMode === 'card' ? <><FaList /> List</> : <><FaTh /> Card</>}
+            </button>
+          </div>
         </div>
 
         {loading && (
@@ -229,19 +199,19 @@ const ReadLaterPage = () => {
 
         {error && <p style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
 
-        {!loading && articles.length === 0 && (
+        {!loading && visibleArticles.length === 0 && (
           <div style={{ textAlign: 'center', padding: '4rem', color: textSecondary }}>
             <FaBookmark style={{ fontSize: '3rem', opacity: 0.2, marginBottom: '1rem' }} />
-            <p style={{ fontSize: '1.1rem' }}>Read Laterに保存した記事はありません</p>
-            <p style={{ fontSize: '0.9rem' }}>記事をスワイプするか、チェックして「Read Later」ボタンを押してください</p>
+            <p style={{ fontSize: '1.1rem' }}>
+              {readCount > 0 ? '全て既読にしました！Refreshで一覧を更新できます' : 'Read Laterに保存した記事はありません'}
+            </p>
           </div>
         )}
 
         {/* CARD VIEW */}
-        {!loading && articles.length > 0 && viewMode === 'card' && (
+        {!loading && visibleArticles.length > 0 && viewMode === 'card' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-            {articles.map(article => {
-              const isChecked = checkedIds.has(article.article_id);
+            {visibleArticles.map(article => {
               const isFav = favoritedIds.has(article.article_id);
               return (
                 <div
@@ -249,7 +219,7 @@ const ReadLaterPage = () => {
                   onClick={() => handleArticleClick(article)}
                   style={{
                     backgroundColor: cardBg, borderRadius: '10px', overflow: 'hidden',
-                    border: isChecked ? '2px solid #FF6B35' : `1px solid ${border}`,
+                    border: `1px solid ${border}`,
                     boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)',
                     cursor: 'pointer', position: 'relative',
                     transition: 'transform 0.2s, box-shadow 0.2s',
@@ -257,13 +227,6 @@ const ReadLaterPage = () => {
                   onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)'; }}
                   onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)'; }}
                 >
-                  <div style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 2 }}>
-                    <input type="checkbox" checked={isChecked}
-                      onChange={e => toggleCheck(e, article.article_id)}
-                      onClick={e => e.stopPropagation()}
-                      style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer' }}
-                    />
-                  </div>
                   {article.image_url ? (
                     <img src={article.image_url} alt="" style={{ width: '100%', height: '150px', objectFit: 'cover' }} />
                   ) : (
@@ -285,20 +248,34 @@ const ReadLaterPage = () => {
                         {article.description}
                       </p>
                     )}
-                    {/* Favorites星ボタン */}
-                    <button
-                      onClick={e => handleToggleFavoriteById(e, article)}
-                      style={{
-                        padding: '0.25rem 0.6rem',
-                        backgroundColor: isFav ? '#FFD700' : 'transparent',
-                        color: isFav ? 'white' : textSecondary,
-                        border: `1px solid ${isFav ? '#FFD700' : border}`,
-                        borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem',
-                        display: 'flex', alignItems: 'center', gap: '0.3rem',
-                      }}
-                    >
-                      <FaStar /> {isFav ? 'Favorited' : 'Favorite'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {/* 星ボタン */}
+                      <button
+                        onClick={e => handleToggleFavoriteById(e, article)}
+                        style={{
+                          padding: '0.25rem 0.6rem',
+                          backgroundColor: isFav ? '#FFD700' : 'transparent',
+                          color: isFav ? 'white' : textSecondary,
+                          border: `1px solid ${isFav ? '#FFD700' : border}`,
+                          borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem',
+                          display: 'flex', alignItems: 'center', gap: '0.3rem',
+                        }}
+                      >
+                        <FaStar /> {isFav ? 'Favorited' : 'Favorite'}
+                      </button>
+                      {/* 削除ボタン */}
+                      <button
+                        onClick={e => { e.stopPropagation(); handleRemove(article.article_id); }}
+                        style={{
+                          padding: '0.25rem 0.6rem', backgroundColor: 'transparent',
+                          color: textSecondary, border: `1px solid ${border}`,
+                          borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem',
+                          display: 'flex', alignItems: 'center', gap: '0.3rem',
+                        }}
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -307,10 +284,9 @@ const ReadLaterPage = () => {
         )}
 
         {/* LIST VIEW */}
-        {!loading && articles.length > 0 && viewMode === 'list' && (
+        {!loading && visibleArticles.length > 0 && viewMode === 'list' && (
           <div style={{ backgroundColor: cardBg, borderRadius: '10px', border: `1px solid ${border}`, overflow: 'hidden' }}>
-            {articles.map((article, idx) => {
-              const isChecked = checkedIds.has(article.article_id);
+            {visibleArticles.map((article, idx) => {
               const isFav = favoritedIds.has(article.article_id);
               return (
                 <div
@@ -319,19 +295,12 @@ const ReadLaterPage = () => {
                   style={{
                     display: 'flex', alignItems: 'center', gap: '0.75rem',
                     padding: '0.65rem 1rem',
-                    borderBottom: idx < articles.length - 1 ? `1px solid ${border}` : 'none',
+                    borderBottom: idx < visibleArticles.length - 1 ? `1px solid ${border}` : 'none',
                     cursor: 'pointer',
-                    backgroundColor: isChecked ? (isDarkMode ? '#3a3a2a' : '#fffbe6') : 'transparent',
                   }}
                   onMouseOver={e => { e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#f9f9f9'; }}
-                  onMouseOut={e => { e.currentTarget.style.backgroundColor = isChecked ? (isDarkMode ? '#3a3a2a' : '#fffbe6') : 'transparent'; }}
+                  onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
-                  {/* チェックボックス */}
-                  <input type="checkbox" checked={isChecked}
-                    onChange={e => toggleCheck(e, article.article_id)}
-                    onClick={e => e.stopPropagation()}
-                    style={{ width: '16px', height: '16px', accentColor: '#FF6B35', cursor: 'pointer', flexShrink: 0 }}
-                  />
                   {/* 星ボタン */}
                   <button
                     onClick={e => handleToggleFavoriteById(e, article)}
@@ -345,21 +314,25 @@ const ReadLaterPage = () => {
                   </button>
 
                   {/* フィード名 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: '120px', maxWidth: '160px', flexShrink: 0 }}>
-                    <span style={{ color: '#FF6B35', fontSize: '0.82rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {article.feed_title || 'Feed'}
-                    </span>
-                  </div>
+                  <span style={{ color: '#FF6B35', fontSize: '0.82rem', fontWeight: '600', minWidth: '100px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {article.feed_title || 'Feed'}
+                  </span>
 
                   {/* タイトル */}
                   <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {article.title}
                   </span>
 
-                  {/* 時刻 */}
+                  {/* 時刻 + 削除 */}
                   <span style={{ color: textSecondary, fontSize: '0.8rem', flexShrink: 0 }}>
                     {getRelativeTime(article.saved_at)}
                   </span>
+                  <button
+                    onClick={e => { e.stopPropagation(); handleRemove(article.article_id); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: textSecondary, fontSize: '0.8rem', flexShrink: 0, padding: '2px 4px' }}
+                  >
+                    <FaTrash />
+                  </button>
                 </div>
               );
             })}
@@ -367,7 +340,6 @@ const ReadLaterPage = () => {
         )}
       </div>
 
-      {/* ArticleModal */}
       {selectedArticle && (
         <ArticleModal
           article={selectedArticle}
