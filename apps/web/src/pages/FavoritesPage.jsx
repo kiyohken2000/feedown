@@ -111,7 +111,7 @@ const FavoritesPage = () => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '5em', flexShrink: 0 }}>
         {getFeedFavicon(fav.feedTitle) && <img src={getFeedFavicon(fav.feedTitle)} alt="" style={{ width: '13px', height: '13px', borderRadius: '2px' }} onError={e => e.target.style.display = 'none'} />}
         <span style={{ color: textSecondary, fontSize: '0.82rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
-      </span>
+      </div>
       <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
         <span style={{ color: textSecondary, fontSize: '0.8rem' }}>{getRelativeTime(fav.createdAt)}</span>
