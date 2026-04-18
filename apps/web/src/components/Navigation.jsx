@@ -54,6 +54,7 @@ const Navigation = ({ unreadCount = 0 }) => {
     activeNavLink: {
       backgroundColor: 'rgba(255,255,255,0.2)',
     },
+    // モノトーンバッジ
     unreadBadge: {
       backgroundColor: 'rgba(255,255,255,0.25)',
       color: 'white',
@@ -61,6 +62,7 @@ const Navigation = ({ unreadCount = 0 }) => {
       borderRadius: '12px',
       fontSize: '0.78rem',
       fontWeight: '700',
+      border: '1px solid rgba(255,255,255,0.4)',
     },
   };
 
