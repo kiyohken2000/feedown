@@ -184,11 +184,11 @@ const ReadLaterPage = () => {
         <button onClick={e => handleToggleFavoriteById(e, article)} title={isFav ? 'Favoritesから削除' : 'Favoritesに追加'}
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: isFav ? '#FFD700' : textSecondary, fontSize: '0.9rem', flexShrink: 0 }}><FaStar /></button>
         {isRead && <span style={{ color: '#28a745', fontSize: '0.75rem', flexShrink: 0 }}>✓</span>}
-        <span style={{ color: textSecondary, fontSize: '0.82rem', fontWeight: '600', width: '5em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0, textAlign: 'left' }}>
+        <span style={{ color: textSecondary, fontSize: '0.82rem', fontWeight: '600', width: '5em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0, textAlign: 'left' }}></span>
         <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{article.title}</span>
         <span style={{ color: textSecondary, fontSize: '0.8rem', flexShrink: 0 }}>{getRelativeTime(article.saved_at)}</span>
         <button onClick={e => { e.stopPropagation(); handleRemove(article.article_id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: textSecondary, fontSize: '0.8rem', flexShrink: 0, padding: '2px 4px' }}><FaTrash /></button>
-      </span>
+      </div>
     );
   };
 
