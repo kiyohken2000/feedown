@@ -690,7 +690,7 @@ const DashboardPage = () => {
                 <span style={{ flex: 1 }}>All Feeds</span>
                 {/* モノトーンバッジ */}
                 {unreadCount > 0 && (
-                  <span style={{ backgroundColor: selectedFeedId === '' ? 'rgba(255,255,255,0.3)' : (isDarkMode ? '#555' : '#bbb'), color: 'white', borderRadius: '12px', padding: '0.1rem 0.45rem', fontSize: '0.75rem', fontWeight: '700' }}>{unreadCount}</span>
+                  <span style={{ backgroundColor: 'rgba(0,0,0,0.22)', color: 'white', borderRadius: '12px', padding: '0.1rem 0.45rem', fontSize: '0.75rem', fontWeight: '700' }}>{unreadCount}</span>
                 )}
               </div>
 
