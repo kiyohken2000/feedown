@@ -37,7 +37,7 @@ const CategorySection = ({ label, feedList, feedUnreadCounts, selectedFeedId, se
           <div key={feed.id} onClick={() => setSelectedFeedId(feed.id)} style={{
             padding: '0.5rem 1rem', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: '0.6rem',
-            backgroundColor: isActive ? '#FF6B35' : 'transparent',
+            backgroundColor: isActive ? (isDarkMode ? '#444' : '#555') : 'transparent',
             color: isActive ? 'white' : textPrimary,
             borderRadius: '6px', margin: '0.1rem 0.5rem',
             fontSize: '0.87rem', whiteSpace: 'nowrap', overflow: 'hidden',
@@ -51,7 +51,7 @@ const CategorySection = ({ label, feedList, feedUnreadCounts, selectedFeedId, se
             }
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{feed.title || feed.url}</span>
             {unread > 0 && (
-              <span style={{ backgroundColor: isActive ? 'white' : (isDarkMode ? '#555' : '#bbb'), color: isActive ? '#FF6B35' : (isDarkMode ? '#eee' : '#fff'), borderRadius: '12px', padding: '0.1rem 0.4rem', fontSize: '0.72rem', fontWeight: '700', flexShrink: 0 }}>{unread}</span>
+              <span style={{ backgroundColor: isActive ? 'white' : (isDarkMode ? '#555' : '#bbb'), color: isActive ? (isDarkMode ? '#444' : '#555') : (isDarkMode ? '#eee' : '#fff'), borderRadius: '12px', padding: '0.1rem 0.4rem', fontSize: '0.72rem', fontWeight: '700', flexShrink: 0 }}>{unread}</span>
             )}
           </div>
         );
@@ -681,7 +681,7 @@ const DashboardPage = () => {
               <div onClick={() => setSelectedFeedId('')} style={{
                 padding: '0.6rem 1rem', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: '0.6rem',
-                backgroundColor: selectedFeedId === '' ? '#FF6B35' : 'transparent',
+                backgroundColor: selectedFeedId === '' ? (isDarkMode ? '#444' : '#555') : 'transparent',
                 color: selectedFeedId === '' ? 'white' : textPrimary,
                 borderRadius: '6px', margin: '0 0.5rem',
                 fontWeight: '600', fontSize: '0.9rem', whiteSpace: 'nowrap',
@@ -710,7 +710,7 @@ const DashboardPage = () => {
                             <div key={feed.id} onClick={() => setSelectedFeedId(feed.id)} style={{
                               padding: '0.5rem 1rem', cursor: 'pointer',
                               display: 'flex', alignItems: 'center', gap: '0.6rem',
-                              backgroundColor: isActive ? '#FF6B35' : 'transparent',
+                              backgroundColor: isActive ? (isDarkMode ? '#444' : '#555') : 'transparent',
                               color: isActive ? 'white' : textPrimary,
                               borderRadius: '6px', margin: '0.1rem 0.5rem',
                               fontSize: '0.87rem', whiteSpace: 'nowrap', overflow: 'hidden',
@@ -720,7 +720,7 @@ const DashboardPage = () => {
                             >
                               {feed.faviconUrl ? <img src={feed.faviconUrl} alt="" style={{ width: '16px', height: '16px', borderRadius: '3px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} /> : <FaRss style={{ flexShrink: 0, fontSize: '0.8rem', opacity: 0.5 }} />}
                               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{feed.title || feed.url}</span>
-                              {unread > 0 && <span style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.3)' : (isDarkMode ? '#555' : '#bbb'), color: 'white', borderRadius: '12px', padding: '0.1rem 0.4rem', fontSize: '0.72rem', fontWeight: '700', flexShrink: 0 }}>{unread}</span>}
+                              {unread > 0 && <span style={{ backgroundColor: isActive ? 'white' : (isDarkMode ? '#555' : '#bbb'), color: isActive ? (isDarkMode ? '#444' : '#555') : (isDarkMode ? '#eee' : '#fff'), borderRadius: '12px', padding: '0.1rem 0.4rem', fontSize: '0.72rem', fontWeight: '700', flexShrink: 0 }}>{unread}</span>}
                             </div>
                           );
                         })}
