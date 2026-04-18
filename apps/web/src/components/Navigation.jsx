@@ -12,7 +12,7 @@ const Navigation = ({ unreadCount = 0 }) => {
     navList: { display: 'flex', listStyle: 'none', margin: 0, padding: 0, gap: '0.25rem' },
     navLink: { color: 'white', textDecoration: 'none', padding: '0.4rem 0.75rem', borderRadius: '4px', transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem' },
     activeNavLink: { backgroundColor: 'rgba(255,255,255,0.2)' },
-    unreadBadge: { backgroundColor: 'rgba(0,0,0,0.22)', color: 'white', padding: '0.1rem 0.45rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: '700' },
+    unreadBadge: { backgroundColor: 'rgba(0,0,0,0.4)', color: 'white', padding: '0.1rem 0.45rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: '700' },
   };
   const navItems = [
     { path: '/read-later', label: 'Read Later', icon: FaBookmark },
