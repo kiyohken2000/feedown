@@ -248,7 +248,7 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
     sectionHeading: { color: isDarkMode ? '#b0b0b0' : '#555', marginBottom: '1rem', fontSize: '1.3rem', fontWeight: '600' },
     form: { display: 'flex', gap: '1rem', marginBottom: '1rem' },
     input: { flex: 1, padding: '0.75rem', border: isDarkMode ? '2px solid #444' : '2px solid #e0e0e0', borderRadius: '5px', fontSize: '1rem', backgroundColor: isDarkMode ? '#1a1a1a' : 'white', color: isDarkMode ? '#e0e0e0' : '#333' },
-    button: { padding: '0.75rem 1.5rem', backgroundColor: '#FF6B35', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '1rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' },
+    button: { padding: '0.75rem 1.5rem', backgroundColor: isDarkMode ? '#555' : '#666', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '1rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' },
     feedsList: { display: 'grid', gap: '0.75rem' },
     feedItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: isDarkMode ? '#1a1a1a' : '#f9f9f9', borderRadius: '5px', border: isDarkMode ? '1px solid #444' : '1px solid #e0e0e0', cursor: 'move', transition: 'all 0.2s' },
     feedItemDragging: { opacity: 0.5, transform: 'scale(0.98)' },
