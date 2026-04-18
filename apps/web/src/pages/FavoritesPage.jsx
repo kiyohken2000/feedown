@@ -108,11 +108,11 @@ const FavoritesPage = () => {
         ? <img src={fav.imageUrl} alt="" style={{ width: '56px', height: '42px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
         : <div style={{ width: '56px', height: '42px', backgroundColor: isDarkMode ? '#333' : '#f0f0f0', borderRadius: '5px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaRss style={{ color: '#FF6B35', opacity: 0.3, fontSize: '0.9rem' }} /></div>
       }
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '5em', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '5em', flexShrink: 0, overflow: 'hidden' }}>
         {getFeedFavicon(fav.feedTitle) && <img src={getFeedFavicon(fav.feedTitle)} alt="" style={{ width: '13px', height: '13px', borderRadius: '2px' }} onError={e => e.target.style.display = 'none'} />}
-        <span style={{ color: textSecondary, fontSize: '0.82rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}></span>
+        <span style={{ color: textSecondary, fontSize: '0.82rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{fav.feedTitle || 'Feed'}</span>
       </div>
-      <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
+      <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{fav.title}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
         <span style={{ color: textSecondary, fontSize: '0.8rem' }}>{getRelativeTime(fav.createdAt)}</span>
         <button onClick={e => handleRemoveFavoriteFromList(e, fav.articleId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: textSecondary, fontSize: '0.8rem', padding: '2px 4px' }}><FaTimes /></button>
