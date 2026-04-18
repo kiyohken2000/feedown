@@ -22,7 +22,7 @@ import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import { useAsyncStorageState } from '../../utils/useAsyncStorageState'
 
-// スワイプ可能な記事アイテム（カード表示）
+// スワイプ可能な記事アイテム（カード・リスト・マガジン表示対応）
 const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isSelectionMode, isChecked, onToggleCheck, onMarkRead, onReadLater, isReadLater, theme, isDarkMode, viewMode }) => {
   const translateX = useRef(new Animated.Value(0)).current
 
@@ -58,6 +58,8 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
   })
 
   const isListMode = viewMode === 'list'
+  const isMagazineMode = viewMode === 'magazine'
+  const checkColor = isDarkMode ? '#555' : '#888'
 
   return (
     <View style={{ overflow: 'hidden', marginVertical: isListMode ? 2 : 6, marginHorizontal: isListMode ? 0 : 12 }}>
@@ -75,10 +77,10 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
       <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
         <TouchableOpacity
           style={[
-            isListMode ? styles.articleListRow : styles.articleCard,
+            isListMode ? styles.articleListRow : isMagazineMode ? styles.articleMagazine : styles.articleCard,
             { backgroundColor: theme.card },
             isRead && styles.articleCardRead,
-            isChecked && { borderColor: colors.primary, borderWidth: 2 },
+            isChecked && { borderColor: checkColor, borderWidth: 2 },
             isListMode && { borderBottomColor: theme.border, borderBottomWidth: 1 },
           ]}
           onPress={() => isSelectionMode ? onToggleCheck(article.id) : onPress(article)}
@@ -86,8 +88,8 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
           activeOpacity={0.7}
         >
           {isSelectionMode && (
-            <TouchableOpacity onPress={() => onToggleCheck(article.id)} style={styles.checkboxContainer}>
-              <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
+            <TouchableOpacity onPress={() => onToggleCheck(article.id)} style={[styles.checkboxContainer, isMagazineMode && { position: 'absolute', top: 12, left: 12, zIndex: 10 }]}>
+              <View style={[styles.checkbox, { borderColor: checkColor }, isChecked && { backgroundColor: checkColor }]}>
                 {isChecked && <Text style={styles.checkmark}>✓</Text>}
               </View>
             </TouchableOpacity>
@@ -95,20 +97,21 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
 
           {!isListMode && (
             article.imageUrl ? (
-              <Image source={{ uri: article.imageUrl }} style={styles.thumbnail} resizeMode="cover" />
+              <Image source={{ uri: article.imageUrl }} style={isMagazineMode ? styles.thumbnailMagazine : styles.thumbnailCard} resizeMode="cover" />
             ) : (
-              <View style={[styles.noThumbnail, { backgroundColor: theme.border }]}>
+              <View style={[isMagazineMode ? styles.noThumbnailMagazine : styles.noThumbnailCard, { backgroundColor: theme.border }]}>
                 <Text style={[styles.noThumbnailText, { color: theme.textMuted }]}>No image</Text>
               </View>
             )
           )}
 
-          <View style={[styles.articleContent, isListMode && { marginLeft: 0 }]}>
+          <View style={[styles.articleContent, (isListMode || isMagazineMode) && { marginLeft: 0 }]}>
             <View style={styles.articleMeta}>
               {!isListMode && feed?.faviconUrl && (
                 <Image source={{ uri: feed.faviconUrl }} style={styles.favicon} />
               )}
-              <Text style={[styles.feedTitleText, { flex: 1 }]} numberOfLines={1}>
+              {/* フィード名をモノトーンに変更 */}
+              <Text style={[styles.feedTitleText, { color: theme.textSecondary, flex: 1 }]} numberOfLines={1}>
                 {article.feedTitle || 'Unknown Feed'}
               </Text>
               {isReadLater && <Text style={styles.readLaterBadge}>📌</Text>}
@@ -116,13 +119,13 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
               <Text style={[styles.time, { color: theme.textMuted }]}>{getRelativeTime(article.publishedAt)}</Text>
             </View>
             <Text
-              style={[styles.articleTitle, { color: theme.text }, isListMode && { fontSize: fontSize.normal }]}
-              numberOfLines={isListMode ? 1 : 2}
+              style={[styles.articleTitle, { color: theme.text }, isListMode && { fontSize: fontSize.normal }, isMagazineMode && { fontSize: fontSize.large, marginBottom: 6 }]}
+              numberOfLines={isListMode ? 1 : 3}
             >
               {article.title}
             </Text>
             {!isListMode && (
-              <Text style={[styles.articleDescription, { color: theme.textSecondary }]} numberOfLines={2}>
+              <Text style={[styles.articleDescription, { color: theme.textSecondary }]} numberOfLines={isMagazineMode ? 3 : 2}>
                 {article.description || ''}
               </Text>
             )}
@@ -156,7 +159,7 @@ export default function Home() {
     refreshAll, fetchArticles, markAsRead, batchMarkAsRead,
   } = useContext(FeedsContext)
 
-  // 永続化された設定
+  // 永続化された設定 (card | list | magazine)
   const [filter, setFilter] = useAsyncStorageState('@home_filter', 'all')
   const [viewMode, setViewMode] = useAsyncStorageState('@home_viewMode', 'card')
 
@@ -363,7 +366,7 @@ export default function Home() {
       <View style={styles.footer}><Text style={[styles.footerText, { color: theme.textMuted }]}>No more articles</Text></View>
     ) : null
     if (isLoading && filteredArticles.length > 0) return (
-      <View style={styles.footer}><ActivityIndicator size="small" color={colors.primary} /></View>
+      <View style={styles.footer}><ActivityIndicator size="small" color={isDarkMode ? '#888' : '#555'} /></View>
     )
     return null
   }
@@ -381,11 +384,14 @@ export default function Home() {
     )
   }
 
+  const activeColor = isDarkMode ? '#555' : '#888'
+  const inactiveBorderColor = isDarkMode ? '#444' : '#ccc'
+
   return (
     <ScreenTemplate>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Text style={styles.headerTitle}>FeedOwn</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>FeedOwn</Text>
         <View style={styles.headerRight}>
           <Dropdown
             style={[styles.feedDropdown, { backgroundColor: theme.card, borderColor: theme.border }]}
@@ -402,7 +408,8 @@ export default function Home() {
             value={selectedFeedId}
             onChange={item => setSelectedFeedId(item.value)}
           />
-          <View style={[styles.unreadBadge, unreadCount === 0 && styles.allReadBadge]}>
+          {/* 未読バッジをモノトーンに */}
+          <View style={[styles.unreadBadge, { backgroundColor: isDarkMode ? '#444' : '#bbb' }, unreadCount === 0 && styles.allReadBadge]}>
             <Text style={styles.unreadText}>{unreadCount > 0 ? `${unreadCount} unread` : 'All read'}</Text>
           </View>
         </View>
@@ -410,11 +417,11 @@ export default function Home() {
 
       {/* 選択モードバー */}
       {selectionMode ? (
-        <View style={[styles.selectionBar, { backgroundColor: isDarkMode ? '#2d2d2d' : '#fff3e0', borderBottomColor: theme.border }]}>
+        <View style={[styles.selectionBar, { backgroundColor: isDarkMode ? '#2d2d2d' : '#f5f5f5', borderBottomColor: theme.border }]}>
           <TouchableOpacity onPress={handleSelectAll} style={styles.selectAllButton}>
-            <View style={[styles.checkbox, allSelected && styles.checkboxChecked]}>
+            <View style={[styles.checkbox, { borderColor: activeColor }, allSelected && { backgroundColor: activeColor }]}>
               {allSelected && <Text style={styles.checkmark}>✓</Text>}
-              {!allSelected && selectedIds.size > 0 && <Text style={[styles.checkmark, { color: colors.primary }]}>−</Text>}
+              {!allSelected && selectedIds.size > 0 && <Text style={[styles.checkmark, { color: activeColor }]}>−</Text>}
             </View>
             <Text style={[styles.selectAllText, { color: theme.text }]}>
               {selectedIds.size > 0 ? `${selectedIds.size}件選択` : '全選択'}
@@ -447,23 +454,30 @@ export default function Home() {
             {['all', 'unread', 'read'].map(f => (
               <TouchableOpacity
                 key={f}
-                style={[styles.filterButton, { backgroundColor: theme.card }, filter === f && styles.filterButtonActive]}
+                style={[
+                  styles.filterButton,
+                  { borderColor: filter === f ? activeColor : inactiveBorderColor },
+                  filter === f && { backgroundColor: activeColor }
+                ]}
                 onPress={() => setFilter(f)}
               >
-                <Text style={[styles.filterButtonText, filter === f && styles.filterButtonTextActive]}>
+                <Text style={[
+                  styles.filterButtonText,
+                  { color: filter === f ? 'white' : theme.textSecondary }
+                ]}>
                   {f === 'all' ? 'All' : f === 'unread' ? 'Unread' : 'Read'}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
           <View style={styles.rightButtons}>
-            {/* 表示切替ボタン */}
+            {/* 3段階の表示切替ボタン（Card → List → Magazine） */}
             <TouchableOpacity
               style={[styles.viewToggleBtn, { borderColor: theme.border }]}
-              onPress={() => setViewMode(v => v === 'card' ? 'list' : 'card')}
+              onPress={() => setViewMode(v => v === 'card' ? 'list' : v === 'list' ? 'magazine' : 'card')}
             >
               <Text style={[styles.viewToggleText, { color: theme.text }]}>
-                {viewMode === 'card' ? '☰' : '⊞'}
+                {viewMode === 'card' ? '☰' : viewMode === 'list' ? '📰' : '⊞'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -484,7 +498,7 @@ export default function Home() {
         keyExtractor={item => item.id}
         contentContainerStyle={[styles.listContent, viewMode === 'list' && { paddingHorizontal: 0, paddingVertical: 0 }]}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={isDarkMode ? '#888' : '#555'} />
         }
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.3}
@@ -495,7 +509,7 @@ export default function Home() {
 
       {isLoading && articles.length === 0 && (
         <View style={[styles.loadingOverlay, { backgroundColor: isDarkMode ? 'rgba(18,18,18,0.9)' : 'rgba(255,255,255,0.9)' }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={isDarkMode ? '#888' : '#555'} />
           <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading articles...</Text>
         </View>
       )}
@@ -505,20 +519,19 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  headerTitle: { fontSize: fontSize.xxLarge, fontWeight: 'bold', color: colors.primary },
+  headerTitle: { fontSize: fontSize.xxLarge, fontWeight: 'bold' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   feedDropdown: { width: 120, height: 32, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8 },
   feedDropdownText: { fontSize: fontSize.small },
   feedDropdownList: { borderRadius: 8, marginTop: 4, width: 180, marginLeft: -60 },
-  unreadBadge: { backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  unreadBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   allReadBadge: { backgroundColor: '#28a745' },
-  unreadText: { color: colors.white, fontSize: fontSize.small, fontWeight: '600' },
+  unreadText: { color: 'white', fontSize: fontSize.small, fontWeight: '600' },
 
   selectionBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, gap: 8 },
   selectAllButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 8 },
   selectAllText: { fontSize: fontSize.small, fontWeight: '600' },
-  checkbox: { width: 22, height: 22, borderRadius: 4, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkbox: { width: 22, height: 22, borderRadius: 4, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   checkmark: { color: 'white', fontSize: 13, fontWeight: '700' },
   selectionActions: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 },
   selectionActionBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
@@ -531,36 +544,39 @@ const styles = StyleSheet.create({
 
   filterBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1 },
   filterButtons: { flexDirection: 'row', gap: 6 },
-  filterButton: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.primary },
-  filterButtonActive: { backgroundColor: colors.primary },
-  filterButtonText: { fontSize: fontSize.small, fontWeight: '600', color: colors.primary },
-  filterButtonTextActive: { color: colors.white },
+  filterButton: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
+  filterButtonText: { fontSize: fontSize.small, fontWeight: '600' },
   rightButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   viewToggleBtn: { width: 34, height: 34, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   viewToggleText: { fontSize: 18 },
   markAllButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: '#28a745', minWidth: 80, alignItems: 'center' },
-  markAllButtonDisabled: { backgroundColor: colors.gray, opacity: 0.6 },
-  markAllButtonText: { fontSize: fontSize.small, fontWeight: '600', color: colors.white },
+  markAllButtonDisabled: { backgroundColor: '#888', opacity: 0.6 },
+  markAllButtonText: { fontSize: fontSize.small, fontWeight: '600', color: 'white' },
 
   listContent: { paddingHorizontal: 12, paddingVertical: 8, flexGrow: 1 },
 
-  // カード表示
+  // カード表示（従来の横並び）
   articleCard: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'row', padding: 12 },
-  // リスト表示
+  // リスト表示（境界線ありの横並び）
   articleListRow: { flexDirection: 'row', padding: 12, paddingHorizontal: 16, alignItems: 'center' },
+  // マガジン表示（画像が上で縦並び）
+  articleMagazine: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'column', padding: 12 },
+
   articleCardRead: { opacity: 0.6 },
   checkboxContainer: { justifyContent: 'center', marginRight: 10 },
-  thumbnail: { width: 80, height: 80, backgroundColor: colors.grayLight, borderRadius: 8 },
-  noThumbnail: { width: 80, height: 80, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  thumbnailCard: { width: 80, height: 80, backgroundColor: '#e0e0e0', borderRadius: 8 },
+  thumbnailMagazine: { width: '100%', height: 160, backgroundColor: '#e0e0e0', borderRadius: 8, marginBottom: 12 },
+  noThumbnailCard: { width: 80, height: 80, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  noThumbnailMagazine: { width: '100%', height: 160, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   noThumbnailText: { fontSize: fontSize.xSmall },
   articleContent: { flex: 1, marginLeft: 10, justifyContent: 'center' },
   articleMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   favicon: { width: 14, height: 14, borderRadius: 2, marginRight: 6 },
-  feedTitleText: { color: colors.primary, fontSize: fontSize.small, fontWeight: '600' },
+  feedTitleText: { fontSize: fontSize.small, fontWeight: '600' },
   readLaterBadge: { fontSize: 11, marginHorizontal: 3 },
   dot: { marginHorizontal: 4 },
   time: { fontSize: fontSize.small },
-  articleTitle: { fontSize: fontSize.normal, fontWeight: '600', color: colors.black, marginBottom: 4, lineHeight: 20 },
+  articleTitle: { fontSize: fontSize.normal, fontWeight: '600', marginBottom: 4, lineHeight: 20 },
   articleDescription: { fontSize: fontSize.small, lineHeight: 18 },
   footer: { paddingVertical: 20, alignItems: 'center' },
   footerText: { fontSize: fontSize.small },
