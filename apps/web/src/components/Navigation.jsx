@@ -55,8 +55,8 @@ const Navigation = ({ unreadCount = 0 }) => {
       backgroundColor: 'rgba(255,255,255,0.2)',
     },
     unreadBadge: {
-      backgroundColor: 'white',
-      color: '#FF6B35',
+      backgroundColor: 'rgba(255,255,255,0.25)',
+      color: 'white',
       padding: '0.1rem 0.45rem',
       borderRadius: '12px',
       fontSize: '0.78rem',
