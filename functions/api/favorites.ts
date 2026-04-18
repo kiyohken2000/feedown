@@ -125,3 +125,48 @@ export async function onRequestPost(context: any): Promise<Response> {
     );
   }
 }
+
+export async function onRequestPost(context: any): Promise<Response> {
+  try {
+    const { request, env, params } = context;
+    const articleId = params.id;
+    
+    const authResult = await requireAuth(request, env);
+    if (authResult instanceof Response) return authResult;
+    const { uid, accessToken } = authResult;
+    
+    const body = await request.json();
+    const { title, url, description, feedTitle, imageUrl } = body;
+    
+    const supabase = createSupabaseClient(env, accessToken);
+    const { error } = await supabase
+      .from('favorites')
+      .upsert({
+        id: articleId,
+        user_id: uid,
+        title,
+        url,
+        description: description || '',
+        feed_title: feedTitle || '',
+        image_url: imageUrl || null,
+        saved_at: new Date().toISOString(),
+      });
+    
+    if (error) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to add favorite' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    return new Response(
+      JSON.stringify({ success: true }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Failed to add favorite' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
