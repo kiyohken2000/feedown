@@ -188,7 +188,7 @@ const ReadLaterPage = () => {
         <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{article.title}</span>
         <span style={{ color: textSecondary, fontSize: '0.8rem', flexShrink: 0 }}>{getRelativeTime(article.saved_at)}</span>
         <button onClick={e => { e.stopPropagation(); handleRemove(article.article_id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: textSecondary, fontSize: '0.8rem', flexShrink: 0, padding: '2px 4px' }}><FaTrash /></button>
-      </div>
+      </span>
     );
   };
 
