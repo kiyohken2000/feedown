@@ -70,7 +70,9 @@ const LoginPage = () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #FF6B35 0%, #f7931e 100%)',
+      background: isDarkMode
+        ? 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'
+        : 'linear-gradient(135deg, #FF6B35 0%, #f7931e 100%)',
       padding: '2rem',
     },
     card: {
