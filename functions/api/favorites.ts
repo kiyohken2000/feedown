@@ -67,3 +67,61 @@ export async function onRequestGet(context: any): Promise<Response> {
     );
   }
 }
+
+/**
+ * POST /api/favorites
+ * Add article to favorites
+ */
+export async function onRequestPost(context: any): Promise<Response> {
+  try {
+    const { request, env } = context;
+
+    const authResult = await requireAuth(request, env);
+    if (authResult instanceof Response) return authResult;
+    const { uid, accessToken } = authResult;
+
+    const body = await request.json();
+    const { articleId, title, url, description, feedTitle, imageUrl } = body;
+
+    if (!articleId || !url) {
+      return new Response(
+        JSON.stringify({ error: 'articleId and url are required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabase = createSupabaseClient(env, accessToken);
+
+    const { error } = await supabase
+      .from('favorites')
+      .upsert({
+        id: articleId,
+        user_id: uid,
+        title,
+        url,
+        description: description || '',
+        feed_title: feedTitle || '',
+        image_url: imageUrl || null,
+        saved_at: new Date().toISOString(),
+      });
+
+    if (error) {
+      console.error('Add favorite error:', error.message);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to add favorite' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Add favorite error:', error);
+    return new Response(
+      JSON.stringify({ success: false, error: 'Failed to add favorite' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
