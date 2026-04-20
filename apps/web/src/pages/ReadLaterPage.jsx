@@ -111,16 +111,13 @@ const ReadLaterPage = () => {
       setImportMsg({ type: 'error', text: 'タイトルとURLは必須です' });
       return;
     }
-    setImporting(true);
-    setImportMsg(null);
+    setImporting(true); setImportMsg(null);
     try {
       const articleId = crypto.randomUUID();
-      const data = await callReadLaterAPI('POST', {
-        articleId,
-        title: importForm.title,
-        url: importForm.url,
-        feedTitle: importForm.feedTitle,
-      });
+      const body = { articleId, title: importForm.title, url: importForm.url, feedTitle: importForm.feedTitle };
+      console.log('Sending:', body);  // ← 追加
+      const data = await callReadLaterAPI('POST', body);
+      console.log('Response:', data);  // ← 追加
       if (data.success) {
         setImportMsg({ type: 'success', text: '追加しました' });
         setImportForm({ title: '', url: '', feedTitle: '' });
@@ -128,11 +125,10 @@ const ReadLaterPage = () => {
       } else {
         setImportMsg({ type: 'error', text: data.error || '失敗しました' });
       }
-    } catch {
-      setImportMsg({ type: 'error', text: '失敗しました' });
-    } finally {
-      setImporting(false);
-    }
+    } catch (e) {
+      console.error('Import error:', e);
+      setImportMsg({ type: 'error', text: '失敗しました: ' + e.message });
+    } finally { setImporting(false); }
   };
 
   const handleArticleClick = useCallback(
