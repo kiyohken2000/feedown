@@ -69,7 +69,7 @@ const ReadLaterPage = () => {
     setError(null);
     try {
       const data = await callReadLaterAPI('GET');
-      console.log('Refresh response:', data);
+      console.log('Refresh response:', JSON.stringify(data));
       if (data.success) {
         setArticles(data.data.articles || []);
         setReadIds(new Set());
