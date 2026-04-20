@@ -51,6 +51,7 @@ export async function onRequestPost(context: any): Promise<Response> {
       description: description || null,
       feed_title: feedTitle || null,
       image_url: imageUrl || null,
+      saved_at: new Date().toISOString(),
     })
 
   if (error) return Response.json({ success: false, error: error.message }, { status: 500 })
