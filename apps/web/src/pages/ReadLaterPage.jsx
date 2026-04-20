@@ -242,6 +242,7 @@ const ReadLaterPage = () => {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: bg }}>
       <Navigation />
+      loading: {String(loading)} / refreshing: {String(refreshing)} / articles: {articles.length}
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem' }}>
         {/* ヘッダー */}
         <div
