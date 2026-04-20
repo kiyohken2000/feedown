@@ -116,25 +116,20 @@ const FavoritesPage = () => {
       setImportMsg({ type: 'error', text: 'タイトルとURLは必須です' });
       return;
     }
-    setImporting(true);
-    setImportMsg(null);
+    setImporting(true); setImportMsg(null);
     try {
       const token = await getAccessToken();
       const articleId = crypto.randomUUID();
       const res = await fetch('/api/favorites', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          articleId,
-          title: importForm.title,
-          url: importForm.url,
-          feedTitle: importForm.feedTitle,
-        }),
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleId, title: importForm.title, url: importForm.url, feedTitle: importForm.feedTitle }),
       });
-      const data = await res.json();
+      // レスポンスをテキストで確認
+      const text = await res.text();
+      console.log('Favorites import response:', res.status, text);
+      let data;
+      try { data = JSON.parse(text); } catch { data = { success: false, error: text }; }
       if (data.success) {
         setImportMsg({ type: 'success', text: '追加しました' });
         setImportForm({ title: '', url: '', feedTitle: '' });
@@ -142,11 +137,10 @@ const FavoritesPage = () => {
       } else {
         setImportMsg({ type: 'error', text: data.error || '失敗しました' });
       }
-    } catch {
-      setImportMsg({ type: 'error', text: '失敗しました' });
-    } finally {
-      setImporting(false);
-    }
+    } catch (e) {
+      console.error('Import error:', e);
+      setImportMsg({ type: 'error', text: '失敗しました: ' + e.message });
+    } finally { setImporting(false); }
   };
 
   const getRelativeTime = d => {
