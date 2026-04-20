@@ -1,3 +1,6 @@
+// ★ 移管完了したら false に変更
+const SHOW_IMPORT_FORM = true;
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaTimes, FaList, FaTh, FaStar, FaRss, FaNewspaper } from 'react-icons/fa';
@@ -18,6 +21,10 @@ const FavoritesPage = () => {
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [viewMode, setViewMode] = usePersistedState('favorites_viewMode', 'list');
+
+  const [importForm, setImportForm] = useState({ title: '', url: '', feedTitle: '' });
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState(null);
 
   const apiClient = useMemo(() => createApiClient(import.meta.env.VITE_API_BASE_URL || '', getAccessToken), []);
   const api = useMemo(() => new FeedOwnAPI(apiClient), [apiClient]);
@@ -48,14 +55,52 @@ const FavoritesPage = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleArticleClick = (fav) => setSelectedArticle({ id: fav.articleId, title: fav.title, url: fav.url, description: fav.description, feedTitle: fav.feedTitle || 'Unknown Feed', publishedAt: fav.createdAt, imageUrl: fav.imageUrl || null });
+  const handleArticleClick = (fav) =>
+    setSelectedArticle({
+      id: fav.articleId,
+      title: fav.title,
+      url: fav.url,
+      description: fav.description,
+      feedTitle: fav.feedTitle || 'Unknown Feed',
+      publishedAt: fav.createdAt,
+      imageUrl: fav.imageUrl || null,
+    });
+
   const handleRemoveFromFavorites = async () => {
     if (!selectedArticle) return;
     try { await api.articles.removeFromFavorites(selectedArticle.id); setSelectedArticle(null); await fetchFavorites(); } catch (e) { console.error(e); }
   };
+
   const handleRemoveFavoriteFromList = async (e, articleId) => {
     e.stopPropagation();
     try { await api.articles.removeFromFavorites(articleId); await fetchFavorites(); } catch (e) { console.error(e); }
+  };
+
+  const handleImport = async () => {
+    if (!importForm.title || !importForm.url) {
+      setImportMsg({ type: 'error', text: 'タイトルとURLは必須です' });
+      return;
+    }
+    setImporting(true); setImportMsg(null);
+    try {
+      const token = await getAccessToken();
+      const articleId = crypto.randomUUID();
+      const res = await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleId, title: importForm.title, url: importForm.url, feedTitle: importForm.feedTitle }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setImportMsg({ type: 'success', text: '追加しました' });
+        setImportForm({ title: '', url: '', feedTitle: '' });
+        await fetchFavorites();
+      } else {
+        setImportMsg({ type: 'error', text: data.error || '失敗しました' });
+      }
+    } catch (e) {
+      setImportMsg({ type: 'error', text: '失敗しました' });
+    } finally { setImporting(false); }
   };
 
   const getRelativeTime = (d) => {
@@ -67,10 +112,16 @@ const FavoritesPage = () => {
     if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
     return new Date(d).toLocaleDateString();
   };
+
   const getFeedFavicon = (feedTitle) => feeds.find(f => f.title === feedTitle)?.faviconUrl || null;
 
   const cycleViewMode = () => setViewMode(v => v === 'card' ? 'list' : v === 'list' ? 'magazine' : 'card');
-  const viewModeLabel = viewMode === 'card' ? <><FaList /> List</> : viewMode === 'list' ? <><FaNewspaper /> Magazine</> : <><FaTh /> Card</>;
+  const viewModeLabel =
+    viewMode === 'card'
+      ? <><FaList /> List</>
+      : viewMode === 'list'
+        ? <><FaNewspaper /> Magazine</>
+        : <><FaTh /> Card</>;
 
   const renderCard = (fav) => (
     <div key={fav.articleId} onClick={() => handleArticleClick(fav)}
