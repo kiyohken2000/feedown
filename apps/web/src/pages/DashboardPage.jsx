@@ -367,6 +367,8 @@ const DashboardPage = () => {
     return new Date(d).toLocaleDateString();
   };
 
+  const stripHtml = (html) => html?.replace(/<[^>]*>/g, '') || '';
+
   const getFeedFavicon = (feedId) => feeds.find(f => f.id === feedId)?.faviconUrl || null;
   const getFeedCategory = useCallback((feedId) => feeds.find(f => f.id === feedId)?.category || null, [feeds]);
 
@@ -478,7 +480,7 @@ const DashboardPage = () => {
             {isRead && <span style={{ color: '#28a745', marginLeft: 'auto' }}>✓</span>}
           </div>
           <h3 style={{ color: textPrimary, fontSize: '0.92rem', fontWeight: '600', lineHeight: '1.4', margin: '0 0 0.4rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}>
-            {article.title}
+            {stripHtml(article.title)}
           </h3>
           {article.description && (
             <p style={{ color: textSecondary, fontSize: '0.8rem', lineHeight: '1.5', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}
@@ -588,7 +590,7 @@ const DashboardPage = () => {
             {isRead && <span style={{ color: '#28a745' }}>✓</span>}
           </div>
           <h3 style={{ color: textPrimary, fontSize: '1rem', fontWeight: '700', lineHeight: '1.5', margin: '0 0 0.5rem', textAlign: 'left' }}>
-            {article.title}
+            {stripHtml(article.title)}
           </h3>
           {article.description && (
             <p style={{ color: textSecondary, fontSize: '0.85rem', lineHeight: '1.6', margin: '0 0 0.6rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}
