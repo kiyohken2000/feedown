@@ -174,9 +174,92 @@ const FavoritesPage = () => {
       </>
     );
 
-  /* renderCard / renderListRow / renderMagazineRow / renderByMode
-     ※ ここは元コードから変更なし */
-  // --- 省略せずそのまま使用してください ---
+const renderCard = (fav) => (
+    <div key={fav.articleId} onClick={() => handleArticleClick(fav)}
+      style={{ backgroundColor: cardBg, borderRadius: '10px', overflow: 'hidden', border: `1px solid ${border}`, boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)', cursor: 'pointer', position: 'relative', transition: 'transform 0.2s, box-shadow 0.2s' }}
+      onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)'; }}
+      onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)'; }}
+    >
+      <button onClick={e => handleRemoveFavoriteFromList(e, fav.articleId)}
+        style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 2, backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.75rem' }}>
+        <FaTimes />
+      </button>
+      {fav.imageUrl
+        ? <img src={fav.imageUrl} alt="" style={{ width: '100%', height: '150px', objectFit: 'cover' }} />
+        : <div style={{ width: '100%', height: '60px', backgroundColor: isDarkMode ? '#333' : '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaRss style={{ color: '#FF6B35', opacity: 0.3, fontSize: '1.2rem' }} /></div>
+      }
+      <div style={{ padding: '0.85rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem', fontSize: '0.78rem', color: textSecondary }}>
+          {getFeedFavicon(fav.feedTitle) && <img src={getFeedFavicon(fav.feedTitle)} alt="" style={{ width: '13px', height: '13px', borderRadius: '2px' }} onError={e => e.target.style.display = 'none'} />}
+          <span style={{ color: textSecondary, fontWeight: '600' }}>{fav.feedTitle || 'Feed'}</span>
+          <span>·</span><span>{getRelativeTime(fav.createdAt)}</span>
+        </div>
+        <h3 style={{ color: textPrimary, fontSize: '0.92rem', fontWeight: '600', lineHeight: '1.4', margin: '0 0 0.4rem', textAlign: 'left', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{fav.title}</h3>
+        {fav.description && <p style={{ color: textSecondary, fontSize: '0.8rem', lineHeight: '1.5', margin: 0, textAlign: 'left', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{fav.description}</p>}
+      </div>
+    </div>
+  );
+
+  const renderListRow = (fav, idx, total) => (
+    <div key={fav.articleId} onClick={() => handleArticleClick(fav)}
+      style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', borderBottom: idx < total - 1 ? `1px solid ${border}` : 'none', cursor: 'pointer' }}
+      onMouseOver={e => { e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#f9f9f9'; }}
+      onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+    >
+      {fav.imageUrl
+        ? <img src={fav.imageUrl} alt="" style={{ width: '56px', height: '42px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
+        : <div style={{ width: '56px', height: '42px', backgroundColor: isDarkMode ? '#333' : '#f0f0f0', borderRadius: '5px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaRss style={{ color: '#FF6B35', opacity: 0.3, fontSize: '0.9rem' }} /></div>
+      }
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '5em', flexShrink: 0, overflow: 'hidden' }}>
+        {getFeedFavicon(fav.feedTitle) && <img src={getFeedFavicon(fav.feedTitle)} alt="" style={{ width: '13px', height: '13px', borderRadius: '2px' }} onError={e => e.target.style.display = 'none'} />}
+        <span style={{ color: textSecondary, fontSize: '0.82rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{fav.feedTitle || 'Feed'}</span>
+      </div>
+      <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{fav.title}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+        <span style={{ color: textSecondary, fontSize: '0.8rem' }}>{getRelativeTime(fav.createdAt)}</span>
+        <button onClick={e => handleRemoveFavoriteFromList(e, fav.articleId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: textSecondary, fontSize: '0.8rem', padding: '2px 4px' }}><FaTimes /></button>
+      </div>
+    </div>
+  );
+
+  const renderMagazineRow = (fav, idx, total) => (
+    <div key={fav.articleId} onClick={() => handleArticleClick(fav)}
+      style={{ display: 'flex', gap: '1rem', padding: '1rem', borderBottom: idx < total - 1 ? `1px solid ${border}` : 'none', cursor: 'pointer', alignItems: 'flex-start' }}
+      onMouseOver={e => { e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#f5f5f5'; }}
+      onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+    >
+      {fav.imageUrl
+        ? <img src={fav.imageUrl} alt="" style={{ width: '160px', height: '110px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+        : <div style={{ width: '160px', height: '110px', backgroundColor: isDarkMode ? '#333' : '#eee', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaRss style={{ color: '#FF6B35', opacity: 0.3, fontSize: '1.5rem' }} /></div>
+      }
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem', fontSize: '0.8rem', color: textSecondary }}>
+          {getFeedFavicon(fav.feedTitle) && <img src={getFeedFavicon(fav.feedTitle)} alt="" style={{ width: '14px', height: '14px', borderRadius: '2px' }} onError={e => e.target.style.display = 'none'} />}
+          <span style={{ color: textSecondary, fontWeight: '600' }}>{fav.feedTitle || 'Feed'}</span>
+          <span>·</span><span>{getRelativeTime(fav.createdAt)}</span>
+        </div>
+        <h3 style={{ color: textPrimary, fontSize: '1rem', fontWeight: '700', lineHeight: '1.5', margin: '0 0 0.5rem', textAlign: 'left' }}>{fav.title}</h3>
+        {fav.description && <p style={{ color: textSecondary, fontSize: '0.85rem', lineHeight: '1.6', margin: '0 0 0.6rem', textAlign: 'left', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{fav.description}</p>}
+        <button onClick={e => handleRemoveFavoriteFromList(e, fav.articleId)}
+          style={{ padding: '0.2rem 0.55rem', backgroundColor: 'transparent', color: textSecondary, border: `1px solid ${border}`, borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+          <FaTimes /> Remove
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderByMode = (favList) => {
+    if (viewMode === 'card') return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+        {favList.map(fav => renderCard(fav))}
+      </div>
+    );
+    return (
+      <div style={{ backgroundColor: cardBg, borderRadius: '10px', border: `1px solid ${border}`, overflow: 'hidden' }}>
+        {favList.map((fav, i) => viewMode === 'magazine' ? renderMagazineRow(fav, i, favList.length) : renderListRow(fav, i, favList.length))}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
