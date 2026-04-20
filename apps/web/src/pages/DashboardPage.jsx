@@ -481,9 +481,8 @@ const DashboardPage = () => {
             {article.title}
           </h3>
           {article.description && (
-            <p style={{ color: textSecondary, fontSize: '0.8rem', lineHeight: '1.5', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}>
-              {article.description}
-            </p>
+            <p style={{ color: textSecondary, fontSize: '0.8rem', lineHeight: '1.5', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}
+              dangerouslySetInnerHTML={{ __html: article.description }} />   
           )}
           <button onClick={e => { e.stopPropagation(); isReadLater ? handleRemoveFromReadLater(article.id) : handleAddToReadLater(article); }}
             style={{
@@ -592,9 +591,8 @@ const DashboardPage = () => {
             {article.title}
           </h3>
           {article.description && (
-            <p style={{ color: textSecondary, fontSize: '0.85rem', lineHeight: '1.6', margin: '0 0 0.6rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}>
-              {article.description}
-            </p>
+            <p style={{ color: textSecondary, fontSize: '0.85rem', lineHeight: '1.6', margin: '0 0 0.6rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}
+              dangerouslySetInnerHTML={{ __html: article.description }} />
           )}
           <button onClick={e => { e.stopPropagation(); isReadLater ? handleRemoveFromReadLater(article.id) : handleAddToReadLater(article); }}
             style={{
