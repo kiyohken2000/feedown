@@ -121,7 +121,7 @@ const ReadLaterPage = () => {
       if (data.success) {
         setImportMsg({ type: 'success', text: '追加しました' });
         setImportForm({ title: '', url: '', feedTitle: '' });
-        await fetchArticles();
+        await handleRefresh();
       } else {
         setImportMsg({ type: 'error', text: data.error || '失敗しました' });
       }
