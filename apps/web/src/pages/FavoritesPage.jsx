@@ -93,6 +93,21 @@ const FavoritesPage = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Escキーが押されて、かつ記事が表示中なら閉じる
+      if (e.key === 'Escape' && selectedArticle) {
+        setSelectedArticle(null);
+      }
+    };
+    
+    // イベントリスナー（Event Listener）を登録
+    window.addEventListener('keydown', handleKeyDown);
+    
+    // クリーンアップ
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedArticle]);
+
   const handleArticleClick = fav => {
     setSelectedArticle({
       id: fav.id,
