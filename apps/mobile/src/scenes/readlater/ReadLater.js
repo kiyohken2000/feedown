@@ -1,21 +1,25 @@
-import React, { useContext, useEffect, useState, useCallback } from 'react'
+import React, { useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import {
-  StyleSheet, Text, View, FlatList, TouchableOpacity,
+  StyleSheet, Text, View, SectionList, TouchableOpacity,
   Image, ActivityIndicator, RefreshControl,
 } from 'react-native'
 import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { colors, fontSize, getThemeColors } from '../../theme'
 import { UserContext } from '../../contexts/UserContext'
 import { useTheme } from '../../contexts/ThemeContext'
+import { FeedsContext } from '../../contexts/FeedsContext' // ★カテゴリ情報取得用に追加
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import { useAsyncStorageState } from '../../utils/useAsyncStorageState'
+
+const stripHtml = (html) => html?.replace(/<[^>]*>/g, '') || '';
 
 export default function ReadLater() {
   const navigation = useNavigation()
   const { getAccessToken, serverUrl } = useContext(UserContext)
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
+  const { feeds } = useContext(FeedsContext) // ★追加
 
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -103,7 +107,7 @@ export default function ReadLater() {
         setFavoritedIds(prev => { const s = new Set(prev); s.delete(article.article_id); return s })
         showToast({ title: 'Favorites削除', body: '' })
       } else {
-        const response = await fetch(`${serverUrl}/api/favorites`, {
+        await fetch(`${serverUrl}/api/favorites`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -146,6 +150,26 @@ export default function ReadLater() {
     return `${Math.floor(diff / 86400)}d ago`
   }
 
+  // ★ Home.js と同じカテゴリグループ化ロジック
+  const groupedArticles = useMemo(() => {
+    if (!articles.length) return []
+    const catMap = {}
+    const uncategorized = []
+    articles.forEach(article => {
+      const feed = feeds.find(f => f.title === article.feed_title)
+      const cat = feed?.category || null
+      if (cat) {
+        if (!catMap[cat]) catMap[cat] = []
+        catMap[cat].push(article)
+      } else {
+        uncategorized.push(article)
+      }
+    })
+    const sorted = Object.entries(catMap).sort(([a], [b]) => a.localeCompare(b, 'ja'))
+    if (uncategorized.length > 0) sorted.push(['その他', uncategorized])
+    return sorted.map(([title, data]) => ({ title, data }))
+  }, [articles, feeds])
+
   const readCount = readIds.size
   const isListMode = viewMode === 'list'
   const isMagazineMode = viewMode === 'magazine'
@@ -154,113 +178,84 @@ export default function ReadLater() {
   const renderItem = ({ item }) => {
     const isFav = favoritedIds.has(item.article_id)
     const isRead = readIds.has(item.article_id)
+    const feed = feeds.find(f => f.title === item.feed_title)
 
-    // LIST表示
-    if (isListMode) {
-      return (
+    return (
+      <View style={{ marginVertical: isListMode ? 0 : 6, marginHorizontal: isListMode ? 0 : 12 }}>
         <TouchableOpacity
-          style={[styles.listRow, { backgroundColor: theme.card, borderBottomColor: theme.border }, isRead && styles.readItem]}
+          style={[
+            isCardMode ? styles.articleCard : isMagazineMode ? styles.articleMagazine : styles.articleListRow,
+            { backgroundColor: isListMode ? 'transparent' : theme.card },
+            isRead && styles.readItem,
+            isListMode && { borderBottomColor: theme.border, borderBottomWidth: 1 },
+          ]}
           onPress={() => handleArticlePress(item)}
           activeOpacity={0.7}
         >
-          {item.image_url
-            ? <Image source={{ uri: item.image_url }} style={styles.listThumbnail} resizeMode="cover" />
-            : <View style={[styles.listThumbnail, { backgroundColor: theme.border, alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ color: theme.textMuted, fontSize: 10 }}>No img</Text>
-              </View>
-          }
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={[styles.feedTitle, { color: theme.textSecondary }]} numberOfLines={1}>{item.feed_title || 'Feed'}</Text>
-            <Text style={[styles.title, { color: theme.text, fontSize: fontSize.normal }]} numberOfLines={1}>{item.title}</Text>
-          </View>
-          <Text style={[styles.time, { color: theme.textMuted, marginLeft: 8 }]}>{getRelativeTime(item.saved_at)}</Text>
-          <TouchableOpacity onPress={() => handleToggleFavorite(item)} style={styles.starBtn}>
-            <Text style={{ fontSize: 18, color: isFav ? '#FFD700' : theme.textMuted }}>★</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleRemove(item.article_id)} style={styles.deleteBtn}>
-            <Text style={{ fontSize: 16, color: theme.textMuted }}>✕</Text>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      )
-    }
+          {item.image_url ? (
+            <Image 
+              source={{ uri: item.image_url }} 
+              style={isCardMode ? styles.thumbnailCard : isMagazineMode ? styles.thumbnailMagazine : styles.thumbnailList} 
+              resizeMode="cover" 
+            />
+          ) : (
+            <View style={[isCardMode ? styles.noThumbnailCard : isMagazineMode ? styles.noThumbnailMagazine : styles.noThumbnailList, { backgroundColor: theme.border }]}>
+              <Text style={[styles.noThumbnailText, { color: theme.textMuted }]}>📡</Text>
+            </View>
+          )}
 
-    // CARD/MAGAZINEのreturnの前に追加
-    if (isMagazineMode) {
-      return (
-        <TouchableOpacity
-          style={[styles.magazineCard, { backgroundColor: theme.card, borderBottomColor: theme.border }, isRead && styles.readItem]}
-          onPress={() => handleArticlePress(item)}
-          activeOpacity={0.7}
-        >
-          {item.image_url
-            ? <Image source={{ uri: item.image_url }} style={styles.magazineThumbnail} resizeMode="cover" />
-            : <View style={[styles.magazineThumbnail, { backgroundColor: theme.border, alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ color: theme.textMuted }}>No image</Text>
-              </View>
-          }
-          <View style={styles.magazineContent}>
-            <Text style={[styles.feedTitle, { color: theme.textSecondary }]} numberOfLines={1}>
-              {item.feed_title || 'Feed'} · {getRelativeTime(item.saved_at)}
+          <View style={[styles.articleContent, isCardMode && { padding: 12, marginLeft: 0 }]}>
+            <View style={styles.articleMeta}>
+              {feed?.faviconUrl && (
+                <Image source={{ uri: feed.faviconUrl }} style={styles.favicon} />
+              )}
+              <Text style={[styles.feedTitleText, { color: theme.textSecondary, flex: 1 }]} numberOfLines={1}>
+                {item.feed_title || 'Unknown Feed'}
+              </Text>
+              {isListMode && isRead && <Text style={{ color: '#28a745', fontSize: 12, marginHorizontal: 4 }}>✓</Text>}
+              <Text style={[styles.dot, { color: theme.textMuted }]}>·</Text>
+              <Text style={[styles.time, { color: theme.textMuted }]}>{getRelativeTime(item.saved_at)}</Text>
+            </View>
+            
+            <Text
+              style={[styles.articleTitle, { color: theme.text }, isListMode && { fontSize: fontSize.normal }, (isMagazineMode || isCardMode) && { fontSize: fontSize.large, marginBottom: 4 }]}
+              numberOfLines={isListMode ? 1 : 3}
+            >
+              {stripHtml(item.title)}
             </Text>
-            <Text style={[styles.magazineTitle, { color: theme.text }]} numberOfLines={2}>{item.title}</Text>
-            {item.description && (
-              <Text style={[styles.description, { color: theme.textSecondary }]} numberOfLines={3}>{item.description}</Text>
+            {!isListMode && (
+              <Text style={[styles.articleDescription, { color: theme.textSecondary }]} numberOfLines={isMagazineMode ? 3 : 2}>
+                {stripHtml(item.description) || ''}
+              </Text>
             )}
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 }}>
-              <TouchableOpacity onPress={() => handleToggleFavorite(item)} style={styles.starBtn}>
+
+            {/* ReadLater 用のアクションボタン（Card / Magazine は下部に配置） */}
+            {!isListMode && (
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8, gap: 16 }}>
+                <TouchableOpacity onPress={() => handleToggleFavorite(item)}>
+                  <Text style={{ fontSize: 20, color: isFav ? '#FFD700' : theme.textMuted }}>★</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleRemove(item.article_id)}>
+                  <Text style={{ fontSize: 18, color: theme.textMuted }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {/* List用のアクションボタン（右側にインライン配置） */}
+          {isListMode && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 8 }}>
+              <TouchableOpacity onPress={() => handleToggleFavorite(item)}>
                 <Text style={{ fontSize: 18, color: isFav ? '#FFD700' : theme.textMuted }}>★</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleRemove(item.article_id)} style={styles.deleteBtn}>
+              <TouchableOpacity onPress={() => handleRemove(item.article_id)}>
                 <Text style={{ fontSize: 16, color: theme.textMuted }}>✕</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </TouchableOpacity>
-      )
-    }
-
-    // CARD / MAGAZINE表示（縦型・画像上部）
-    return (
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: theme.card }, isRead && styles.readItem]}
-        onPress={() => handleArticlePress(item)}
-        activeOpacity={0.7}
-      >
-        {/* 画像（フル幅） */}
-        {item.image_url ? (
-          <Image
-            source={{ uri: item.image_url }}
-            style={isMagazineMode ? styles.imageMagazine : styles.imageCard}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[isMagazineMode ? styles.imageMagazine : styles.imageCard, { backgroundColor: theme.border, justifyContent: 'center', alignItems: 'center' }]}>
-            <Text style={{ color: theme.textMuted, fontSize: fontSize.small }}>No image</Text>
-          </View>
-        )}
-        {/* コンテンツ */}
-        <View style={styles.cardContent}>
-          <Text style={[styles.feedTitle, { color: theme.textSecondary }]} numberOfLines={1}>
-            {item.feed_title || 'Feed'} · {getRelativeTime(item.saved_at)}{isRead ? ' · ✓ Read' : ''}
-          </Text>
-          <Text style={[styles.title, { color: theme.text }]} numberOfLines={isMagazineMode ? 3 : 2}>
-            {item.title}
-          </Text>
-          {item.description && (
-            <Text style={[styles.description, { color: theme.textSecondary }]} numberOfLines={isMagazineMode ? 3 : 2}>
-              {item.description}
-            </Text>
           )}
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8, gap: 8 }}>
-            <TouchableOpacity onPress={() => handleToggleFavorite(item)} style={styles.starBtn}>
-              <Text style={{ fontSize: 20, color: isFav ? '#FFD700' : theme.textMuted }}>★</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleRemove(item.article_id)} style={styles.deleteBtn}>
-              <Text style={{ fontSize: 16, color: theme.textMuted }}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableOpacity>
+
+        </TouchableOpacity>
+      </View>
     )
   }
 
@@ -295,19 +290,28 @@ export default function ReadLater() {
           </Text>
         </View>
       ) : (
-        <FlatList
+        <SectionList
           key={viewMode}
-          data={articles}
+          sections={groupedArticles}
           renderItem={renderItem}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item.article_id}
           extraData={{ viewMode, favoritedIds: favoritedIds.size, readIds: readIds.size }}
+          // ★ Home.js と完全一致するカテゴリヘッダー（オレンジ帯）
+          renderSectionHeader={({ section: { title, data } }) => (
+            <View style={[styles.sectionHeader, { borderBottomColor: isDarkMode ? '#444' : '#e0e0e0' }]}>
+              <Text style={[styles.sectionHeaderText, { color: theme.textSecondary }]}>{title}</Text>
+              <Text style={{ fontSize: 12, color: theme.textSecondary }}>{data.length}件</Text>
+            </View>
+          )}
           contentContainerStyle={[
-            isListMode ? styles.listContent : styles.cardContent_list,
+            styles.listContent,
+            (viewMode === 'list' || viewMode === 'magazine') && { paddingHorizontal: 0, paddingVertical: 0 }
           ]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />
           }
           showsVerticalScrollIndicator={false}
+          stickySectionHeadersEnabled={false}
         />
       )}
     </ScreenTemplate>
@@ -323,33 +327,41 @@ const styles = StyleSheet.create({
   readCountText: { fontSize: fontSize.small },
   viewToggleBtn: { width: 34, height: 34, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   viewToggleText: { fontSize: 18 },
-  refreshHint: { paddingVertical: 6, paddingHorizontal: 16, alignItems: 'center' },
-  refreshHintText: { fontSize: fontSize.small },
 
+  // ★ Home.js 準拠のカテゴリ見出しスタイル
+  sectionHeader: { 
+    flexDirection: 'row', alignItems: 'center', paddingBottom: 6, marginBottom: 12, marginTop: 20,
+    marginHorizontal: 12, borderBottomWidth: 2, borderLeftWidth: 4, borderLeftColor: '#FF6B35', paddingLeft: 8
+  },
+  sectionHeaderText: { fontSize: 16, fontWeight: '700', marginRight: 8 },
 
-  listThumbnail: { width: 56, height: 42, borderRadius: 6 },
-  magazineCard: { flexDirection: 'row', padding: 14, paddingHorizontal: 16, borderBottomWidth: 1, alignItems: 'flex-start', gap: 12 },
-  magazineThumbnail: { width: 120, height: 90, borderRadius: 8 },
-  magazineContent: { flex: 1 },
-  magazineTitle: { fontSize: fontSize.large, fontWeight: '700', lineHeight: 22, marginBottom: 4 },
+  listContent: { paddingHorizontal: 12, paddingVertical: 8, flexGrow: 1 },
 
-  // リスト
-  listContent: { flexGrow: 1 },
-  listRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 1 },
-
-  // カード・マガジン共通
-  cardContent_list: { padding: 12, flexGrow: 1 },
-  card: { borderRadius: 12, marginVertical: 6, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  imageCard: { width: '100%', height: 160 },
-  imageMagazine: { width: '100%', height: 200 },
-  cardContent: { padding: 12 },
+  // ★ Home.js 準拠のビューレイアウト
+  articleCard: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'column' },
+  articleListRow: { flexDirection: 'row', padding: 12, paddingHorizontal: 16, alignItems: 'center' },
+  articleMagazine: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'row', padding: 12, alignItems: 'flex-start' },
 
   readItem: { opacity: 0.5 },
-  feedTitle: { fontSize: fontSize.small, fontWeight: '600', marginBottom: 4 },
-  title: { fontSize: fontSize.large, fontWeight: '600', lineHeight: 22, marginBottom: 4 },
-  description: { fontSize: fontSize.small, lineHeight: 18 },
-  starBtn: { paddingHorizontal: 6, paddingVertical: 2 },
-  deleteBtn: { paddingHorizontal: 6, paddingVertical: 2 },
+
+  thumbnailCard: { width: '100%', height: 150, backgroundColor: '#e0e0e0' },
+  thumbnailList: { width: 56, height: 42, borderRadius: 5, marginRight: 10, backgroundColor: '#e0e0e0' },
+  thumbnailMagazine: { width: 160, height: 110, borderRadius: 8, marginRight: 12, backgroundColor: '#e0e0e0' },
+  
+  noThumbnailCard: { width: '100%', height: 60, justifyContent: 'center', alignItems: 'center' },
+  noThumbnailList: { width: 56, height: 42, borderRadius: 5, marginRight: 10, justifyContent: 'center', alignItems: 'center' },
+  noThumbnailMagazine: { width: 160, height: 110, borderRadius: 8, marginRight: 12, justifyContent: 'center', alignItems: 'center' },
+  noThumbnailText: { fontSize: 24, opacity: 0.5 },
+  
+  articleContent: { flex: 1, justifyContent: 'center' },
+  articleMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  favicon: { width: 14, height: 14, borderRadius: 2, marginRight: 6 },
+  feedTitleText: { fontSize: fontSize.small, fontWeight: '600' },
+  dot: { marginHorizontal: 4 },
+  time: { fontSize: fontSize.small },
+  articleTitle: { fontSize: fontSize.normal, fontWeight: '600', marginBottom: 4, lineHeight: 20 },
+  articleDescription: { fontSize: fontSize.small, lineHeight: 18 },
+
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyText: { fontSize: fontSize.normal, textAlign: 'center', lineHeight: 24 },
