@@ -24,7 +24,9 @@ export interface ParsedArticle {
  * 文字参照（HTML Entity）を通常の文字に変換する
  */
 function decodeHtmlEntities(text: string): string {
-  return text.replace(/&#(\d+);/g, (_, dec) => {
+  if (!text) return '';
+  // &#45; や &/#45; などの表記揺れもまとめて変換
+  return text.replace(/(?:&|&amp;)?\/?#(\d+);/g, (_, dec) => {
     return String.fromCharCode(Number(dec));
   });
 }
@@ -116,7 +118,8 @@ function parseAtom(doc: Document): ParsedFeed {
   const title = getElementText(feed, 'title');
   const subtitle = getElementText(feed, 'subtitle');
   const linkEl = feed.querySelector('link[rel="alternate"]') || feed.querySelector('link');
-  const link = linkEl?.getAttribute('href') || '';
+  // ここでもデコード処理を噛ませる
+  const link = decodeHtmlEntities(linkEl?.getAttribute('href') || '');
 
   const items: ParsedArticle[] = [];
   const entries = feed.getElementsByTagName('entry');
@@ -126,7 +129,8 @@ function parseAtom(doc: Document): ParsedFeed {
     const guid = getElementText(entry, 'id');
     const entryTitle = getElementText(entry, 'title');
     const entryLinkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
-    const entryLink = entryLinkEl?.getAttribute('href') || '';
+    // ここでもデコード処理を噛ませる
+    const entryLink = decodeHtmlEntities(entryLinkEl?.getAttribute('href') || '');
     const content = getContent(entry);
     const published = getElementText(entry, 'published') || getElementText(entry, 'updated');
     const authorEl = entry.querySelector('author name');
