@@ -126,7 +126,7 @@ export default function Profile() {
     <ScreenTemplate>
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         <View style={[styles.header, { borderBottomColor: theme.border }]}>
-          <Text style={styles.headerTitle}>Settings</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Settings</Text>
         </View>
 
         {/* User Info */}

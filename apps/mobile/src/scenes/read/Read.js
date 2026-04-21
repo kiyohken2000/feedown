@@ -58,11 +58,6 @@ export default function Read() {
     }
   }, [serverUrl])
 
-  // Initial load
-  useEffect(() => {
-    fetchFeeds()
-  }, [])
-
   // Fetch recommended feeds when serverUrl is available
   useEffect(() => {
     if (serverUrl) {
@@ -276,7 +271,7 @@ export default function Read() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={[styles.header, { borderBottomColor: theme.border }]}>
-          <Text style={styles.headerTitle}>Manage Feeds</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Manage Feeds</Text>
           <Text style={[styles.feedCount, { color: theme.textMuted }]}>{feeds.length} feeds</Text>
         </View>
 

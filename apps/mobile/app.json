@@ -45,7 +45,9 @@
       "userInterfaceStyle": "automatic",
       "permissions": [
         "VIBRATE",
-        "CAMERA"
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "packagerOpts": {
@@ -70,8 +72,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "09e91d3a-0014-4831-b35f-9962d05db0e3"
+        "projectId": "a473e96b-300e-4041-a119-87964f133a0a"
       }
-    }
+    },
+    "owner": "shinjimiyahara"
   }
 }

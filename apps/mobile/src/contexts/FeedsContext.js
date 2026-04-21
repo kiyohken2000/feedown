@@ -1,14 +1,14 @@
-import React, { createContext, useState, useContext, useCallback } from 'react'
+import React, { createContext, useState, useContext, useCallback, useEffect } from 'react'
 import { UserContext } from './UserContext'
 import { createApiClient } from '../utils/api'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export const FeedsContext = createContext()
 
 export const FeedsContextProvider = ({ children }) => {
-  const { getAccessToken } = useContext(UserContext)
+  const { getAccessToken, serverUrl } = useContext(UserContext)
 
   // State
-  const [feeds, setFeeds] = useState([])
   const [articles, setArticles] = useState([])
   const [readArticles, setReadArticles] = useState(new Set())
   const [favoritedArticles, setFavoritedArticles] = useState(new Set())
@@ -17,6 +17,19 @@ export const FeedsContextProvider = ({ children }) => {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
   const [hasMore, setHasMore] = useState(true)
+  const [feeds, setFeeds] = useState([])
+  
+  // 起動時にキャッシュから読み込む
+  useEffect(() => {
+    AsyncStorage.getItem('@cached_feeds').then(cached => {
+      if (cached) setFeeds(JSON.parse(cached))
+    }).catch(console.error)
+  }, [])
+
+  const setFeedsWithCache = useCallback((feedsData) => {
+  setFeeds(feedsData)  // ← setFeeds を呼ぶ
+  AsyncStorage.setItem('@cached_feeds', JSON.stringify(feedsData)).catch(console.error)
+  }, [])
 
   // Create API client
   const getApi = useCallback(() => {
@@ -29,8 +42,26 @@ export const FeedsContextProvider = ({ children }) => {
       const api = getApi()
       const response = await api.feeds.list()
       if (response.success) {
-        setFeeds(response.data.feeds || [])
-        return response.data.feeds || []
+        let feedsData = response.data.feeds || []
+
+        // カテゴリをサーバーから取得してマージ
+        try {
+          const token = await getAccessToken()
+          const catRes = await fetch(`${serverUrl}/api/feed-categories`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+          const catData = await catRes.json()
+          if (catData.success) {
+            const catMap = {}
+            catData.data.categories.forEach(c => { catMap[c.id] = c.category })
+            feedsData = feedsData.map(f => ({ ...f, category: catMap[f.id] || null }))
+          }
+        } catch (e) {
+          console.log('Category fetch skipped:', e.message)
+        }
+
+        setFeedsWithCache(feedsData) 
+        return feedsData
       } else {
         throw new Error(response.error)
       }
@@ -39,7 +70,7 @@ export const FeedsContextProvider = ({ children }) => {
       setError(err.message)
       return []
     }
-  }, [getApi])
+  }, [getApi, getAccessToken, serverUrl])
 
   // Fetch articles
   const fetchArticles = useCallback(async (reset = true, limit = 50) => {
@@ -142,12 +173,7 @@ export const FeedsContextProvider = ({ children }) => {
 
       console.log(`Refresh complete: ${totalSuccessful}/${totalFeeds} feeds, ${totalNewArticles} new articles`)
 
-      // Update feeds if returned
-      if (latestFeeds) {
-        setFeeds(latestFeeds)
-      } else {
-        await fetchFeeds()
-      }
+      await fetchFeeds()
 
       // Fetch articles after refresh
       await fetchArticles(true)
@@ -156,11 +182,9 @@ export const FeedsContextProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to refresh:', err)
       setError(err.message)
-      // On error, still try to fetch existing data
-      await fetchFeeds()
-      await fetchArticles(true)
+      // ネットワークエラー時はキャッシュをそのまま使う（fetchFeedsは呼ばない）
       return { success: false, error: err.message }
-    } finally {
+    }finally {
       setIsRefreshing(false)
     }
   }, [getApi, fetchFeeds, fetchArticles])

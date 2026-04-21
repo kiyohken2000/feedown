@@ -19,7 +19,10 @@
     "preview": {
       "extends": "base",
       "distribution": "internal",
-      "channel": "internal"
+      "channel": "internal",
+      "android": {
+        "buildType": "apk"
+      }
     },
     "production": {
       "extends": "base",

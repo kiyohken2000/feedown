@@ -4,6 +4,7 @@ import {
   Text,
   View,
   FlatList,
+  SectionList,
   TouchableOpacity,
   Image,
   RefreshControl,
@@ -11,9 +12,11 @@ import {
   Animated,
   PanResponder,
   Vibration,
+  Modal,
+  ScrollView,
+  SafeAreaView,
 } from 'react-native'
 import { useNavigation, useFocusEffect } from '@react-navigation/native'
-import { Dropdown } from 'react-native-element-dropdown'
 import { colors, fontSize, getThemeColors } from '../../theme'
 import { FeedsContext } from '../../contexts/FeedsContext'
 import { UserContext } from '../../contexts/UserContext'
@@ -22,7 +25,8 @@ import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import { useAsyncStorageState } from '../../utils/useAsyncStorageState'
 
-// スワイプ可能な記事アイテム（カード・リスト・マガジン表示対応）
+const stripHtml = (html) => html?.replace(/<[^>]*>/g, '') || '';
+
 const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isSelectionMode, isChecked, onToggleCheck, onMarkRead, onReadLater, isReadLater, theme, isDarkMode, viewMode }) => {
   const translateX = useRef(new Animated.Value(0)).current
 
@@ -62,7 +66,7 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
   const checkColor = isDarkMode ? '#555' : '#888'
 
   return (
-    <View style={{ overflow: 'hidden', marginVertical: isListMode ? 2 : 6, marginHorizontal: isListMode ? 0 : 12 }}>
+    <View style={{ overflow: 'hidden', marginVertical: (isListMode || isMagazineMode) ? 2 : 6, marginHorizontal: (isListMode || isMagazineMode) ? 0 : 12 }}>
       <Animated.View style={[StyleSheet.absoluteFillObject, { borderRadius: isListMode ? 0 : 12, backgroundColor: bgColorLeft }]}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 20 }}>
           <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>📌 Read Later</Text>
@@ -110,7 +114,6 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
               {!isListMode && feed?.faviconUrl && (
                 <Image source={{ uri: feed.faviconUrl }} style={styles.favicon} />
               )}
-              {/* フィード名をモノトーンに変更 */}
               <Text style={[styles.feedTitleText, { color: theme.textSecondary, flex: 1 }]} numberOfLines={1}>
                 {article.feedTitle || 'Unknown Feed'}
               </Text>
@@ -122,11 +125,11 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
               style={[styles.articleTitle, { color: theme.text }, isListMode && { fontSize: fontSize.normal }, isMagazineMode && { fontSize: fontSize.large, marginBottom: 6 }]}
               numberOfLines={isListMode ? 1 : 3}
             >
-              {article.title}
+              {stripHtml(article.title)}
             </Text>
             {!isListMode && (
               <Text style={[styles.articleDescription, { color: theme.textSecondary }]} numberOfLines={isMagazineMode ? 3 : 2}>
-                {article.description || ''}
+                {stripHtml(article.description) || ''}
               </Text>
             )}
           </View>
@@ -150,7 +153,7 @@ function getRelativeTime(dateString) {
 
 export default function Home() {
   const navigation = useNavigation()
-  const { user, getAccessToken } = useContext(UserContext)
+  const { user, getAccessToken, serverUrl } = useContext(UserContext)
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
   const {
@@ -159,16 +162,16 @@ export default function Home() {
     refreshAll, fetchArticles, markAsRead, batchMarkAsRead,
   } = useContext(FeedsContext)
 
-  // 永続化された設定 (card | list | magazine)
   const [filter, setFilter] = useAsyncStorageState('@home_filter', 'all')
   const [viewMode, setViewMode] = useAsyncStorageState('@home_viewMode', 'card')
-
   const [selectedFeedId, setSelectedFeedId] = useState(null)
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [readLaterIds, setReadLaterIds] = useState(new Set())
   const [isMarkingSelected, setIsMarkingSelected] = useState(false)
+  const [feedModalVisible, setFeedModalVisible] = useState(false)
+  const [expandedCategories, setExpandedCategories] = useState(new Set())
 
   const isFirstFocus = useRef(true)
   const fetchArticlesRef = useRef(fetchArticles)
@@ -176,16 +179,15 @@ export default function Home() {
 
   useEffect(() => { fetchArticlesRef.current = fetchArticles }, [fetchArticles])
 
-  // Read Later API
   const callReadLaterAPI = useCallback(async (method, body = null, query = '') => {
     const token = await getAccessToken()
-    const res = await fetch(`/api/read-later${query}`, {
+    const res = await fetch(`${serverUrl}/api/read-later${query}`, {
       method,
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
     })
     return res.json()
-  }, [getAccessToken])
+  }, [getAccessToken, serverUrl])
 
   useEffect(() => {
     if (!user) return
@@ -196,7 +198,7 @@ export default function Home() {
 
   useEffect(() => {
     const unsub = navigation.getParent()?.addListener('tabPress', () => {
-      if (navigation.isFocused()) flatListRef.current?.scrollToOffset({ offset: 0, animated: true })
+      if (navigation.isFocused()) flatListRef.current?.scrollToIndex({ index: 0, animated: true })
     })
     return unsub
   }, [navigation])
@@ -212,10 +214,18 @@ export default function Home() {
 
   useEffect(() => { if (error) showErrorToast({ title: 'Error', body: error }) }, [error])
 
-  const feedOptions = useMemo(() => {
-    const opts = [{ label: 'All Feeds', value: null }]
-    feeds.forEach(f => opts.push({ label: f.title || f.url, value: f.id }))
-    return opts
+  const groupedFeeds = useMemo(() => {
+    const catMap = {}
+    const noCategory = []
+    feeds.forEach(f => {
+      if (f.category) {
+        if (!catMap[f.category]) catMap[f.category] = []
+        catMap[f.category].push(f)
+      } else noCategory.push(f)
+    })
+    const sorted = Object.entries(catMap).sort(([a], [b]) => a.localeCompare(b, 'ja'))
+    if (noCategory.length > 0) sorted.push(['その他', noCategory])
+    return sorted
   }, [feeds])
 
   const filteredArticles = useMemo(() => {
@@ -225,6 +235,25 @@ export default function Home() {
     else if (filter === 'read') result = result.filter(a => readArticles.has(a.id))
     return result
   }, [articles, filter, readArticles, selectedFeedId])
+
+  const groupedArticles = useMemo(() => {
+    if (!filteredArticles.length) return []
+    const catMap = {}
+    const uncategorized = []
+    filteredArticles.forEach(article => {
+      const feed = feeds.find(f => f.id === article.feedId)
+      const cat = feed?.category || null
+      if (cat) {
+        if (!catMap[cat]) catMap[cat] = []
+        catMap[cat].push(article)
+      } else {
+        uncategorized.push(article)
+      }
+    })
+    const sorted = Object.entries(catMap).sort(([a], [b]) => a.localeCompare(b, 'ja'))
+    if (uncategorized.length > 0) sorted.push(['その他', uncategorized])
+    return sorted.map(([title, data]) => ({ title, data }))
+  }, [filteredArticles, feeds])
 
   const unreadCount = useMemo(() =>
     articles.filter(a => !readArticles.has(a.id)).length,
@@ -340,23 +369,15 @@ export default function Home() {
     const feed = feeds.find(f => f.id === article.feedId)
     const isChecked = selectedIds.has(article.id)
     const isReadLater = readLaterIds.has(article.id)
-
     return (
       <SwipeableArticleItem
-        article={article}
-        isRead={isRead}
-        feed={feed}
+        article={article} isRead={isRead} feed={feed}
         onPress={art => navigation.navigate('ArticleDetail', { article: art })}
         onLongPress={handleLongPress}
-        isSelectionMode={selectionMode}
-        isChecked={isChecked}
+        isSelectionMode={selectionMode} isChecked={isChecked}
         onToggleCheck={handleToggleCheck}
-        onMarkRead={handleSwipeMarkRead}
-        onReadLater={handleSwipeReadLater}
-        isReadLater={isReadLater}
-        theme={theme}
-        isDarkMode={isDarkMode}
-        viewMode={viewMode}
+        onMarkRead={handleSwipeMarkRead} onReadLater={handleSwipeReadLater}
+        isReadLater={isReadLater} theme={theme} isDarkMode={isDarkMode} viewMode={viewMode}
       />
     )
   }
@@ -384,31 +405,74 @@ export default function Home() {
     )
   }
 
+  const selectedFeedLabel = selectedFeedId
+    ? feeds.find(f => f.id === selectedFeedId)?.title || 'Feed'
+    : 'All Feeds'
+
   const activeColor = isDarkMode ? '#555' : '#888'
   const inactiveBorderColor = isDarkMode ? '#444' : '#ccc'
 
   return (
     <ScreenTemplate>
+      {/* Feed選択モーダル */}
+      <Modal visible={feedModalVisible} animationType="slide" onRequestClose={() => setFeedModalVisible(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+            <Text style={{ fontSize: fontSize.large, fontWeight: '700', color: theme.text }}>Feeds</Text>
+            <TouchableOpacity onPress={() => setFeedModalVisible(false)}>
+              <Text style={{ fontSize: 20, color: theme.textMuted }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView>
+            {/* All Feeds */}
+            <TouchableOpacity
+              style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: theme.border, backgroundColor: selectedFeedId === null ? colors.primary : 'transparent' }}
+              onPress={() => { setSelectedFeedId(null); setFeedModalVisible(false) }}
+            >
+              <Text style={{ color: selectedFeedId === null ? 'white' : theme.text, fontWeight: '600' }}>All Feeds</Text>
+            </TouchableOpacity>
+
+            {/* カテゴリ別 */}
+            {groupedFeeds.map(([cat, feedList]) => (
+              <View key={cat}>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.primary }}
+                  onPress={() => setExpandedCategories(prev => {
+                    const s = new Set(prev)
+                    s.has(cat) ? s.delete(cat) : s.add(cat)
+                    return s
+                  })}
+                >
+                  <Text style={{ color: 'white', fontSize: fontSize.small, fontWeight: '700', flex: 1 }}>
+                    {expandedCategories.has(cat) ? '▼ ' : '▶ '}{cat}
+                  </Text>
+                </TouchableOpacity>
+                {expandedCategories.has(cat) && feedList.map(feed => (
+                  <TouchableOpacity
+                    key={feed.id}
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 32, borderBottomWidth: 1, borderBottomColor: theme.border, backgroundColor: selectedFeedId === feed.id ? (isDarkMode ? '#333' : '#f0f0f0') : 'transparent' }}
+                    onPress={() => { setSelectedFeedId(feed.id); setFeedModalVisible(false) }}
+                  >
+                    {feed.faviconUrl && <Image source={{ uri: feed.faviconUrl }} style={{ width: 14, height: 14, borderRadius: 2, marginRight: 8 }} />}
+                    <Text style={{ color: theme.text, fontSize: fontSize.normal }}>{feed.title || feed.url}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <Text style={[styles.headerTitle, { color: theme.text }]}>FeedOwn</Text>
         <View style={styles.headerRight}>
-          <Dropdown
-            style={[styles.feedDropdown, { backgroundColor: theme.card, borderColor: theme.border }]}
-            placeholderStyle={[styles.feedDropdownText, { color: theme.text }]}
-            selectedTextStyle={[styles.feedDropdownText, { color: theme.text }]}
-            containerStyle={[styles.feedDropdownList, { backgroundColor: theme.card }]}
-            itemTextStyle={{ color: theme.text }}
-            activeColor={isDarkMode ? '#333' : '#f0f0f0'}
-            data={feedOptions}
-            maxHeight={300}
-            labelField="label"
-            valueField="value"
-            placeholder="All Feeds"
-            value={selectedFeedId}
-            onChange={item => setSelectedFeedId(item.value)}
-          />
-          {/* 未読バッジをモノトーンに */}
+          <TouchableOpacity
+            style={[styles.feedDropdown, { backgroundColor: theme.card, borderColor: theme.border, justifyContent: 'center' }]}
+            onPress={() => setFeedModalVisible(true)}
+          >
+            <Text style={[styles.feedDropdownText, { color: theme.text }]} numberOfLines={1}>{selectedFeedLabel}</Text>
+          </TouchableOpacity>
           <View style={[styles.unreadBadge, { backgroundColor: isDarkMode ? '#444' : '#bbb' }, unreadCount === 0 && styles.allReadBadge]}>
             <Text style={styles.unreadText}>{unreadCount > 0 ? `${unreadCount} unread` : 'All read'}</Text>
           </View>
@@ -428,18 +492,12 @@ export default function Home() {
             </Text>
           </TouchableOpacity>
           <View style={styles.selectionActions}>
-            <TouchableOpacity
-              onPress={handleMarkSelectedReadLater}
-              disabled={selectedIds.size === 0}
-              style={[styles.selectionActionBtn, styles.readLaterBtn, selectedIds.size === 0 && styles.disabledBtn]}
-            >
+            <TouchableOpacity onPress={handleMarkSelectedReadLater} disabled={selectedIds.size === 0}
+              style={[styles.selectionActionBtn, styles.readLaterBtn, selectedIds.size === 0 && styles.disabledBtn]}>
               <Text style={styles.selectionActionText}>📌 Read Later</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleMarkSelectedRead}
-              disabled={selectedIds.size === 0 || isMarkingSelected}
-              style={[styles.selectionActionBtn, styles.markReadBtn, selectedIds.size === 0 && styles.disabledBtn]}
-            >
+            <TouchableOpacity onPress={handleMarkSelectedRead} disabled={selectedIds.size === 0 || isMarkingSelected}
+              style={[styles.selectionActionBtn, styles.markReadBtn, selectedIds.size === 0 && styles.disabledBtn]}>
               {isMarkingSelected ? <ActivityIndicator size="small" color="white" /> : <Text style={styles.selectionActionText}>✓ 既読</Text>}
             </TouchableOpacity>
             <TouchableOpacity onPress={handleExitSelection} style={styles.cancelBtn}>
@@ -448,55 +506,51 @@ export default function Home() {
           </View>
         </View>
       ) : (
-        /* 通常フィルターバー */
         <View style={[styles.filterBar, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <View style={styles.filterButtons}>
             {['all', 'unread', 'read'].map(f => (
-              <TouchableOpacity
-                key={f}
-                style={[
-                  styles.filterButton,
-                  { borderColor: filter === f ? activeColor : inactiveBorderColor },
-                  filter === f && { backgroundColor: activeColor }
-                ]}
+              <TouchableOpacity key={f}
+                style={[styles.filterButton, { borderColor: filter === f ? activeColor : inactiveBorderColor }, filter === f && { backgroundColor: activeColor }]}
                 onPress={() => setFilter(f)}
               >
-                <Text style={[
-                  styles.filterButtonText,
-                  { color: filter === f ? 'white' : theme.textSecondary }
-                ]}>
+                <Text style={[styles.filterButtonText, { color: filter === f ? 'white' : theme.textSecondary }]}>
                   {f === 'all' ? 'All' : f === 'unread' ? 'Unread' : 'Read'}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
           <View style={styles.rightButtons}>
-            {/* 3段階の表示切替ボタン（Card → List → Magazine） */}
-            <TouchableOpacity
-              style={[styles.viewToggleBtn, { borderColor: theme.border }]}
-              onPress={() => setViewMode(v => v === 'card' ? 'list' : v === 'list' ? 'magazine' : 'card')}
-            >
+            <TouchableOpacity style={[styles.viewToggleBtn, { borderColor: theme.border }]}
+              onPress={() => setViewMode(v => v === 'card' ? 'list' : v === 'list' ? 'magazine' : 'card')}>
               <Text style={[styles.viewToggleText, { color: theme.text }]}>
-                {viewMode === 'card' ? '☰' : viewMode === 'list' ? '📰' : '⊞'}
+                {viewMode === 'card' ? '☰' : viewMode === 'list' ? '⊞' : '📰'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.markAllButton, (unreadCount === 0 || isMarkingAllRead) && styles.markAllButtonDisabled]}
-              onPress={handleMarkAllRead}
-              disabled={unreadCount === 0 || isMarkingAllRead}
-            >
+              onPress={handleMarkAllRead} disabled={unreadCount === 0 || isMarkingAllRead}>
               {isMarkingAllRead ? <ActivityIndicator size="small" color="white" /> : <Text style={styles.markAllButtonText}>All Read</Text>}
             </TouchableOpacity>
           </View>
         </View>
       )}
 
-      <FlatList
+      <SectionList
+        key={viewMode}
         ref={flatListRef}
-        data={filteredArticles}
+        sections={groupedArticles}
+        extraData={{ viewMode, selectionMode, selectedIds: selectedIds.size, readLaterIds: readLaterIds.size }}
         renderItem={renderArticle}
         keyExtractor={item => item.id}
-        contentContainerStyle={[styles.listContent, viewMode === 'list' && { paddingHorizontal: 0, paddingVertical: 0 }]}
+        renderSectionHeader={({ section: { title } }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>{title}</Text>
+          </View>
+        )}
+        contentContainerStyle={[
+          styles.listContent,
+          (viewMode === 'list' || viewMode === 'magazine') && { paddingHorizontal: 0, paddingVertical: 0 }
+        ]}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={isDarkMode ? '#888' : '#555'} />
         }
@@ -523,10 +577,12 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   feedDropdown: { width: 120, height: 32, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8 },
   feedDropdownText: { fontSize: fontSize.small },
-  feedDropdownList: { borderRadius: 8, marginTop: 4, width: 180, marginLeft: -60 },
   unreadBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   allReadBadge: { backgroundColor: '#28a745' },
   unreadText: { color: 'white', fontSize: fontSize.small, fontWeight: '600' },
+
+  sectionHeader: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: colors.primary },
+  sectionHeaderText: { fontSize: fontSize.small, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: 'white' },
 
   selectionBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, gap: 8 },
   selectAllButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 8 },
@@ -555,11 +611,8 @@ const styles = StyleSheet.create({
 
   listContent: { paddingHorizontal: 12, paddingVertical: 8, flexGrow: 1 },
 
-  // カード表示（従来の横並び）
   articleCard: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'row', padding: 12 },
-  // リスト表示（境界線ありの横並び）
   articleListRow: { flexDirection: 'row', padding: 12, paddingHorizontal: 16, alignItems: 'center' },
-  // マガジン表示（画像が上で縦並び）
   articleMagazine: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'column', padding: 12 },
 
   articleCardRead: { opacity: 0.6 },
