@@ -1,15 +1,16 @@
-import React, { useEffect, useState, useMemo } from 'react';
+// ★ 移管完了したら false に変更
+const SHOW_IMPORT_FORM = true;
+
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaTimes, FaList, FaTh, FaStar, FaRss, FaNewspaper } from 'react-icons/fa';
+import { FaList, FaTh, FaStar, FaRss, FaNewspaper } from 'react-icons/fa';
 import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import ArticleModal from '../components/ArticleModal';
 import { useTheme } from '../contexts/ThemeContext';
 import { usePersistedState } from '../hooks/usePersistedState';
-
-// ★ 移管完了したら false に変更
-const SHOW_IMPORT_FORM = true;
+import { useArticles } from '../contexts/ArticlesContext'; // ★ 追加
 
 const FavoritesPage = () => {
   const [loading, setLoading] = useState(true);
@@ -18,6 +19,7 @@ const FavoritesPage = () => {
   const [favoritesError, setFavoritesError] = useState(null);
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [feeds, setFeeds] = useState([]);
+  
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [viewMode, setViewMode] = usePersistedState('favorites_viewMode', 'list');
@@ -25,6 +27,10 @@ const FavoritesPage = () => {
   const [importForm, setImportForm] = useState({ title: '', url: '', feedTitle: '' });
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState(null);
+
+  // ★ Feeds情報を使ってカテゴリ分け・ファビコン表示をするために追加
+  const { feeds: contextFeeds } = useArticles();
+  const activeFeeds = contextFeeds.length > 0 ? contextFeeds : feeds;
 
   const apiClient = useMemo(
     () => createApiClient(import.meta.env.VITE_API_BASE_URL || '', getAccessToken),
@@ -37,6 +43,13 @@ const FavoritesPage = () => {
   const border = isDarkMode ? '#444' : '#e0e0e0';
   const textPrimary = isDarkMode ? '#e0e0e0' : '#333';
   const textSecondary = isDarkMode ? '#aaa' : '#888';
+
+  // ★ データをDashboard/ReadLaterと同じ形式（id, publishedAt等）に正規化
+  const normalizeFavorite = (fav) => ({
+    ...fav,
+    id: fav.articleId,
+    publishedAt: fav.createdAt,
+  });
 
   const fetchFeeds = async () => {
     try {
@@ -52,8 +65,9 @@ const FavoritesPage = () => {
     setFavoritesError(null);
     try {
       const res = await api.favorites.list();
-      if (res.success) setFavorites(res.data.favorites || []);
-      else throw new Error(res.error);
+      if (res.success) {
+        setFavorites((res.data.favorites || []).map(normalizeFavorite));
+      } else throw new Error(res.error);
     } catch {
       setFavoritesError('Failed to load favorites.');
     } finally {
@@ -79,23 +93,24 @@ const FavoritesPage = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleArticleClick = fav =>
+  const handleArticleClick = fav => {
     setSelectedArticle({
-      id: fav.articleId,
+      id: fav.id,
       title: fav.title,
       url: fav.url,
       description: fav.description,
       feedTitle: fav.feedTitle || 'Unknown Feed',
-      publishedAt: fav.createdAt,
+      publishedAt: fav.publishedAt,
       imageUrl: fav.imageUrl || null,
     });
+  };
 
   const handleRemoveFromFavorites = async () => {
     if (!selectedArticle) return;
     try {
       await api.articles.removeFromFavorites(selectedArticle.id);
       setSelectedArticle(null);
-      await fetchFavorites();
+      setFavorites(prev => prev.filter(f => f.id !== selectedArticle.id));
     } catch (e) {
       console.error(e);
     }
@@ -105,7 +120,7 @@ const FavoritesPage = () => {
     e.stopPropagation();
     try {
       await api.articles.removeFromFavorites(articleId);
-      await fetchFavorites();
+      setFavorites(prev => prev.filter(f => f.id !== articleId));
     } catch (e) {
       console.error(e);
     }
@@ -125,7 +140,6 @@ const FavoritesPage = () => {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ articleId, title: importForm.title, url: importForm.url, feedTitle: importForm.feedTitle }),
       });
-      // レスポンスをテキストで確認
       const text = await res.text();
       console.log('Favorites import response:', res.status, text);
       let data;
@@ -153,37 +167,43 @@ const FavoritesPage = () => {
     return new Date(d).toLocaleDateString();
   };
 
-  const getFeedFavicon = feedTitle =>
-    feeds.find(f => f.title === feedTitle)?.faviconUrl || null;
+  const stripHtml = (html) => html?.replace(/<[^>]*>/g, '') || '';
 
-  const cycleViewMode = () =>
-    setViewMode(v => (v === 'card' ? 'list' : v === 'list' ? 'magazine' : 'card'));
+  // ★ ヘルパー関数追加
+  const getFeedFavicon = feedTitle => activeFeeds.find(f => f.title === feedTitle)?.faviconUrl || null;
+  const getFeedCategory = useCallback((feedTitle) => activeFeeds.find(f => f.title === feedTitle)?.category || null, [activeFeeds]);
 
-  const viewModeLabel =
-    viewMode === 'card' ? (
-      <>
-        <FaList /> List
-      </>
-    ) : viewMode === 'list' ? (
-      <>
-        <FaNewspaper /> Magazine
-      </>
-    ) : (
-      <>
-        <FaTh /> Card
-      </>
-    );
+  const cycleViewMode = () => setViewMode(v => (v === 'card' ? 'list' : v === 'list' ? 'magazine' : 'card'));
+  const viewModeLabel = viewMode === 'card' ? <><FaList /> List</> : viewMode === 'list' ? <><FaNewspaper /> Magazine</> : <><FaTh /> Card</>;
 
-const renderCard = (fav) => (
-    <div key={fav.articleId} onClick={() => handleArticleClick(fav)}
+  // ★ カテゴリごとのグループ化ロジックを追加
+  const groupedFavorites = useMemo(() => {
+    if (!favorites.length) return [];
+    const catMap = {};
+    const uncategorized = [];
+    favorites.forEach(fav => {
+      const cat = getFeedCategory(fav.feedTitle);
+      if (cat) {
+        if (!catMap[cat]) catMap[cat] = [];
+        catMap[cat].push(fav);
+      } else {
+        uncategorized.push(fav);
+      }
+    });
+    const sorted = Object.entries(catMap).sort(([a], [b]) => a.localeCompare(b, 'ja'));
+    if (uncategorized.length > 0) sorted.push(['__uncategorized__', uncategorized]);
+    return sorted;
+  }, [favorites, getFeedCategory]);
+
+  const useCategoryGroups = groupedFavorites.length > 1 || (groupedFavorites.length === 1 && groupedFavorites[0][0] !== '__uncategorized__');
+
+  // ★ 各レンダラーをDashboardと全く同じレイアウトに修正
+  const renderCard = (fav) => (
+    <div key={fav.id} onClick={() => handleArticleClick(fav)}
       style={{ backgroundColor: cardBg, borderRadius: '10px', overflow: 'hidden', border: `1px solid ${border}`, boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)', cursor: 'pointer', position: 'relative', transition: 'transform 0.2s, box-shadow 0.2s' }}
       onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)'; }}
       onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isDarkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)'; }}
     >
-      <button onClick={e => handleRemoveFavoriteFromList(e, fav.articleId)}
-        style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 2, backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.75rem' }}>
-        <FaTimes />
-      </button>
       {fav.imageUrl
         ? <img src={fav.imageUrl} alt="" style={{ width: '100%', height: '150px', objectFit: 'cover' }} />
         : <div style={{ width: '100%', height: '60px', backgroundColor: isDarkMode ? '#333' : '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaRss style={{ color: '#FF6B35', opacity: 0.3, fontSize: '1.2rem' }} /></div>
@@ -192,38 +212,43 @@ const renderCard = (fav) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem', fontSize: '0.78rem', color: textSecondary }}>
           {getFeedFavicon(fav.feedTitle) && <img src={getFeedFavicon(fav.feedTitle)} alt="" style={{ width: '13px', height: '13px', borderRadius: '2px' }} onError={e => e.target.style.display = 'none'} />}
           <span style={{ color: textSecondary, fontWeight: '600' }}>{fav.feedTitle || 'Feed'}</span>
-          <span>·</span><span>{getRelativeTime(fav.createdAt)}</span>
+          <span>·</span><span>{getRelativeTime(fav.publishedAt)}</span>
         </div>
-        <h3 style={{ color: textPrimary, fontSize: '0.92rem', fontWeight: '600', lineHeight: '1.4', margin: '0 0 0.4rem', textAlign: 'left', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{fav.title}</h3>
-        {fav.description && <p style={{ color: textSecondary, fontSize: '0.8rem', lineHeight: '1.5', margin: 0, textAlign: 'left', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{fav.description}</p>}
+        <h3 style={{ color: textPrimary, fontSize: '0.92rem', fontWeight: '600', lineHeight: '1.4', margin: '0 0 0.4rem', textAlign: 'left', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{stripHtml(fav.title)}</h3>
+        {fav.description && <p style={{ color: textSecondary, fontSize: '0.8rem', lineHeight: '1.5', margin: '0 0 0.75rem', textAlign: 'left', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: fav.description }} />}
+        
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
+          <button onClick={e => handleRemoveFavoriteFromList(e, fav.id)} title="お気に入りから削除"
+            style={{ padding: '0.25rem 0.6rem', backgroundColor: 'transparent', color: '#FFD700', border: `1px solid #FFD700`, borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <FaStar /> Favorited
+          </button>
+        </div>
       </div>
     </div>
   );
 
   const renderListRow = (fav, idx, total) => (
-    <div key={fav.articleId} onClick={() => handleArticleClick(fav)}
-      style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', borderBottom: idx < total - 1 ? `1px solid ${border}` : 'none', cursor: 'pointer' }}
+    <div key={fav.id} onClick={() => handleArticleClick(fav)}
+      style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 1rem', borderBottom: idx < total - 1 ? `1px solid ${border}` : 'none', cursor: 'pointer' }}
       onMouseOver={e => { e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#f9f9f9'; }}
       onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
     >
-      {fav.imageUrl
-        ? <img src={fav.imageUrl} alt="" style={{ width: '56px', height: '42px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
-        : <div style={{ width: '56px', height: '42px', backgroundColor: isDarkMode ? '#333' : '#f0f0f0', borderRadius: '5px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaRss style={{ color: '#FF6B35', opacity: 0.3, fontSize: '0.9rem' }} /></div>
-      }
+      <button onClick={e => handleRemoveFavoriteFromList(e, fav.id)} title="お気に入りから削除"
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: '#FFD700', fontSize: '0.9rem', flexShrink: 0 }}><FaStar /></button>
+      
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '5em', flexShrink: 0, overflow: 'hidden' }}>
-        {getFeedFavicon(fav.feedTitle) && <img src={getFeedFavicon(fav.feedTitle)} alt="" style={{ width: '13px', height: '13px', borderRadius: '2px' }} onError={e => e.target.style.display = 'none'} />}
-        <span style={{ color: textSecondary, fontSize: '0.82rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{fav.feedTitle || 'Feed'}</span>
+        {getFeedFavicon(fav.feedTitle) ? <img src={getFeedFavicon(fav.feedTitle)} alt="" style={{ width: '14px', height: '14px', borderRadius: '2px', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} /> : <FaRss style={{ fontSize: '0.75rem', color: '#FF6B35', flexShrink: 0 }} />}
+        <span style={{ color: textSecondary, fontSize: '0.82rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{fav.feedTitle || 'Feed'}</span>
       </div>
-      <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{fav.title}</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-        <span style={{ color: textSecondary, fontSize: '0.8rem' }}>{getRelativeTime(fav.createdAt)}</span>
-        <button onClick={e => handleRemoveFavoriteFromList(e, fav.articleId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: textSecondary, fontSize: '0.8rem', padding: '2px 4px' }}><FaTimes /></button>
+      <span style={{ color: textPrimary, fontSize: '0.9rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{stripHtml(fav.title)}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, fontSize: '0.8rem', color: textSecondary }}>
+        <span>{getRelativeTime(fav.publishedAt)}</span>
       </div>
     </div>
   );
 
   const renderMagazineRow = (fav, idx, total) => (
-    <div key={fav.articleId} onClick={() => handleArticleClick(fav)}
+    <div key={fav.id} onClick={() => handleArticleClick(fav)}
       style={{ display: 'flex', gap: '1rem', padding: '1rem', borderBottom: idx < total - 1 ? `1px solid ${border}` : 'none', cursor: 'pointer', alignItems: 'flex-start' }}
       onMouseOver={e => { e.currentTarget.style.backgroundColor = isDarkMode ? '#333' : '#f5f5f5'; }}
       onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
@@ -236,27 +261,35 @@ const renderCard = (fav) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem', fontSize: '0.8rem', color: textSecondary }}>
           {getFeedFavicon(fav.feedTitle) && <img src={getFeedFavicon(fav.feedTitle)} alt="" style={{ width: '14px', height: '14px', borderRadius: '2px' }} onError={e => e.target.style.display = 'none'} />}
           <span style={{ color: textSecondary, fontWeight: '600' }}>{fav.feedTitle || 'Feed'}</span>
-          <span>·</span><span>{getRelativeTime(fav.createdAt)}</span>
+          <span>·</span><span>{getRelativeTime(fav.publishedAt)}</span>
         </div>
-        <h3 style={{ color: textPrimary, fontSize: '1rem', fontWeight: '700', lineHeight: '1.5', margin: '0 0 0.5rem', textAlign: 'left' }}>{fav.title}</h3>
-        {fav.description && <p style={{ color: textSecondary, fontSize: '0.85rem', lineHeight: '1.6', margin: '0 0 0.6rem', textAlign: 'left', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{fav.description}</p>}
-        <button onClick={e => handleRemoveFavoriteFromList(e, fav.articleId)}
-          style={{ padding: '0.2rem 0.55rem', backgroundColor: 'transparent', color: textSecondary, border: `1px solid ${border}`, borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-          <FaTimes /> Remove
-        </button>
+        <h3 style={{ color: textPrimary, fontSize: '1rem', fontWeight: '700', lineHeight: '1.5', margin: '0 0 0.5rem', textAlign: 'left' }}>{stripHtml(fav.title)}</h3>
+        {fav.description && <p style={{ color: textSecondary, fontSize: '0.85rem', lineHeight: '1.6', margin: '0 0 0.6rem', textAlign: 'left', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: fav.description }} />}
+        
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button onClick={e => handleRemoveFavoriteFromList(e, fav.id)} title="お気に入りから削除"
+            style={{ padding: '0.2rem 0.55rem', backgroundColor: 'transparent', color: '#FFD700', border: `1px solid #FFD700`, borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+            <FaStar /> Favorited
+          </button>
+        </div>
       </div>
     </div>
   );
 
-  const renderByMode = (favList) => {
+  const renderArticlesByMode = (favList) => {
     if (viewMode === 'card') return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
         {favList.map(fav => renderCard(fav))}
       </div>
     );
+    if (viewMode === 'list') return (
+      <div style={{ backgroundColor: cardBg, borderRadius: '10px', border: `1px solid ${border}`, overflow: 'hidden' }}>
+        {favList.map((fav, i) => renderListRow(fav, i, favList.length))}
+      </div>
+    );
     return (
       <div style={{ backgroundColor: cardBg, borderRadius: '10px', border: `1px solid ${border}`, overflow: 'hidden' }}>
-        {favList.map((fav, i) => viewMode === 'magazine' ? renderMagazineRow(fav, i, favList.length) : renderListRow(fav, i, favList.length))}
+        {favList.map((fav, i) => renderMagazineRow(fav, i, favList.length))}
       </div>
     );
   };
@@ -333,7 +366,7 @@ const renderCard = (fav) => (
           >
             {viewModeLabel}
           </button>
-        </div> {/* ← ヘッダーのdivの閉じタグ */}
+        </div>
 
         {SHOW_IMPORT_FORM && (
           <div
@@ -446,10 +479,23 @@ const renderCard = (fav) => (
             <p>Star articles from the dashboard to save them here!</p>
           </div>
         )}
-        {!favoritesLoading &&
-          !favoritesError &&
-          favorites.length > 0 &&
-          renderByMode(favorites)}
+
+        {/* ★ カテゴリごとのレンダリング (Dashboard / ReadLater と同じロジック) */}
+        {!favoritesLoading && !favoritesError && favorites.length > 0 && useCategoryGroups && groupedFavorites.map(([cat, favList]) => (
+          <div key={cat} style={{ marginBottom: '2rem' }}>
+            {/* ★ ここがオレンジの帯！ */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: `2px solid ${isDarkMode ? '#444' : '#e0e0e0'}`, borderLeft: '4px solid #FF6B35', paddingLeft: '0.5rem' }}>
+              <span style={{ fontSize: '1rem', fontWeight: '700', color: textSecondary, textAlign: 'left' }}>
+                {cat === '__uncategorized__' ? 'Others' : cat}
+              </span>
+              <span style={{ fontSize: '0.78rem', color: textSecondary }}>{favList.length}件</span>
+            </div>
+            {renderArticlesByMode(favList)}
+          </div>
+        ))}
+
+        {/* カテゴリがない（全て未分類など）の場合はフラットに表示 */}
+        {!favoritesLoading && !favoritesError && favorites.length > 0 && !useCategoryGroups && renderArticlesByMode(favorites)}
       </div>
 
       {selectedArticle && (
