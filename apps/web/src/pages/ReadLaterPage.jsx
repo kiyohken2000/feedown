@@ -91,6 +91,21 @@ const ReadLaterPage = () => {
 
   useEffect(() => { fetchArticles(); fetchFavorites(); }, [fetchArticles, fetchFavorites]);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Escキーが押されて、かつ記事が表示中なら閉じる
+      if (e.key === 'Escape' && selectedArticle) {
+        setSelectedArticle(null);
+      }
+    };
+
+    // イベントリスナー（Event Listener）を登録
+    window.addEventListener('keydown', handleKeyDown);
+
+    // クリーンアップ（Clean Up）関数
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedArticle]);
+
   const handleRemove = async (articleId) => {
     try {
       await callReadLaterAPI('DELETE', null, `?articleId=${encodeURIComponent(articleId)}`);
