@@ -21,12 +21,22 @@ export interface ParsedArticle {
 }
 
 /**
+ * 文字参照（HTML Entity）を通常の文字に変換する
+ */
+function decodeHtmlEntities(text: string): string {
+  return text.replace(/&#(\d+);/g, (_, dec) => {
+    return String.fromCharCode(Number(dec));
+  });
+}
+
+/**
  * Get text content from XML element
  */
 function getElementText(element: Element | null | undefined, tagName: string): string {
   if (!element) return '';
   const el = element.getElementsByTagName(tagName)[0];
-  return el?.textContent?.trim() || '';
+  const rawText = el?.textContent?.trim() || '';
+  return decodeHtmlEntities(rawText);
 }
 
 /**
