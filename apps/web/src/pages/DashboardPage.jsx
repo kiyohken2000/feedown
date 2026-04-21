@@ -115,6 +115,21 @@ const DashboardPage = () => {
 
   useEffect(() => { fetchReadLater(); }, [fetchReadLater]);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Escキーが押されて、かつ記事ポップアップが表示中なら閉じる
+      if (e.key === 'Escape' && selectedArticle) {
+        setSelectedArticle(null);
+      }
+    };
+
+    // イベントリスナーを登録
+    window.addEventListener('keydown', handleKeyDown);
+    
+    // クリーンアップ関数（コンポーネントが破棄されるか、selectedArticleが変わった時に古いリスナーを消す）
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedArticle]);
+
   const showToast = (msg, type = 'success') => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setSwipeToast({ msg, type });
