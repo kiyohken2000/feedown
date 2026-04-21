@@ -3,6 +3,7 @@
  */
 
 import { parseRssDate } from './date.js';
+import he from 'he';
 
 export interface ParsedFeed {
   title: string;
@@ -22,11 +23,13 @@ export interface ParsedArticle {
 
 /**
  * Get text content from XML element
+ * - HTMLエンティティをここで正規化（重要）
  */
 function getElementText(element: Element | null | undefined, tagName: string): string {
   if (!element) return '';
   const el = element.getElementsByTagName(tagName)[0];
-  return el?.textContent?.trim() || '';
+  const text = el?.textContent?.trim() || '';
+  return he.decode(text);
 }
 
 /**
@@ -39,7 +42,7 @@ function getContent(element: Element): string {
     'encoded'
   )[0];
   if (contentEncoded?.textContent) {
-    return contentEncoded.textContent.trim();
+    return he.decode(contentEncoded.textContent.trim());
   }
 
   // Try description
@@ -77,7 +80,9 @@ function parseRss(doc: Document): ParsedFeed {
     const itemLink = getElementText(item, 'link');
     const content = getContent(item);
     const pubDate = getElementText(item, 'pubDate');
-    const author = getElementText(item, 'author') || getElementText(item, 'dc:creator');
+    const author =
+      getElementText(item, 'author') ||
+      getElementText(item, 'dc:creator');
 
     if (!guid || !itemTitle) continue;
 
@@ -105,8 +110,12 @@ function parseAtom(doc: Document): ParsedFeed {
 
   const title = getElementText(feed, 'title');
   const subtitle = getElementText(feed, 'subtitle');
-  const linkEl = feed.querySelector('link[rel="alternate"]') || feed.querySelector('link');
-  const link = linkEl?.getAttribute('href') || '';
+  const linkEl =
+    feed.querySelector('link[rel="alternate"]') ||
+    feed.querySelector('link');
+  const link = linkEl?.getAttribute('href')
+    ? he.decode(linkEl.getAttribute('href')!)
+    : '';
 
   const items: ParsedArticle[] = [];
   const entries = feed.getElementsByTagName('entry');
@@ -115,10 +124,16 @@ function parseAtom(doc: Document): ParsedFeed {
     const entry = entries[i];
     const guid = getElementText(entry, 'id');
     const entryTitle = getElementText(entry, 'title');
-    const entryLinkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
-    const entryLink = entryLinkEl?.getAttribute('href') || '';
+    const entryLinkEl =
+      entry.querySelector('link[rel="alternate"]') ||
+      entry.querySelector('link');
+    const entryLink = entryLinkEl?.getAttribute('href')
+      ? he.decode(entryLinkEl.getAttribute('href')!)
+      : '';
     const content = getContent(entry);
-    const published = getElementText(entry, 'published') || getElementText(entry, 'updated');
+    const published =
+      getElementText(entry, 'published') ||
+      getElementText(entry, 'updated');
     const authorEl = entry.querySelector('author name');
     const author = authorEl?.textContent?.trim();
 
@@ -141,17 +156,14 @@ function parseAtom(doc: Document): ParsedFeed {
  * Parse RSS or Atom feed XML
  */
 export function parseRssFeed(xmlString: string): ParsedFeed {
-  // Parse XML
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlString, 'text/xml');
 
-  // Check for parsing errors
   const parserError = doc.querySelector('parsererror');
   if (parserError) {
     throw new Error('Failed to parse XML: ' + parserError.textContent);
   }
 
-  // Detect feed type and parse accordingly
   if (doc.querySelector('rss')) {
     return parseRss(doc);
   } else if (doc.querySelector('feed')) {
