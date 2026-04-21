@@ -1,5 +1,5 @@
 // ★ 移管完了したら false に変更
-const SHOW_IMPORT_FORM = true;
+const SHOW_IMPORT_FORM = false;
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { FaBookmark, FaTrash, FaList, FaTh, FaRss, FaStar, FaSync, FaNewspaper } from 'react-icons/fa';
