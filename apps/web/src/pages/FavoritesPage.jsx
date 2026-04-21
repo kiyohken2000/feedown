@@ -1,5 +1,5 @@
 // ★ 移管完了したら false に変更
-const SHOW_IMPORT_FORM = true;
+const SHOW_IMPORT_FORM = false;
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
