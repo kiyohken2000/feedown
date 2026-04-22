@@ -154,9 +154,10 @@ const DashboardPage = () => {
   }, [checkedArticles, articles, handleAddToReadLater]);
 
   const markAsRead = useCallback(async (articleId) => {
-    setReadArticles(prev => new Set([...prev, articleId]));
+    setReadArticles(prev => new Set(prev).add(articleId));
+    setArticles(prev => prev.map(a => a.id === articleId ? { ...a, isRead: true } : a));
     try { await api.articles.markAsRead(articleId); } catch (e) { console.error(e); }
-  }, [api, setReadArticles]);
+  }, [api, setReadArticles, setArticles]);
 
   const fetchFeeds = useCallback(async () => {
     try {
@@ -187,9 +188,14 @@ const DashboardPage = () => {
         const hasMoreData = res.data.hasMore ?? (newArticles.length === limit);
         if (reset) setArticles(newArticles); else setArticles(prev => [...prev, ...newArticles]);
         setHasMore(hasMoreData);
-        const readSet = reset ? new Set() : new Set(readArticles);
-        newArticles.forEach(a => { if (a.isRead) readSet.add(a.id); });
-        setReadArticles(readSet);
+        
+        // ★修正: 既存のローカル既読状態を維持しつつ、サーバー側の既読フラグをマージする
+        setReadArticles(prev => {
+          const s = new Set(prev);
+          newArticles.forEach(a => { if (a.isRead) s.add(a.id); });
+          return s;
+        });
+        
         if (reset) setLastArticleFetchTime(Date.now());
       } else throw new Error(res.error);
     } catch (e) {
@@ -197,8 +203,9 @@ const DashboardPage = () => {
     } finally {
       if (reset) setArticlesLoading(false); else setLoadingMore(false);
     }
-  }, [api, articles.length, readArticles, setArticles, setHasMore, setLastArticleFetchTime, setReadArticles]);
+  }, [api, articles.length, setArticles, setHasMore, setLastArticleFetchTime, setReadArticles]);
 
+  // ★追加: 手動Load More
   const handleManualLoadMore = () => {
     if (hasMore && !loadingMore && !articlesLoading) {
       fetchArticles(false, selectedFeedId);
@@ -299,21 +306,40 @@ const DashboardPage = () => {
     return () => { if (observerRef.current) observerRef.current.disconnect(); };
   }, [filteredArticles, readArticles, markAsRead, filter]);
 
+  // ★修正: 一括既読時のゾンビ化防止（楽観的UI更新）
   const handleMarkAllAsRead = async () => {
     if (articlesLoading) return;
     const ids = articles.filter(a => !readArticles.has(a.id)).map(a => a.id);
     if (!ids.length) return;
+
+    // 即座にローカル状態を更新
     setReadArticles(prev => { const s = new Set(prev); ids.forEach(id => s.add(id)); return s; });
-    try { await api.articles.batchMarkAsRead(ids); await fetchArticles(true, selectedFeedId); }
-    catch (e) { setReadArticles(prev => { const s = new Set(prev); ids.forEach(id => s.delete(id)); return s; }); }
+    setArticles(prev => prev.map(a => ids.includes(a.id) ? { ...a, isRead: true } : a));
+
+    try { 
+      await api.articles.batchMarkAsRead(ids); 
+      // ★取り直し（fetchArticles）をせず、ローカルの変更を信じる
+    } catch (e) { 
+      console.error(e);
+    }
   };
 
+  // ★修正: 選択既読時のゾンビ化防止（楽観的UI更新）
   const handleMarkCheckedAsRead = async () => {
     if (!checkedArticles.size) return;
     const ids = [...checkedArticles];
+
+    // 即座にローカル状態を更新
     setReadArticles(prev => { const s = new Set(prev); ids.forEach(id => s.add(id)); return s; });
+    setArticles(prev => prev.map(a => ids.includes(a.id) ? { ...a, isRead: true } : a));
     setCheckedArticles(new Set());
-    try { await api.articles.batchMarkAsRead(ids); } catch (e) { console.error(e); }
+
+    try { 
+      await api.articles.batchMarkAsRead(ids); 
+      // ★取り直しをせず、ローカルの変更を信じる
+    } catch (e) { 
+      console.error(e); 
+    }
   };
 
   const handleCheckboxChange = (e, articleId) => {
