@@ -63,26 +63,58 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
 
   const isListMode = viewMode === 'list'
   const isMagazineMode = viewMode === 'magazine'
+  const isCardMode = viewMode === 'card'
   const checkColor = isDarkMode ? '#555' : '#888'
 
   return (
-    <View style={{ overflow: 'hidden', marginVertical: (isListMode || isMagazineMode) ? 2 : 6, marginHorizontal: (isListMode || isMagazineMode) ? 0 : 12 }}>
-      <Animated.View style={[StyleSheet.absoluteFillObject, { borderRadius: isListMode ? 0 : 12, backgroundColor: bgColorLeft }]}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 20 }}>
-          <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>📌 Read Later</Text>
-        </View>
-      </Animated.View>
-      <Animated.View style={[StyleSheet.absoluteFillObject, { borderRadius: isListMode ? 0 : 12, backgroundColor: bgColorRight }]}>
+    <View style={{ overflow: 'hidden', marginVertical: isListMode ? 0 : 6, marginHorizontal: isListMode ? 0 : 12 }}>
+      {/* translateX の値が 0 より大きい（右スワイプ）ときだけ既読背景を表示 */}
+      <Animated.View 
+        style={[
+          StyleSheet.absoluteFillObject, 
+          { 
+            borderRadius: isListMode ? 0 : 12, 
+            backgroundColor: bgColorRight,
+            zIndex: -1,
+            opacity: translateX.interpolate({
+              inputRange: [0, 10],
+              outputRange: [0, 1],
+              extrapolate: 'clamp'
+            })
+          }
+        ]}
+      >
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'flex-start', paddingLeft: 20 }}>
           <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>✓ 既読</Text>
         </View>
       </Animated.View>
 
-      <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
+      {/* translateX の値が 0 より小さい（左スワイプ）ときだけRead Later背景を表示 */}
+      <Animated.View 
+        style={[
+          StyleSheet.absoluteFillObject, 
+          { 
+            borderRadius: isListMode ? 0 : 12, 
+            backgroundColor: bgColorLeft,
+            zIndex: -1,
+            opacity: translateX.interpolate({
+              inputRange: [-10, 0],
+              outputRange: [1, 0],
+              extrapolate: 'clamp'
+            })
+          }
+        ]}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 20 }}>
+          <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>📌 Read Later</Text>
+        </View>
+      </Animated.View>
+
+      <Animated.View style={{ transform: [{ translateX }], zIndex: 1 }} {...panResponder.panHandlers}>
         <TouchableOpacity
           style={[
-            isListMode ? styles.articleListRow : isMagazineMode ? styles.articleMagazine : styles.articleCard,
-            { backgroundColor: theme.card },
+            isCardMode ? styles.articleCard : isMagazineMode ? styles.articleMagazine : styles.articleListRow,
+            { backgroundColor: isListMode ? theme.background : theme.card }, // List時は背景色を透過させない
             isRead && styles.articleCardRead,
             isChecked && { borderColor: checkColor, borderWidth: 2 },
             isListMode && { borderBottomColor: theme.border, borderBottomWidth: 1 },
@@ -92,7 +124,7 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
           activeOpacity={0.7}
         >
           {isSelectionMode && (
-            <TouchableOpacity onPress={() => onToggleCheck(article.id)} style={[styles.checkboxContainer, isMagazineMode && { position: 'absolute', top: 12, left: 12, zIndex: 10 }]}>
+            <TouchableOpacity onPress={() => onToggleCheck(article.id)} style={[styles.checkboxContainer, (isMagazineMode || isCardMode) && { position: 'absolute', top: 12, left: 12, zIndex: 10 }]}>
               <View style={[styles.checkbox, { borderColor: checkColor }, isChecked && { backgroundColor: checkColor }]}>
                 {isChecked && <Text style={styles.checkmark}>✓</Text>}
               </View>
@@ -101,17 +133,21 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
 
           {!isListMode && (
             article.imageUrl ? (
-              <Image source={{ uri: article.imageUrl }} style={isMagazineMode ? styles.thumbnailMagazine : styles.thumbnailCard} resizeMode="cover" />
+              <Image 
+                source={{ uri: article.imageUrl }} 
+                style={isCardMode ? styles.thumbnailCard : isMagazineMode ? styles.thumbnailMagazine : styles.thumbnailList} 
+                resizeMode="cover" 
+              />
             ) : (
-              <View style={[isMagazineMode ? styles.noThumbnailMagazine : styles.noThumbnailCard, { backgroundColor: theme.border }]}>
-                <Text style={[styles.noThumbnailText, { color: theme.textMuted }]}>No image</Text>
+              <View style={[isCardMode ? styles.noThumbnailCard : isMagazineMode ? styles.noThumbnailMagazine : styles.noThumbnailList, { backgroundColor: theme.border }]}>
+                <Text style={[styles.noThumbnailText, { color: theme.textMuted }]}>📡</Text>
               </View>
             )
           )}
 
-          <View style={[styles.articleContent, (isListMode || isMagazineMode) && { marginLeft: 0 }]}>
+          <View style={[styles.articleContent, isCardMode && { padding: 12, marginLeft: 0 }]}>
             <View style={styles.articleMeta}>
-              {!isListMode && feed?.faviconUrl && (
+              {feed?.faviconUrl && (
                 <Image source={{ uri: feed.faviconUrl }} style={styles.favicon} />
               )}
               <Text style={[styles.feedTitleText, { color: theme.textSecondary, flex: 1 }]} numberOfLines={1}>
@@ -122,7 +158,7 @@ const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isS
               <Text style={[styles.time, { color: theme.textMuted }]}>{getRelativeTime(article.publishedAt)}</Text>
             </View>
             <Text
-              style={[styles.articleTitle, { color: theme.text }, isListMode && { fontSize: fontSize.normal }, isMagazineMode && { fontSize: fontSize.large, marginBottom: 6 }]}
+              style={[styles.articleTitle, { color: theme.text }, isListMode && { fontSize: fontSize.normal }, (isMagazineMode || isCardMode) && { fontSize: fontSize.large, marginBottom: 4 }]}
               numberOfLines={isListMode ? 1 : 3}
             >
               {stripHtml(article.title)}
@@ -198,10 +234,17 @@ export default function Home() {
 
   useEffect(() => {
     const unsub = navigation.getParent()?.addListener('tabPress', () => {
-      if (navigation.isFocused()) flatListRef.current?.scrollToIndex({ index: 0, animated: true })
+      // 修正後のスクロール処理
+      if (navigation.isFocused() && groupedArticles.length > 0) {
+        flatListRef.current?.scrollToLocation({
+          sectionIndex: 0, // 最初のセクション（カテゴリ）
+          itemIndex: 0,    // そのセクションの最初のアイテム
+          animated: true,
+        })
+      }
     })
     return unsub
-  }, [navigation])
+  }, [navigation, groupedArticles])
 
   useEffect(() => { if (user) refreshAll() }, [user])
 
@@ -542,9 +585,10 @@ export default function Home() {
         extraData={{ viewMode, selectionMode, selectedIds: selectedIds.size, readLaterIds: readLaterIds.size }}
         renderItem={renderArticle}
         keyExtractor={item => item.id}
-        renderSectionHeader={({ section: { title } }) => (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{title}</Text>
+        renderSectionHeader={({ section: { title, data } }) => (
+          <View style={[styles.sectionHeader, { borderBottomColor: isDarkMode ? '#444' : '#e0e0e0' }]}>
+            <Text style={[styles.sectionHeaderText, { color: theme.textSecondary }]}>{title}</Text>
+            <Text style={{ fontSize: 12, color: theme.textSecondary }}>{data.length}件</Text>
           </View>
         )}
         contentContainerStyle={[
@@ -559,6 +603,7 @@ export default function Home() {
         ListFooterComponent={renderFooter}
         ListEmptyComponent={renderEmpty}
         showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
       />
 
       {isLoading && articles.length === 0 && (
@@ -581,8 +626,12 @@ const styles = StyleSheet.create({
   allReadBadge: { backgroundColor: '#28a745' },
   unreadText: { color: 'white', fontSize: fontSize.small, fontWeight: '600' },
 
-  sectionHeader: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: colors.primary },
-  sectionHeaderText: { fontSize: fontSize.small, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: 'white' },
+  // ReadLater準拠のカテゴリ見出しスタイル
+  sectionHeader: { 
+    flexDirection: 'row', alignItems: 'center', paddingBottom: 6, marginBottom: 12, marginTop: 20,
+    marginHorizontal: 12, borderBottomWidth: 2, borderLeftWidth: 4, borderLeftColor: '#FF6B35', paddingLeft: 8
+  },
+  sectionHeaderText: { fontSize: 16, fontWeight: '700', marginRight: 8 },
 
   selectionBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, gap: 8 },
   selectAllButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 8 },
@@ -611,18 +660,24 @@ const styles = StyleSheet.create({
 
   listContent: { paddingHorizontal: 12, paddingVertical: 8, flexGrow: 1 },
 
-  articleCard: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'row', padding: 12 },
+  // ReadLater準拠のビューレイアウト
+  articleCard: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'column' },
   articleListRow: { flexDirection: 'row', padding: 12, paddingHorizontal: 16, alignItems: 'center' },
-  articleMagazine: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'column', padding: 12 },
+  articleMagazine: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'row', padding: 12, alignItems: 'flex-start' },
 
   articleCardRead: { opacity: 0.6 },
   checkboxContainer: { justifyContent: 'center', marginRight: 10 },
-  thumbnailCard: { width: 80, height: 80, backgroundColor: '#e0e0e0', borderRadius: 8 },
-  thumbnailMagazine: { width: '100%', height: 160, backgroundColor: '#e0e0e0', borderRadius: 8, marginBottom: 12 },
-  noThumbnailCard: { width: 80, height: 80, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  noThumbnailMagazine: { width: '100%', height: 160, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  noThumbnailText: { fontSize: fontSize.xSmall },
-  articleContent: { flex: 1, marginLeft: 10, justifyContent: 'center' },
+  
+  thumbnailCard: { width: '100%', height: 150, backgroundColor: '#e0e0e0' },
+  thumbnailList: { width: 56, height: 42, borderRadius: 5, marginRight: 10, backgroundColor: '#e0e0e0' },
+  thumbnailMagazine: { width: 160, height: 110, borderRadius: 8, marginRight: 12, backgroundColor: '#e0e0e0' },
+  
+  noThumbnailCard: { width: '100%', height: 60, justifyContent: 'center', alignItems: 'center' },
+  noThumbnailList: { width: 56, height: 42, borderRadius: 5, marginRight: 10, justifyContent: 'center', alignItems: 'center' },
+  noThumbnailMagazine: { width: 160, height: 110, borderRadius: 8, marginRight: 12, justifyContent: 'center', alignItems: 'center' },
+  noThumbnailText: { fontSize: 24, opacity: 0.5 },
+  
+  articleContent: { flex: 1, justifyContent: 'center' },
   articleMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   favicon: { width: 14, height: 14, borderRadius: 2, marginRight: 6 },
   feedTitleText: { fontSize: fontSize.small, fontWeight: '600' },
@@ -631,6 +686,7 @@ const styles = StyleSheet.create({
   time: { fontSize: fontSize.small },
   articleTitle: { fontSize: fontSize.normal, fontWeight: '600', marginBottom: 4, lineHeight: 20 },
   articleDescription: { fontSize: fontSize.small, lineHeight: 18 },
+  
   footer: { paddingVertical: 20, alignItems: 'center' },
   footerText: { fontSize: fontSize.small },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, paddingTop: 100 },

@@ -192,16 +192,18 @@ export default function ReadLater() {
           onPress={() => handleArticlePress(item)}
           activeOpacity={0.7}
         >
-          {item.image_url ? (
-            <Image 
-              source={{ uri: item.image_url }} 
-              style={isCardMode ? styles.thumbnailCard : isMagazineMode ? styles.thumbnailMagazine : styles.thumbnailList} 
-              resizeMode="cover" 
-            />
-          ) : (
-            <View style={[isCardMode ? styles.noThumbnailCard : isMagazineMode ? styles.noThumbnailMagazine : styles.noThumbnailList, { backgroundColor: theme.border }]}>
-              <Text style={[styles.noThumbnailText, { color: theme.textMuted }]}>📡</Text>
-            </View>
+          {!isListMode && (
+            item.image_url ? (
+              <Image 
+                source={{ uri: item.image_url }} 
+                style={isCardMode ? styles.thumbnailCard : isMagazineMode ? styles.thumbnailMagazine : styles.thumbnailList} 
+                resizeMode="cover" 
+              />
+            ) : (
+              <View style={[isCardMode ? styles.noThumbnailCard : isMagazineMode ? styles.noThumbnailMagazine : styles.noThumbnailList, { backgroundColor: theme.border }]}>
+                <Text style={[styles.noThumbnailText, { color: theme.textMuted }]}>📡</Text>
+              </View>
+            )
           )}
 
           <View style={[styles.articleContent, isCardMode && { padding: 12, marginLeft: 0 }]}>

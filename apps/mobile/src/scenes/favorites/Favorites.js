@@ -11,12 +11,11 @@ import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import { useAsyncStorageState } from '../../utils/useAsyncStorageState'
 
-const stripHtml = (html) => html?.replace(/<[^>]*>/g, '') || '';
-
 export default function Favorites() {
   const navigation = useNavigation()
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
+  // ★ feedsを追加取得
   const { favorites, fetchFavorites, toggleFavorite, isLoading, feeds } = useContext(FeedsContext)
 
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -99,13 +98,13 @@ export default function Favorites() {
     return new Date(dateString).toLocaleDateString()
   }
 
-  // カテゴリごとのグループ化ロジック (Home.jsに準拠)
+  // ★ カテゴリグループ化ロジック
   const groupedFavorites = useMemo(() => {
-    if (!favorites.length) return []
+    if (!favorites || !favorites.length) return []
     const catMap = {}
     const uncategorized = []
     favorites.forEach(favorite => {
-      const feed = feeds.find(f => f.title === favorite.feedTitle)
+      const feed = feeds?.find(f => f.title === favorite.feedTitle)
       const cat = feed?.category || null
       if (cat) {
         if (!catMap[cat]) catMap[cat] = []
@@ -121,21 +120,32 @@ export default function Favorites() {
 
   const checkColor = isDarkMode ? '#555' : '#888'
 
-  const renderFavorite = ({ item: favorite }) => {
+  const renderCheckbox = (articleId) => {
+    if (!selectionMode) return null
+    const isChecked = selectedIds.has(articleId)
+    return (
+      <View style={[styles.checkbox, { borderColor: checkColor }, isChecked && { backgroundColor: checkColor }]}>
+        {isChecked && <Text style={styles.checkmark}>✓</Text>}
+      </View>
+    )
+  }
+
+  // ★ Home/ReadLaterのUI構造に完全準拠した統合renderItem
+  const renderItem = ({ item: favorite }) => {
     const isRemoving = removingId === favorite.articleId
     const isChecked = selectedIds.has(favorite.articleId)
     const isListMode = viewMode === 'list'
     const isMagazineMode = viewMode === 'magazine'
     const isCardMode = viewMode === 'card'
-    const feed = feeds.find(f => f.title === favorite.feedTitle)
+    const feed = feeds?.find(f => f.title === favorite.feedTitle)
 
     return (
-      <View style={{ marginVertical: (isListMode || isMagazineMode) ? 2 : 6, marginHorizontal: (isListMode || isMagazineMode) ? 0 : 12 }}>
+      <View style={{ marginVertical: isListMode ? 0 : 6, marginHorizontal: isListMode ? 0 : 12 }}>
         <TouchableOpacity
           style={[
-            isListMode ? styles.articleListRow : isMagazineMode ? styles.articleMagazine : styles.articleCard,
-            { backgroundColor: isChecked ? (isDarkMode ? '#3a3a2a' : '#fff8f0') : theme.card },
-            isChecked && { borderColor: checkColor, borderWidth: 2 },
+            isCardMode ? styles.articleCard : isMagazineMode ? styles.articleMagazine : styles.articleListRow,
+            { backgroundColor: isListMode ? 'transparent' : (isChecked ? (isDarkMode ? '#3a3a2a' : '#fff8f0') : theme.card) },
+            isChecked && !isListMode && { borderColor: checkColor, borderWidth: 2 },
             isListMode && { borderBottomColor: theme.border, borderBottomWidth: 1 },
           ]}
           onPress={() => handleArticlePress(favorite)}
@@ -143,26 +153,28 @@ export default function Favorites() {
           activeOpacity={0.7} disabled={isRemoving}
         >
           {selectionMode && (
-            <TouchableOpacity onPress={() => handleToggleCheck(favorite.articleId)} style={[styles.checkboxContainer, isMagazineMode && { position: 'absolute', top: 12, left: 12, zIndex: 10 }]}>
-              <View style={[styles.checkbox, { borderColor: checkColor }, isChecked && { backgroundColor: checkColor }]}>
-                {isChecked && <Text style={styles.checkmark}>✓</Text>}
-              </View>
+            <TouchableOpacity onPress={() => handleToggleCheck(favorite.articleId)} style={[styles.checkboxContainer, (isMagazineMode || isCardMode) && { position: 'absolute', top: 12, left: 12, zIndex: 10 }]}>
+              {renderCheckbox(favorite.articleId)}
             </TouchableOpacity>
           )}
 
           {!isListMode && (
             favorite.imageUrl ? (
-              <Image source={{ uri: favorite.imageUrl }} style={isMagazineMode ? styles.thumbnailMagazine : styles.thumbnailCard} resizeMode="cover" />
+              <Image 
+                source={{ uri: favorite.imageUrl }} 
+                style={isCardMode ? styles.thumbnailCard : isMagazineMode ? styles.thumbnailMagazine : styles.thumbnailList} 
+                resizeMode="cover" 
+              />
             ) : (
-              <View style={[isMagazineMode ? styles.noThumbnailMagazine : styles.noThumbnailCard, { backgroundColor: theme.border }]}>
-                <Text style={[styles.noThumbnailText, { color: theme.textMuted }]}>No image</Text>
+              <View style={[isCardMode ? styles.noThumbnailCard : isMagazineMode ? styles.noThumbnailMagazine : styles.noThumbnailList, { backgroundColor: theme.border }]}>
+                <Text style={[styles.noThumbnailText, { color: theme.textMuted }]}>📡</Text>
               </View>
             )
           )}
 
-          <View style={[styles.articleContent, (isListMode || isMagazineMode) && { marginLeft: 0 }]}>
+          <View style={[styles.articleContent, isCardMode && { padding: 12, marginLeft: 0 }]}>
             <View style={styles.articleMeta}>
-              {!isListMode && feed?.faviconUrl && (
+              {feed?.faviconUrl && (
                 <Image source={{ uri: feed.faviconUrl }} style={styles.favicon} />
               )}
               <Text style={[styles.feedTitleText, { color: theme.textSecondary, flex: 1 }]} numberOfLines={1}>
@@ -172,14 +184,14 @@ export default function Favorites() {
               <Text style={[styles.time, { color: theme.textMuted }]}>{getRelativeTime(favorite.createdAt)}</Text>
             </View>
             <Text
-              style={[styles.articleTitle, { color: theme.text }, isListMode && { fontSize: fontSize.normal }, isMagazineMode && { fontSize: fontSize.large, marginBottom: 6 }]}
+              style={[styles.articleTitle, { color: theme.text }, isListMode && { fontSize: fontSize.normal }, (isMagazineMode || isCardMode) && { fontSize: fontSize.large, marginBottom: 4 }]}
               numberOfLines={isListMode ? 1 : 3}
             >
-              {stripHtml(favorite.title)}
+              {favorite.title}
             </Text>
             {!isListMode && (
               <Text style={[styles.articleDescription, { color: theme.textSecondary }]} numberOfLines={isMagazineMode ? 3 : 2}>
-                {stripHtml(favorite.description) || ''}
+                {favorite.description || ''}
               </Text>
             )}
           </View>
@@ -207,6 +219,7 @@ export default function Favorites() {
     <ScreenTemplate>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         {selectionMode ? (
+          // 選択モードバー
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TouchableOpacity onPress={() => {
               if (allSelected) setSelectedIds(new Set())
@@ -236,6 +249,7 @@ export default function Favorites() {
             </TouchableOpacity>
           </View>
         ) : (
+          // 通常ヘッダー
           <>
             <Text style={[styles.headerTitle, { color: theme.text }]}>Favorites</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -257,11 +271,13 @@ export default function Favorites() {
         key={viewMode}
         sections={groupedFavorites}
         extraData={{ viewMode, selectionMode, selectedIds: selectedIds.size }}
-        renderItem={renderFavorite}
-        keyExtractor={(item) => item.articleId}
-        renderSectionHeader={({ section: { title } }) => (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{title}</Text>
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id || item.articleId}
+        // ★ 他と一致するカテゴリヘッダー
+        renderSectionHeader={({ section: { title, data } }) => (
+          <View style={[styles.sectionHeader, { borderBottomColor: isDarkMode ? '#444' : '#e0e0e0' }]}>
+            <Text style={[styles.sectionHeaderText, { color: theme.textSecondary }]}>{title}</Text>
+            <Text style={{ fontSize: 12, color: theme.textSecondary }}>{data.length}件</Text>
           </View>
         )}
         contentContainerStyle={[
@@ -273,6 +289,7 @@ export default function Favorites() {
         }
         ListEmptyComponent={renderEmpty}
         showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
       />
 
       {isLoading && favorites.length === 0 && (
@@ -298,24 +315,30 @@ const styles = StyleSheet.create({
   deleteBtn: { backgroundColor: '#dc3545', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
   deleteBtnText: { color: 'white', fontSize: fontSize.small, fontWeight: '700' },
 
-  // Home.js 準拠のカテゴリ帯
-  sectionHeader: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: colors.primary },
-  sectionHeaderText: { fontSize: fontSize.small, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: 'white' },
+  // ★ カテゴリ見出しスタイル
+  sectionHeader: { 
+    flexDirection: 'row', alignItems: 'center', paddingBottom: 6, marginBottom: 12, marginTop: 20,
+    marginHorizontal: 12, borderBottomWidth: 2, borderLeftWidth: 4, borderLeftColor: '#FF6B35', paddingLeft: 8
+  },
+  sectionHeaderText: { fontSize: 16, fontWeight: '700', marginRight: 8 },
 
   listContent: { paddingHorizontal: 12, paddingVertical: 8, flexGrow: 1 },
 
-  // Home.js 準拠のビューレイアウト
-  articleCard: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'row', padding: 12 },
+  // ★ 統合ビューレイアウト
+  articleCard: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'column' },
   articleListRow: { flexDirection: 'row', padding: 12, paddingHorizontal: 16, alignItems: 'center' },
-  articleMagazine: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'column', padding: 12 },
+  articleMagazine: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, flexDirection: 'row', padding: 12, alignItems: 'flex-start' },
 
-  thumbnailCard: { width: 80, height: 80, backgroundColor: '#e0e0e0', borderRadius: 8 },
-  thumbnailMagazine: { width: '100%', height: 160, backgroundColor: '#e0e0e0', borderRadius: 8, marginBottom: 12 },
-  noThumbnailCard: { width: 80, height: 80, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  noThumbnailMagazine: { width: '100%', height: 160, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  noThumbnailText: { fontSize: fontSize.xSmall },
-
-  articleContent: { flex: 1, marginLeft: 10, justifyContent: 'center' },
+  thumbnailCard: { width: '100%', height: 150, backgroundColor: '#e0e0e0' },
+  thumbnailList: { width: 56, height: 42, borderRadius: 5, marginRight: 10, backgroundColor: '#e0e0e0' },
+  thumbnailMagazine: { width: 160, height: 110, borderRadius: 8, marginRight: 12, backgroundColor: '#e0e0e0' },
+  
+  noThumbnailCard: { width: '100%', height: 60, justifyContent: 'center', alignItems: 'center' },
+  noThumbnailList: { width: 56, height: 42, borderRadius: 5, marginRight: 10, justifyContent: 'center', alignItems: 'center' },
+  noThumbnailMagazine: { width: 160, height: 110, borderRadius: 8, marginRight: 12, justifyContent: 'center', alignItems: 'center' },
+  noThumbnailText: { fontSize: 24, opacity: 0.5 },
+  
+  articleContent: { flex: 1, justifyContent: 'center' },
   articleMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   favicon: { width: 14, height: 14, borderRadius: 2, marginRight: 6 },
   feedTitleText: { fontSize: fontSize.small, fontWeight: '600' },
@@ -323,7 +346,7 @@ const styles = StyleSheet.create({
   time: { fontSize: fontSize.small },
   articleTitle: { fontSize: fontSize.normal, fontWeight: '600', marginBottom: 4, lineHeight: 20 },
   articleDescription: { fontSize: fontSize.small, lineHeight: 18 },
-
+  
   removingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center', borderRadius: 12 },
 
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, paddingTop: 100 },
