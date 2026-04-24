@@ -356,7 +356,8 @@ const DashboardPage = () => {
   const someChecked = checkedArticles.size > 0 && checkedArticles.size < filteredArticles.length;
 
   const handleArticleClick = (article) => {
-    setSelectedArticle(article);
+    const resolved = { ...article, url: resolveGoogleUrl(article.url) };
+    setSelectedArticle(resolved);
     if (!readArticles.has(article.id)) markAsRead(article.id);
   };
 
@@ -387,6 +388,16 @@ const DashboardPage = () => {
   };
 
   const stripHtml = (html) => html?.replace(/<[^>]*>/g, '') || '';
+  const resolveGoogleUrl = (url) => {
+    if (!url) return url;
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname === 'www.google.com' && parsed.pathname === '/url') {
+        return parsed.searchParams.get('url') || url;
+      }
+    } catch (e) {}
+    return url;
+  };
   const getFeedFavicon = (feedId) => feeds.find(f => f.id === feedId)?.faviconUrl || null;
   const getFeedCategory = useCallback((feedId) => feeds.find(f => f.id === feedId)?.category || null, [feeds]);
 
