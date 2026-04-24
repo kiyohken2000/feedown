@@ -37,7 +37,6 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     const supabase = createSupabaseClient(env, accessToken);
 
-    // Support batched refresh to stay within Cloudflare's 50 subrequest limit.
     const BATCH_SIZE = 5;
     const url = new URL(request.url);
     const batchOffset = parseInt(url.searchParams.get('offset') || '0', 10);
@@ -196,8 +195,8 @@ async function parseRssXml(xmlText: string): Promise<any> {
 
     while ((entryMatch = entryRegex.exec(xmlText)) !== null) {
       const entryXml = entryMatch[1];
-      // URL取得時にstripHtmlを通してデコード
-      const entryLink = stripHtml(entryXml.match(/<link[^>]*href="([^"]+)"/)?.[1] || '');
+      // Googleリダイレクトを剥ぎ取って取得
+      const entryLink = cleanUrl(entryXml.match(/<link[^>]*href="([^"]+)"/)?.[1] || '');
       const entryTitle = entryXml.match(/<title[^>]*>(.*?)<\/title>/)?.[1] || 'Untitled';
       const entryContent = entryXml.match(/<content[^>]*>(.*?)<\/content>/s)?.[1] || 
                            entryXml.match(/<summary[^>]*>(.*?)<\/summary>/s)?.[1] || '';
@@ -216,7 +215,7 @@ async function parseRssXml(xmlText: string): Promise<any> {
     let itemMatch;
     while ((itemMatch = itemRegex.exec(xmlText)) !== null) {
       const itemXml = itemMatch[1];
-      const itemLink = stripHtml(itemXml.match(/<link[^>]*>(.*?)<\/link>/)?.[1] || '');
+      const itemLink = cleanUrl(itemXml.match(/<link[^>]*>(.*?)<\/link>/)?.[1] || '');
       result.items.push({
         title: stripHtml(itemXml.match(/<title[^>]*>(.*?)<\/title>/)?.[1] || 'Untitled'),
         link: itemLink,
@@ -231,7 +230,7 @@ async function parseRssXml(xmlText: string): Promise<any> {
     let itemMatch;
     while ((itemMatch = itemRegex.exec(xmlText)) !== null) {
       const itemXml = itemMatch[1];
-      const itemLink = stripHtml(itemXml.match(/<link[^>]*>(.*?)<\/link>/)?.[1] || '');
+      const itemLink = cleanUrl(itemXml.match(/<link[^>]*>(.*?)<\/link>/)?.[1] || '');
       result.items.push({
         title: stripHtml(itemXml.match(/<title[^>]*>(.*?)<\/title>/)?.[1] || 'Untitled'),
         link: itemLink,
@@ -243,6 +242,29 @@ async function parseRssXml(xmlText: string): Promise<any> {
     }
   }
   return result;
+}
+
+/**
+ * GoogleのリダイレクトURLから本来のURLを抽出する
+ */
+function cleanUrl(url: string): string {
+  if (!url) return '';
+  
+  // まずはHTMLエンティティをデコード
+  let cleaned = stripHtml(url);
+
+  try {
+    const parsedUrl = new URL(cleaned);
+    // GoogleのリダイレクトURL (google.com/url?url=...) かチェック
+    if (parsedUrl.hostname.includes('google') && parsedUrl.pathname === '/url') {
+      const actualUrl = parsedUrl.searchParams.get('url') || parsedUrl.searchParams.get('q');
+      if (actualUrl) return actualUrl;
+    }
+  } catch (e) {
+    // パースできない場合は掃除済みの文字列をそのまま返す
+  }
+  
+  return cleaned;
 }
 
 function extractImageUrl(entryXml: string, content: string): string | null {
@@ -259,7 +281,6 @@ function stripHtml(html: string): string {
   return html
     .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
     .replace(/<[^>]+>/g, '')
-    // 文字参照をデコード（GIGAZINEの &/#45; 等にも対応）
     .replace(/(?:&|&amp;)?\/?#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)))
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -285,7 +306,8 @@ async function storeArticles(supabase: any, uid: string, feedId: string, article
     if (existingArticleIds.has(articleHash)) continue;
     newArticles.push({
       id: articleHash, user_id: uid, feed_id: feedId, feed_title: feedTitle,
-      title: article.title, url: article.link, description: article.content?.substring(0, 10000),
+      title: article.title, url: article.url, // parsedFeedで抽出した綺麗なURL
+      description: article.content?.substring(0, 10000),
       published_at: article.publishedAt?.toISOString(), fetched_at: now.toISOString(),
       expires_at: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       image_url: article.imageUrl,
