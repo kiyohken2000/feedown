@@ -27,6 +27,17 @@ import { useAsyncStorageState } from '../../utils/useAsyncStorageState'
 
 const stripHtml = (html) => html?.replace(/<[^>]*>/g, '') || '';
 
+const resolveGoogleUrl = (url) => {
+  if (!url) return url;
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname === 'www.google.com' && urlObj.pathname === '/url') {
+      return urlObj.searchParams.get('url') || url;
+    }
+  } catch (e) {}
+  return url;
+};
+
 const SwipeableArticleItem = ({ article, isRead, feed, onPress, onLongPress, isSelectionMode, isChecked, onToggleCheck, onMarkRead, onReadLater, isReadLater, theme, isDarkMode, viewMode }) => {
   const translateX = useRef(new Animated.Value(0)).current
 
@@ -415,7 +426,7 @@ export default function Home() {
     return (
       <SwipeableArticleItem
         article={article} isRead={isRead} feed={feed}
-        onPress={art => navigation.navigate('ArticleDetail', { article: art })}
+        onPress={art => navigation.navigate('ArticleDetail', { article: { ...art, url: resolveGoogleUrl(art.url) } })}
         onLongPress={handleLongPress}
         isSelectionMode={selectionMode} isChecked={isChecked}
         onToggleCheck={handleToggleCheck}
