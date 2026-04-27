@@ -257,7 +257,7 @@ function extractImageUrl(entryXml: string, content: string): string | null {
 function stripHtml(html: string): string {
   if (!html) return '';
   return html
-    .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
+    .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1')
     .replace(/<[^>]+>/g, '')
     // 文字参照をデコード（GIGAZINEの &/#45; 等にも対応）
     .replace(/(?:&|&amp;)?\/?#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)))
@@ -267,6 +267,8 @@ function stripHtml(html: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
+    // エンティティデコード後に出現するタグ（例: &lt;b&gt; → <b>）も除去
+    .replace(/<[^>]+>/g, '')
     .trim();
 }
 
