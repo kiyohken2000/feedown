@@ -1,0 +1,9 @@
+# Exclude monorepo workspaces unrelated to the mobile build.
+# Combined with scripts/eas-build-pre-install.js (which trims root
+# package.json `workspaces` to ["apps/mobile"]), this prevents yarn from
+# resolving deps like sharp (pulled in via workers -> miniflare).
+/apps/web
+/workers
+/functions
+/packages
+/docs
