@@ -8966,6 +8966,11 @@ react-native-element-dropdown@^2.12.4:
   dependencies:
     lodash "^4.17.21"
 
+react-native-enriched-markdown@^0.5.0:
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/react-native-enriched-markdown/-/react-native-enriched-markdown-0.5.0.tgz#0d2e9a965963ca253c592136741d8329734d434f"
+  integrity sha512-CYihNlcg8IjsrVbmypDjFHsDF6Z6vYO0yraw6CkR30SDsg99J6fcBrOkyWOItO8PIDD21jw8yD1eYP/0LBOCdA==
+
 react-native-executorch-expo-resource-fetcher@^0.8.0:
   version "0.8.0"
   resolved "https://registry.yarnpkg.com/react-native-executorch-expo-resource-fetcher/-/react-native-executorch-expo-resource-fetcher-0.8.0.tgz#583c66e26c9729b36001658e5c701b44d20e2476"
@@ -10630,15 +10635,10 @@ url-parse@^1.5.3:
     querystringify "^2.1.1"
     requires-port "^1.0.0"
 
-use-latest-callback@^0.1.5:
+use-latest-callback@0.1.9, use-latest-callback@^0.1.5, use-latest-callback@^0.2.4:
   version "0.1.9"
   resolved "https://registry.yarnpkg.com/use-latest-callback/-/use-latest-callback-0.1.9.tgz#10191dc54257e65a8e52322127643a8940271e2a"
   integrity sha512-CL/29uS74AwreI/f2oz2hLTW7ZqVeV5+gxFeGudzQrgkCytrHw33G4KbnQOrRlAEzzAFXi7dDLMC9zhWcVpzmw==
-
-use-latest-callback@^0.2.4:
-  version "0.2.6"
-  resolved "https://registry.yarnpkg.com/use-latest-callback/-/use-latest-callback-0.2.6.tgz#e5ea752808c86219acc179ace0ae3c1203255e77"
-  integrity sha512-FvRG9i1HSo0wagmX63Vrm8SnlUU3LMM3WyZkQ76RnslpBrX694AdG4A0zQBx2B3ZifFA0yv/BaEHGBnEax5rZg==
 
 use-sync-external-store@^1.5.0:
   version "1.6.0"

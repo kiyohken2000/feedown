@@ -48,6 +48,7 @@
     "react-dom": "19.2.0",
     "react-native": "0.83.6",
     "react-native-element-dropdown": "^2.12.4",
+    "react-native-enriched-markdown": "^0.5.0",
     "react-native-executorch": "^0.8.4",
     "react-native-executorch-expo-resource-fetcher": "^0.8.0",
     "react-native-gesture-handler": "~2.30.0",

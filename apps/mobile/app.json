@@ -70,7 +70,8 @@
       ],
       "expo-sqlite",
       "expo-audio",
-      "expo-video"
+      "expo-video",
+      "react-native-enriched-markdown"
     ],
     "extra": {
       "eas": {

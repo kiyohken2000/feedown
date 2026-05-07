@@ -13,6 +13,39 @@
 
 FeedOwn を汎用チャットAIアプリにすることが目的ではない。目的は、記事本文・読書履歴・関心情報を端末外に送らずに、読む負担を減らすこと。
 
+## 現在の進捗
+
+2026-05-07 時点で、ネイティブ依存と dev client ビルドの準備は完了している。
+ここから先は、主に `apps/mobile/src` 配下の JavaScript 実装を進める段階。
+
+完了済み:
+
+- `apps/mobile/package.json` に `react-native-executorch` と `react-native-executorch-expo-resource-fetcher` が追加済み。
+- `react-native-gifted-chat` が追加済み。
+- `react-native-enriched-markdown` が追加済み。
+- `expo-dev-client` が追加済み。
+- `expo-audio` と `expo-video` が追加済み。`expo-av` は使わない。
+- `expo-clipboard`、`expo-haptics`、`expo-linking`、`expo-notifications`、`expo-sqlite` など、AI機能周辺で使う候補依存が追加済み。
+- `apps/mobile/app.json` で `newArchEnabled: true` が設定済み。
+- `apps/mobile/app.json` の plugin に `expo-asset`、`expo-camera`、`expo-sqlite`、`expo-audio`、`expo-video` が入っている。
+- dev client のビルドは完了済み。
+
+未実装:
+
+- `apps/mobile/src/ai/` はまだ存在しない。
+- AIモデル管理、モデル選択、ダウンロード状態管理は未実装。
+- `ArticleDetail.js` へのAIパネル接続は未実装。
+- `Profile.js` へのオンデバイスAI設定UIは未実装。
+- 要約、信号分離、記事チャット、読み上げのJSサービス層は未実装。
+
+次の実装開始点:
+
+1. `apps/mobile/src/ai/models.js` で LLM 候補一覧と既定モデルを定義する。
+2. `apps/mobile/src/ai/aiStorage.js` と `modelState.js` で設定・モデル状態を保存する。
+3. `Profile.js` にオンデバイスAI設定セクションを追加し、選択中LLMモデルとダウンロード状態を表示する。
+4. `articleContext.js`、`prompts.js`、`summaryService.js` を作り、まず1記事の要約生成だけを通す。
+5. `ArticleDetail.js` に `ArticleAiPanel` を追加する。
+
 ## 背景
 
 `react-native-executorch` は、Meta の ExecuTorch を使って React Native アプリ内でAIモデルをローカル実行するためのライブラリ。FeedOwn の "Own your feeds, own your data" という方向性と相性が良い。
@@ -1252,7 +1285,7 @@ type ArticleChatThread = {
 - 記事にないことは推測として分ける。
 - 不明な場合は不明と答える。
 - JSONだけを返す。
-- Markdown装飾を返さない。
+- JSON全体をMarkdown文書として返さない。本文フィールド内では、箇条書き、太字、リンク程度の限定Markdownだけを許可する。
 - 長い引用を避ける。
 - 日本語記事には日本語で返す。
 - 英語記事には原則としてユーザーのUI言語に合わせる。初期版では日本語UIなら日本語で返す。
@@ -1725,7 +1758,7 @@ npx expo install <package>
 | --- | --- | --- |
 | embedding検索 | 未定 | 意味検索フェーズでモデルと保存方式を決める |
 | バックグラウンド音声 | `expo-audio` 周辺 | 本文読み上げや音声ダイジェストまで後回し |
-| markdown表示 | 未定 | AI出力は構造化JSONとして描画し、Markdown依存を避ける |
+| Markdown表示 | `react-native-enriched-markdown` | `yarn workspace mobile add react-native-enriched-markdown` | AIの説明文、要約、チャット回答のMarkdown描画に使う |
 
 ### 追加コマンド案
 
@@ -1734,6 +1767,7 @@ npx expo install <package>
 ```bash
 yarn workspace mobile add react-native-executorch react-native-executorch-expo-resource-fetcher
 yarn workspace mobile add react-native-gifted-chat
+yarn workspace mobile add react-native-enriched-markdown
 yarn workspace mobile expo install expo-file-system expo-asset expo-network expo-device
 yarn workspace mobile expo install expo-clipboard expo-dev-client expo-haptics expo-linking
 yarn workspace mobile expo install expo-media-library expo-notifications expo-sqlite
@@ -1791,6 +1825,38 @@ type GiftedChatMessage = {
 - 長い回答で記事本文全体を押し出しすぎないよう、AIパネルの高さ制限を検討する。
 - `react-native-gifted-chat` の依存が現在の React Native / Expo SDK と衝突しないか、導入時に確認する。
 
+### react-native-enriched-markdown の利用方針
+
+AI出力のMarkdown描画には `react-native-enriched-markdown` を採用する。
+
+利用箇所:
+
+- `PerspectiveSummaryView`: 要約本文、注意点、補足の表示。
+- `ArticleSignalsView`: 信号分離結果の説明文や根拠の表示。
+- `ArticleChatView`: assistant の回答本文。
+- `ArticleAiPanel`: モデル未準備、エラー詳細、診断補足など、短い説明文の表示。
+
+基本方針:
+
+- LLMの一次出力は引き続き構造化JSONを要求する。
+- JSONの各フィールドに入った説明文だけをMarkdownとして描画する。
+- LLMに自由なMarkdown文書全体を返させる設計にはしない。
+- 見出し、箇条書き、太字、リンク程度に用途を絞る。
+- 画像、HTML、任意埋め込み、危険なリンクスキームは表示しない。
+- 長い引用や記事本文の大量再掲はプロンプト側で禁止する。
+
+チャットでの扱い:
+
+- `react-native-gifted-chat` の bubble 内で assistant メッセージだけ `react-native-enriched-markdown` を使って描画する。
+- user メッセージは通常のテキスト表示でよい。
+- Markdown描画が重い場合は、チャット回答だけ通常テキストにフォールバックできるようにする。
+
+実装メモ:
+
+- ダークモード用の本文色、リンク色、コード背景色を既存の `ThemeContext` に合わせる。
+- Reader Mode のフォントサイズ設定をAI出力にも反映する。
+- Markdown描画コンポーネントは `AiMarkdownText.js` のように小さく包み、各画面で直接ライブラリAPIに依存しない。
+
 ## 実装引き継ぎチェックリスト
 
 この章は、別セッションや別担当者がこのドキュメントだけを見て実装に入るための作業手順である。最初の実装では、すべてを一度に完成させない。まずは「モデル管理 + 単一記事の要約生成」までを通す。
@@ -1811,6 +1877,30 @@ type GiftedChatMessage = {
 
 ### Step 1: 依存追加
 
+状態: 完了。
+
+現在の `apps/mobile/package.json` では、以下が追加済み。
+
+- `react-native-executorch`
+- `react-native-executorch-expo-resource-fetcher`
+- `react-native-gifted-chat`
+- `react-native-enriched-markdown`
+- `expo-dev-client`
+- `expo-audio`
+- `expo-video`
+- `expo-clipboard`
+- `expo-haptics`
+- `expo-linking`
+- `expo-notifications`
+- `expo-sqlite`
+- `expo-file-system`
+- `expo-asset`
+- `expo-network`
+- `expo-device`
+
+このステップは再実行しない。
+今後依存を追加する場合は、必ず root から `yarn workspace mobile ...` または `yarn workspace mobile expo install ...` を使う。
+
 作業ディレクトリ:
 
 ```bash
@@ -1822,6 +1912,7 @@ C:\Users\all\develop\expo\feedown
 ```bash
 yarn workspace mobile add react-native-executorch react-native-executorch-expo-resource-fetcher
 yarn workspace mobile add react-native-gifted-chat
+yarn workspace mobile add react-native-enriched-markdown
 yarn workspace mobile expo install expo-file-system expo-asset expo-network expo-device
 yarn workspace mobile expo install expo-clipboard expo-dev-client expo-haptics expo-linking
 yarn workspace mobile expo install expo-media-library expo-notifications expo-sqlite
@@ -1848,6 +1939,12 @@ yarn workspace mobile add react-native-audio-api
 
 ### Step 2: Expo / New Architecture / dev client 確認
 
+状態: 完了。
+
+現在の `apps/mobile/app.json` では `newArchEnabled: true` が設定済み。
+`expo-dev-client` も導入済みで、dev client ビルドは完了済み。
+以降は Expo Go ではなく dev client / EAS build 前提でJS実装を進める。
+
 確認対象:
 
 - `apps/mobile/app.json` または `app.config.*`
@@ -1869,6 +1966,12 @@ yarn workspace mobile add react-native-audio-api
 - New Architecture が無効なら、実装前に有効化方針を決める。
 
 ### Step 3: AI基盤ディレクトリを追加
+
+状態: 次に着手する。
+
+`apps/mobile/src/ai/` はまだ存在しないため、このステップからJS実装を開始する。
+既存コードでは、記事詳細は `apps/mobile/src/scenes/article/ArticleDetail.js`、設定画面は `apps/mobile/src/scenes/profile/Profile.js`、Reader Mode本文表示は `apps/mobile/src/components/ArticleReader.js` にある。
+AI基盤はこれらへ直接大きく書かず、`src/ai` と小さなUIコンポーネントに分ける。
 
 追加するディレクトリ:
 
@@ -1926,8 +2029,8 @@ apps/mobile/src/components/ScreenTemplate.js
 
 実装方針:
 
-- 既存アプリでは設定系UIが `Profile.js` にある可能性が高い。
-- まず `Profile.js` に「オンデバイスAI」セクションを追加する。
+- 既存アプリでは設定系UIが `Profile.js` にまとまっている。
+- まず `Profile.js` の `Reader` セクションと `Statistics` セクションの間に「オンデバイスAI」セクションを追加する。
 - 大きくなりすぎる場合は `apps/mobile/src/scenes/profile/OnDeviceAiSettings.js` を新規作成する。
 - ダークモードとフォントサイズ設定は既存の `ThemeContext` に合わせる。
 
@@ -1972,6 +2075,7 @@ apps/mobile/src/components/ArticleReader.js
 
 ```txt
 apps/mobile/src/components/ArticleAiPanel.js
+apps/mobile/src/components/AiMarkdownText.js
 apps/mobile/src/components/PerspectiveSummaryView.js
 ```
 
@@ -1980,7 +2084,11 @@ apps/mobile/src/components/PerspectiveSummaryView.js
 - `ArticleDetail.js` に直接大きなAIロジックを書かない。
 - `ArticleDetail.js` は記事データを `ArticleAiPanel` に渡すだけにする。
 - `ArticleAiPanel` 内で `useArticleAi(article)` を使う。
+- AI出力の本文描画は `AiMarkdownText` に寄せる。
 - Reader Mode本文が取得できる場合は `articleContext.js` に渡す。
+- 既存の `ArticleDetail.js` は通常記事表示と Reader Mode 表示を条件分岐している。初期実装では通常記事表示の `ScrollView` 内、記事本文/URL情報の下に `ArticleAiPanel` を置く。
+- Reader Mode 表示中にも使う場合は、`ArticleReader` に直接AIロジックを入れず、`ArticleDetail.js` 側で `readerContent` を `ArticleAiPanel` に渡す構成にする。
+- 既存の固定下部アクションバーと重ならないよう、通常記事表示では `contentContainer.paddingBottom` を維持し、AIパネルが下部バーに隠れないか実機で確認する。
 
 最小UI:
 
@@ -2067,6 +2175,8 @@ apps/mobile/src/components/ArticleChatView.js
 実装方針:
 
 - `react-native-gifted-chat` を使う。
+- assistant メッセージの本文は `AiMarkdownText` 経由で `react-native-enriched-markdown` 表示にする。
+- user メッセージは通常テキスト表示でよい。
 - 対象は現在の記事1件だけ。
 - よく使う質問チップを入力欄の上に置く。
 - チャット履歴は端末内のみ。
