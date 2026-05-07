@@ -1927,7 +1927,7 @@ apps/mobile/src/components/ArticleReadAloudControls.js
 
 完了条件:
 
-- 初期PRではSQLiteのスキーマ設計に踏み込まない。
+- 初期実装ではSQLiteのスキーマ設計に踏み込まない。
 - SQLiteは後続フェーズ用の依存として扱う。
 
 ### Step 11: 実機検証
@@ -1967,9 +1967,9 @@ apps/mobile/src/components/ArticleReadAloudControls.js
 - モデルがない状態でもアプリが自然に使える。
 - 要約生成が実機で1回以上成功している。
 
-### Step 12: 初回PRの推奨スコープ
+### Step 12: mainでの初回実装スコープ
 
-初回PRに含める:
+mainで最初に実装する:
 
 - 依存追加
 - AIモデル管理の最小UI
@@ -1979,7 +1979,7 @@ apps/mobile/src/components/ArticleReadAloudControls.js
 - 要約キャッシュ
 - 実機検証メモ
 
-初回PRに含めない:
+最初の実装では後回しにする:
 
 - 信号分離
 - 記事チャット
@@ -1989,40 +1989,47 @@ apps/mobile/src/components/ArticleReadAloudControls.js
 - SQLiteスキーマ
 - バックグラウンド再生
 
-初回PRの完了条件:
+初回実装の完了条件:
 
 - モデル未ダウンロード時のUIがある。
 - モデル準備済みなら1記事の要約が生成できる。
 - 失敗時に通常の記事閲覧が壊れない。
 - ドキュメントに実測値を追記している。
 
-### Step 13: 後続PRの分割案
+### Step 13: mainでの後続実装順
 
-PR 2:
+作業2:
 
 - `technical` / `critical` 要約
 - 要約UIの改善
 - コピー、haptics、エラー表示改善
 
-PR 3:
+作業3:
 
 - 信号分離
 - `ArticleSignalsView`
 - 低信頼度/本文不足UI
 
-PR 4:
+作業4:
 
 - `react-native-gifted-chat` による単一記事チャット
 - 質問チップ
 - チャット履歴
 
-PR 5:
+作業5:
 
 - TTSモデル管理
 - 要約読み上げ
 - チャット回答読み上げ
 
-PR 6:
+作業6:
 
 - SQLiteを使った意味検索の検証
 - 関連記事チャットの技術検証
+
+mainで直接作業するため、各作業の区切りでは最低限以下を確認する。
+
+- 既存の記事閲覧が壊れていない。
+- モデル未準備状態でクラッシュしない。
+- 追加した設定項目が保存/復元できる。
+- 実機検証で見つかった制約をこの計画書に追記している。
