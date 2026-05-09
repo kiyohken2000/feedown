@@ -116,8 +116,6 @@ export const FeedsContextProvider = ({ children }) => {
       let totalNewArticles = 0
       let totalSuccessful = 0
       let totalFeeds = 0
-      let latestFeeds = null
-
       while (true) {
         const refreshResponse = await api.refresh.refreshAll(offset || undefined)
         if (!refreshResponse.success) {
@@ -130,10 +128,6 @@ export const FeedsContextProvider = ({ children }) => {
         totalSuccessful += stats?.successfulFeeds || 0
         totalNewArticles += stats?.newArticles || 0
 
-        if (refreshResponse.data.feeds) {
-          latestFeeds = refreshResponse.data.feeds
-        }
-
         console.log(`Batch at offset ${offset}: ${stats?.successfulFeeds} ok, ${stats?.newArticles} new, ${remaining ?? 0} remaining`)
 
         if (!remaining || remaining <= 0 || !nextOffset) break
@@ -142,12 +136,8 @@ export const FeedsContextProvider = ({ children }) => {
 
       console.log(`Refresh complete: ${totalSuccessful}/${totalFeeds} feeds, ${totalNewArticles} new articles`)
 
-      // Update feeds if returned
-      if (latestFeeds) {
-        setFeeds(latestFeeds)
-      } else {
-        await fetchFeeds()
-      }
+      // Always fetch the full feed list after refresh to avoid partial batch issues
+      await fetchFeeds()
 
       // Fetch articles after refresh
       await fetchArticles(true)

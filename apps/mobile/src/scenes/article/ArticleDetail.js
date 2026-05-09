@@ -17,6 +17,8 @@ import { UserContext } from '../../contexts/UserContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import ArticleReader from '../../components/ArticleReader'
+import ArticleAiPanel from '../../components/article/ArticleAiPanel'
+import { useArticleTranslation } from '../../ai/useArticleTranslation'
 import { createApiClient } from '../../utils/api'
 import { showToast, showErrorToast } from '../../utils/showToast'
 
@@ -40,6 +42,8 @@ export default function ArticleDetail() {
   const [readerContent, setReaderContent] = useState(null)
   const [isLoadingReader, setIsLoadingReader] = useState(false)
   const [readerError, setReaderError] = useState(null)
+
+  const translation = useArticleTranslation(article, readerContent)
 
   const isFavorited = favoritedArticles.has(article.id)
 
@@ -187,11 +191,15 @@ export default function ArticleDetail() {
         <ArticleReader
           article={readerContent}
           onLinkPress={handleLinkPress}
+          translation={translation}
         />
       ) : (
         /* Default Article View */
         <>
           <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={styles.contentContainer}>
+            {/* AI Panel — scrolls with article content */}
+            <ArticleAiPanel article={article} readerContent={readerContent} />
+
             {/* Article Image */}
             {article.imageUrl && (
               <Image
@@ -253,24 +261,26 @@ export default function ArticleDetail() {
               </TouchableOpacity>
             </View>
 
-            {/* Row 2: Reader Mode button */}
-            <TouchableOpacity
-              style={[styles.readerBottomButton, { backgroundColor: isDarkMode ? theme.card : colors.white }]}
-              onPress={handleReaderMode}
-              disabled={isLoadingReader}
-            >
-              {isLoadingReader ? (
-                <View style={styles.readerButtonContent}>
-                  <ActivityIndicator size="small" color={colors.bluePrimary || '#007AFF'} />
-                  <Text style={[styles.readerBottomButtonText, { marginLeft: 8 }]}>Loading...</Text>
-                </View>
-              ) : (
-                <View style={styles.readerButtonContent}>
-                  <Text style={styles.readerIcon}>📖</Text>
-                  <Text style={styles.readerBottomButtonText}>Reader Mode</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            {/* Row 2: Reader Mode */}
+            <View style={styles.bottomButtonRow}>
+              <TouchableOpacity
+                style={[styles.readerBottomButton, { flex: 1, backgroundColor: isDarkMode ? theme.card : colors.white }]}
+                onPress={handleReaderMode}
+                disabled={isLoadingReader}
+              >
+                {isLoadingReader ? (
+                  <View style={styles.readerButtonContent}>
+                    <ActivityIndicator size="small" color={colors.bluePrimary || '#007AFF'} />
+                    <Text style={[styles.readerBottomButtonText, { marginLeft: 8 }]}>Loading...</Text>
+                  </View>
+                ) : (
+                  <View style={styles.readerButtonContent}>
+                    <Text style={styles.readerIcon}>📖</Text>
+                    <Text style={styles.readerBottomButtonText}>Reader Mode</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </>
       )}

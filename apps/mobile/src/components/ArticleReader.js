@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react'
 import {
+  ActivityIndicator,
   StyleSheet,
+  TouchableOpacity,
   View,
   Text,
   ScrollView,
@@ -10,8 +12,9 @@ import {
 import RenderHtml from 'react-native-render-html'
 import { colors, fontSize, getThemeColors } from '../theme'
 import { useTheme } from '../contexts/ThemeContext'
+import ArticleTranslatedView from './article/ArticleTranslatedView'
 
-export default function ArticleReader({ article, onLinkPress }) {
+export default function ArticleReader({ article, onLinkPress, translation }) {
   const { width } = useWindowDimensions()
   const { isDarkMode, getFontSizeConfig } = useTheme()
   const theme = getThemeColors(isDarkMode)
@@ -200,21 +203,81 @@ export default function ArticleReader({ article, onLinkPress }) {
             {article.siteName && article.siteName}
           </Text>
         )}
+
+        {/* Translation controls */}
+        {translation?.needsTranslation && (
+          <View style={styles.translateRow}>
+            {translation.translatedParagraphs ? (
+              <View style={styles.toggleRow}>
+                <TouchableOpacity
+                  onPress={() => translation.setShowTranslated(false)}
+                  style={[styles.toggleTab, !translation.showTranslated && { borderBottomColor: colors.primary }]}
+                >
+                  <Text style={[styles.toggleTabText, { color: !translation.showTranslated ? colors.primary : theme.textMuted }]}>
+                    Original
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => translation.setShowTranslated(true)}
+                  style={[styles.toggleTab, translation.showTranslated && { borderBottomColor: colors.primary }]}
+                >
+                  <Text style={[styles.toggleTabText, { color: translation.showTranslated ? colors.primary : theme.textMuted }]}>
+                    Translated
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => translation.translate({ force: true })}
+                  style={styles.regenButton}
+                  disabled={translation.isTranslating}
+                >
+                  <Text style={[styles.regenText, { color: theme.textMuted }]}>↺</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={translation.translate}
+                disabled={translation.isTranslating || !translation.isModelReady}
+                style={[styles.translateButton, { borderColor: colors.primary, opacity: translation.isModelReady ? 1 : 0.4 }]}
+              >
+                {translation.isTranslating ? (
+                  <View style={styles.translateButtonInner}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={[styles.translateButtonText, { color: colors.primary, marginLeft: 6 }]}>Translating…</Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.translateButtonText, { color: colors.primary }]}>Translate</Text>
+                )}
+              </TouchableOpacity>
+            )}
+            {translation.error && (
+              <Text style={[styles.translateError, { color: theme.textMuted }]}>{translation.error}</Text>
+            )}
+          </View>
+        )}
       </View>
 
       {/* Article Content */}
       <View style={styles.content}>
-        <RenderHtml
-          contentWidth={contentWidth}
-          source={{ html: article.content }}
-          tagsStyles={tagsStyles}
-          renderers={renderers}
-          renderersProps={renderersProps}
-          enableExperimentalMarginCollapsing={true}
-          defaultTextProps={{
-            selectable: true,
-          }}
-        />
+        {translation?.showTranslated && translation.translatedParagraphs ? (
+          <ArticleTranslatedView
+            paragraphs={translation.translatedParagraphs}
+            theme={theme}
+            fontConfig={fontConfig}
+          />
+        ) : (
+          <RenderHtml
+            contentWidth={contentWidth}
+            source={{ html: article.content }}
+            tagsStyles={tagsStyles}
+            renderers={renderers}
+            renderersProps={renderersProps}
+            enableExperimentalMarginCollapsing={true}
+            ignoredDomTags={['source', 'track', 'video', 'audio', 'iframe', 'script', 'style']}
+            defaultTextProps={{
+              selectable: true,
+            }}
+          />
+        )}
       </View>
     </ScrollView>
   )
@@ -243,6 +306,52 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: fontSize.normal,
     lineHeight: 22,
+  },
+  translateRow: {
+    marginTop: 12,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 0,
+  },
+  toggleTab: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginRight: 4,
+  },
+  toggleTabText: {
+    fontSize: fontSize.small,
+    fontWeight: '600',
+  },
+  regenButton: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  regenText: {
+    fontSize: 16,
+  },
+  translateButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1.5,
+  },
+  translateButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  translateButtonText: {
+    fontSize: fontSize.small,
+    fontWeight: '600',
+  },
+  translateError: {
+    fontSize: fontSize.small,
+    marginTop: 6,
   },
   content: {
     flex: 1,

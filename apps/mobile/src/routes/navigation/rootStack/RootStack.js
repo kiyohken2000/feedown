@@ -5,6 +5,7 @@ import Post from "../../../scenes/post/Post";
 import { HomeTitleContext } from "../../../contexts/HomeTitleContext";
 import { ModalStacks } from "../stacks/ModalStacks";
 import { TransitionPresets } from "@react-navigation/stack";
+import ArticleChatScreen from "../../../scenes/article/ArticleChatScreen";
 
 const Stack = createStackNavigator()
 
@@ -28,6 +29,11 @@ export default function RootStack() {
             <Stack.Screen
               name='HomeRoot'
               component={TabNavigator}
+            />
+            <Stack.Screen
+              name='ArticleChat'
+              component={ArticleChatScreen}
+              options={{ headerShown: false }}
             />
             <Stack.Group
               screenOptions={{

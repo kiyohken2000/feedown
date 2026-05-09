@@ -43,6 +43,7 @@
       "package": "net.votepurchase.feedown",
       "versionCode": 8,
       "userInterfaceStyle": "automatic",
+      "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "VIBRATE",
         "CAMERA",
@@ -70,8 +71,7 @@
       ],
       "expo-sqlite",
       "expo-audio",
-      "expo-video",
-      "react-native-enriched-markdown"
+      "expo-video"
     ],
     "extra": {
       "eas": {
