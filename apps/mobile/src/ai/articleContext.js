@@ -1,6 +1,6 @@
-const MAX_TEXT_LENGTH = 4000
+const DEFAULT_MAX_TEXT_LENGTH = 4000
 
-export function buildArticleContext(article, readerContent = null) {
+export function buildArticleContext(article, readerContent = null, maxTextLength = DEFAULT_MAX_TEXT_LENGTH) {
   let text = ''
   let contentSource = 'metadata'
 
@@ -17,9 +17,10 @@ export function buildArticleContext(article, readerContent = null) {
 
   text = normalizeWhitespace(text)
 
-  const truncated = text.length > MAX_TEXT_LENGTH
+  const limit = typeof maxTextLength === 'number' && maxTextLength > 0 ? maxTextLength : DEFAULT_MAX_TEXT_LENGTH
+  const truncated = text.length > limit
   if (truncated) {
-    text = text.slice(0, MAX_TEXT_LENGTH)
+    text = text.slice(0, limit)
   }
 
   const contentHash = djb2Hash(text)

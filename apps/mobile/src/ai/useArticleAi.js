@@ -31,10 +31,11 @@ export function useArticleAi(article, readerContent = null) {
   // { feature: 'summary'|'signals', perspective?, articleCtx, messages, outputLanguage, retrying }
   const pendingRef = useRef(null)
 
+  const maxInputChars = selectedModel?.maxInputChars
   const articleCtx = useMemo(
-    () => buildArticleContext(article, readerContent),
+    () => buildArticleContext(article, readerContent, maxInputChars),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [article.id, article.description, readerContent?.content],
+    [article.id, article.description, readerContent?.content, maxInputChars],
   )
 
   // Reset all state when article changes
@@ -128,7 +129,17 @@ export function useArticleAi(article, readerContent = null) {
     } else if (!pending.retrying) {
       const repairMessages = buildRepairPromptMessages(pending.messages, rawResponse)
       pendingRef.current = { ...pending, retrying: true, messages: repairMessages }
-      llm.generate(repairMessages)
+      llm.generate(repairMessages).catch((err) => {
+        console.warn('LLM repair generate failed:', err)
+        const cur = pendingRef.current
+        if (cur?.feature !== 'summary') return
+        setSummaryErrors((prev) => ({
+          ...prev,
+          [cur.perspective]: 'Model failed to generate. Try a shorter article or a smaller model.',
+        }))
+        setIsLoadingSummary(false)
+        pendingRef.current = null
+      })
     } else {
       setSummaryErrors((prev) => ({
         ...prev,
@@ -158,7 +169,13 @@ export function useArticleAi(article, readerContent = null) {
     } else if (!pending.retrying) {
       const repairMessages = buildRepairPromptMessages(pending.messages, rawResponse)
       pendingRef.current = { ...pending, retrying: true, messages: repairMessages }
-      llm.generate(repairMessages)
+      llm.generate(repairMessages).catch((err) => {
+        console.warn('LLM repair generate failed:', err)
+        if (pendingRef.current?.feature !== 'signals') return
+        setSignalsError('Model failed to generate. Try a shorter article or a smaller model.')
+        setIsLoadingSignals(false)
+        pendingRef.current = null
+      })
     } else {
       setSignalsError('Failed to analyze signals. Please try again.')
       setIsLoadingSignals(false)
@@ -205,7 +222,13 @@ export function useArticleAi(article, readerContent = null) {
 
     const messages = buildChatMessagesForGenerate(articleCtx, nextHistory)
     pendingRef.current = { feature: 'chat', articleCtx }
-    llm.generate(messages)
+    llm.generate(messages).catch((err) => {
+      console.warn('LLM chat generate failed:', err)
+      if (pendingRef.current?.feature !== 'chat') return
+      setChatError('Model failed to generate. Try a shorter article or a smaller model.')
+      setIsLoadingChat(false)
+      pendingRef.current = null
+    })
   }
 
   const clearChat = () => {
@@ -240,7 +263,16 @@ export function useArticleAi(article, readerContent = null) {
 
     const messages = buildSummaryMessages(articleCtx, perspective, outputLanguage)
     pendingRef.current = { feature: 'summary', articleCtx, messages, perspective, outputLanguage, retrying: false }
-    llm.generate(messages)
+    llm.generate(messages).catch((err) => {
+      console.warn('LLM summary generate failed:', err)
+      if (pendingRef.current?.feature !== 'summary') return
+      setSummaryErrors((prev) => ({
+        ...prev,
+        [pendingRef.current.perspective]: 'Model failed to generate. Try a shorter article or a smaller model.',
+      }))
+      setIsLoadingSummary(false)
+      pendingRef.current = null
+    })
   }
 
   const generateSignals = async ({ force = false } = {}) => {
@@ -269,7 +301,13 @@ export function useArticleAi(article, readerContent = null) {
 
     const messages = buildSignalsMessages(articleCtx, outputLanguage)
     pendingRef.current = { feature: 'signals', articleCtx, messages, outputLanguage, retrying: false }
-    llm.generate(messages)
+    llm.generate(messages).catch((err) => {
+      console.warn('LLM signals generate failed:', err)
+      if (pendingRef.current?.feature !== 'signals') return
+      setSignalsError('Model failed to generate. Try a shorter article or a smaller model.')
+      setIsLoadingSignals(false)
+      pendingRef.current = null
+    })
   }
 
   const switchPerspective = (perspective) => {

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useContext, useEffect, useRef, useState } from 'react'
 import {
   StatusBar,
   StyleSheet,
@@ -9,8 +9,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useTheme } from '../../contexts/ThemeContext'
+import { UserContext } from '../../contexts/UserContext'
 import { colors, getThemeColors, fontSize } from '../../theme'
 import { useArticleAi } from '../../ai/useArticleAi'
+import { createApiClient } from '../../utils/api'
 import ArticleChatView from '../../components/article/ArticleChatView'
 
 export default function ArticleChatScreen() {
@@ -19,7 +21,31 @@ export default function ArticleChatScreen() {
   const { article, readerContent, outputLanguage } = route.params
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
-  const ai = useArticleAi(article, readerContent ?? null)
+  const { getAccessToken } = useContext(UserContext)
+  const [autoReader, setAutoReader] = useState(null)
+  const fetchedUrlRef = useRef(null)
+  const effectiveReaderContent = readerContent ?? autoReader
+  const ai = useArticleAi(article, effectiveReaderContent)
+
+  useEffect(() => {
+    if (readerContent) return
+    if (!article?.url) return
+    if (fetchedUrlRef.current === article.url) return
+    fetchedUrlRef.current = article.url
+    let cancelled = false
+    ;(async () => {
+      try {
+        const api = createApiClient(getAccessToken)
+        const response = await api.articles.getContent(article.url)
+        if (!cancelled && response.success && response.data?.article?.content) {
+          setAutoReader(response.data.article)
+        }
+      } catch (_err) {
+        // silent — fall back to RSS description
+      }
+    })()
+    return () => { cancelled = true }
+  }, [article?.url, readerContent, getAccessToken])
 
   return (
     <SafeAreaView

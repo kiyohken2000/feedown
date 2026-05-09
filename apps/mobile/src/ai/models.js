@@ -8,6 +8,8 @@ import {
 export const FEEDOWN_DEFAULT_LLM_ID = 'lfm2_5_1_2b_instruct_quantized'
 export const MODEL_DEFINITION_VERSION = '1'
 
+export const DEFAULT_MAX_INPUT_CHARS = 4000
+
 export const FEEDOWN_LLM_MODELS = [
   {
     id: 'lfm2_5_1_2b_instruct_quantized',
@@ -16,6 +18,7 @@ export const FEEDOWN_LLM_MODELS = [
     recommendation: 'recommended',
     features: ['summary'],
     notes: 'Balanced quality and performance.',
+    maxInputChars: 5000,
   },
   {
     id: 'qwen3_0_6b_quantized',
@@ -24,6 +27,7 @@ export const FEEDOWN_LLM_MODELS = [
     recommendation: 'candidate',
     features: ['summary'],
     notes: 'Lightweight. Good starting point for testing.',
+    maxInputChars: 4000,
   },
   {
     id: 'qwen3_1_7b_quantized',
@@ -32,6 +36,7 @@ export const FEEDOWN_LLM_MODELS = [
     recommendation: 'candidate',
     features: ['summary'],
     notes: 'Higher quality, higher memory usage.',
+    maxInputChars: 5000,
   },
   {
     id: 'lfm2_5_350m_quantized',
@@ -40,6 +45,7 @@ export const FEEDOWN_LLM_MODELS = [
     recommendation: 'fallback',
     features: ['summary'],
     notes: 'For low-memory devices.',
+    maxInputChars: 3000,
   },
 ]
 

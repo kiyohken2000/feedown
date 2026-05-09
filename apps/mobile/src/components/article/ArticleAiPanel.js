@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useContext, useEffect, useRef, useState } from 'react'
 import {
   ScrollView,
   StyleSheet,
@@ -11,7 +11,9 @@ import { useNavigation } from '@react-navigation/native'
 import { colors, fontSize, getThemeColors } from '../../theme'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAi } from '../../contexts/AiContext'
+import { UserContext } from '../../contexts/UserContext'
 import { useArticleAi, PERSPECTIVES } from '../../ai/useArticleAi'
+import { createApiClient } from '../../utils/api'
 import PerspectiveSummaryView from './PerspectiveSummaryView'
 import ArticleSignalsView from './ArticleSignalsView'
 
@@ -29,10 +31,34 @@ export default function ArticleAiPanel({ article, readerContent }) {
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
   const { settings, llm } = useAi()
+  const { getAccessToken } = useContext(UserContext)
   // const { settings, llm, tts } = useAi()  // TTS: restore tts when re-enabling
   const [expanded, setExpanded] = useState(false)
   const [activeTab, setActiveTab] = useState('brief')
-  const ai = useArticleAi(article, readerContent)
+  const [autoReader, setAutoReader] = useState(null)
+  const fetchedUrlRef = useRef(null)
+  const effectiveReaderContent = readerContent ?? autoReader
+  const ai = useArticleAi(article, effectiveReaderContent)
+
+  useEffect(() => {
+    if (readerContent) return
+    if (!article?.url) return
+    if (fetchedUrlRef.current === article.url) return
+    fetchedUrlRef.current = article.url
+    let cancelled = false
+    ;(async () => {
+      try {
+        const api = createApiClient(getAccessToken)
+        const response = await api.articles.getContent(article.url)
+        if (!cancelled && response.success && response.data?.article?.content) {
+          setAutoReader(response.data.article)
+        }
+      } catch (_err) {
+        // silent — fall back to RSS description
+      }
+    })()
+    return () => { cancelled = true }
+  }, [article?.url, readerContent, getAccessToken])
 
   if (!settings.enabled || !settings.downloadEnabled || !ai.isModelReady) {
     return null
@@ -146,7 +172,7 @@ export default function ArticleAiPanel({ article, readerContent }) {
           style={[styles.chatButton, { borderTopColor: theme.border }]}
           onPress={() => navigation.navigate('ArticleChat', {
             article,
-            readerContent,
+            readerContent: effectiveReaderContent,
             outputLanguage: settings.outputLanguage ?? 'en',
           })}
           activeOpacity={0.7}
