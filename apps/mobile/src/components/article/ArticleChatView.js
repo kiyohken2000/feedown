@@ -162,11 +162,15 @@ function MarkdownView({ text, textStyle, maxWidth }) {
     i++
   }
 
-  return <View style={[mdStyles.container, maxWidth ? { maxWidth } : null]}>{elements}</View>
+  return (
+    <View style={[mdStyles.container, maxWidth ? { width: maxWidth } : null]}>
+      {elements}
+    </View>
+  )
 }
 
 const mdStyles = StyleSheet.create({
-  container: { margin: 3 },
+  container: { margin: 3, flexShrink: 1 },
   h1: { fontSize: fontSize.large, fontWeight: 'bold', marginTop: 6, marginBottom: 3 },
   h2: { fontWeight: 'bold', marginTop: 4, marginBottom: 2 },
   bulletRow: { flexDirection: 'row', marginVertical: 2 },
