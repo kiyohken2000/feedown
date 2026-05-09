@@ -6,6 +6,17 @@ import { buildTranslationMessages } from './prompts'
 import { parseTranslationOutput, buildTranslationRepairMessages } from './jsonOutput'
 import { getTranslationCache, saveTranslationCache } from './aiCache'
 
+function limitParagraphsForTranslation(paragraphs, maxChars = 2500) {
+  const result = []
+  let total = 0
+  for (const p of paragraphs) {
+    if (total + p.length > maxChars) break
+    result.push(p)
+    total += p.length
+  }
+  return result.length > 0 ? result : paragraphs.slice(0, 1)
+}
+
 function extractParagraphs(html) {
   let text = html
     .replace(/<\/?(p|h[1-6]|li|blockquote|div|article|section|header|footer|br\s*\/?)(\s[^>]*)?>|<br\s*\/?>/gi, '\n\n')
@@ -91,7 +102,12 @@ export function useArticleTranslation(article, readerContent) {
     } else if (!pending.retrying) {
       const repairMessages = buildTranslationRepairMessages(pending.messages, rawResponse)
       pendingRef.current = { ...pending, retrying: true, messages: repairMessages }
-      llm.generate(repairMessages)
+      llm.generate(repairMessages).catch((err) => {
+        console.error('Translation repair error:', err)
+        setError('Translation failed. Please try again.')
+        setIsTranslating(false)
+        pendingRef.current = null
+      })
     } else {
       setError('Translation failed. Please try again.')
       setIsTranslating(false)
@@ -117,9 +133,15 @@ export function useArticleTranslation(article, readerContent) {
       }
     }
 
-    const messages = buildTranslationMessages(paragraphs, targetLang)
+    const limitedParagraphs = limitParagraphsForTranslation(paragraphs)
+    const messages = buildTranslationMessages(limitedParagraphs, targetLang)
     pendingRef.current = { contentHash, messages, retrying: false }
-    llm.generate(messages)
+    llm.generate(messages).catch((err) => {
+      console.error('Translation generate error:', err)
+      setError('Translation failed. Please try again.')
+      setIsTranslating(false)
+      pendingRef.current = null
+    })
   }
 
   const interrupt = () => {

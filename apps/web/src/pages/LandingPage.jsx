@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaNewspaper, FaStar, FaMoon, FaLock, FaArrowRight, FaBook, FaServer, FaRocket } from 'react-icons/fa';
+import { FaNewspaper, FaStar, FaMoon, FaLock, FaArrowRight, FaBook, FaServer, FaRocket, FaBrain, FaShieldAlt, FaComments, FaLanguage, FaListUl } from 'react-icons/fa';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
@@ -19,6 +19,14 @@ import mobileArticle from '../assets/images/mobile_screenshots/mobile_ss_article
 import mobileReader from '../assets/images/mobile_screenshots/mobile_ss_reader1.png';
 import mobileFeeds from '../assets/images/mobile_screenshots/mobile_ss_feeds.png';
 import mobileSettings from '../assets/images/mobile_screenshots/mobile_ss_settings1.png';
+// On-Device AI screenshots
+import aiSettings from '../assets/images/on_device_ai/01_settings.PNG';
+import aiSummarize1 from '../assets/images/on_device_ai/02_summarize01_generating_summary.png';
+import aiSummarize2 from '../assets/images/on_device_ai/02_summarize02_japanese_article.png';
+import aiSummarize3 from '../assets/images/on_device_ai/02_summarize02_english_articla.png';
+import aiSignals from '../assets/images/on_device_ai/03_signals.png';
+import aiChat from '../assets/images/on_device_ai/04_chat.png';
+import aiTranslation from '../assets/images/on_device_ai/05_translation.png';
 
 export default function LandingPage() {
   const { isDarkMode } = useTheme();
@@ -269,6 +277,59 @@ export default function LandingPage() {
       alignItems: 'center',
       justifyContent: 'center',
       transition: 'background 0.2s',
+    },
+    // On-Device AI Section
+    aiSection: {
+      padding: '80px 20px',
+      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
+    },
+    aiContent: {
+      maxWidth: '1100px',
+      margin: '0 auto',
+    },
+    aiFeatureGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+      gap: '24px',
+      marginBottom: '60px',
+    },
+    aiFeatureCard: {
+      padding: '28px',
+      borderRadius: '16px',
+      backgroundColor: isDarkMode ? '#1e1e2e' : '#f0f4ff',
+      borderLeft: '4px solid #6C63FF',
+    },
+    aiFeatureIcon: {
+      fontSize: '32px',
+      marginBottom: '14px',
+      color: '#6C63FF',
+    },
+    aiScreenshotGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+      gap: '20px',
+      marginBottom: '32px',
+      justifyItems: 'center',
+    },
+    aiPrivacyBadge: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '10px 18px',
+      borderRadius: '50px',
+      backgroundColor: isDarkMode ? '#1e2a1e' : '#e8f5e9',
+      color: isDarkMode ? '#81c784' : '#388e3c',
+      fontSize: '13px',
+      fontWeight: '600',
+      marginBottom: '40px',
+    },
+    aiPrivacyNote: {
+      maxWidth: '700px',
+      margin: '0 auto',
+      textAlign: 'center',
+      fontSize: '14px',
+      lineHeight: '1.7',
+      color: isDarkMode ? '#888' : '#888',
     },
     // Self-host Section
     selfHost: {
@@ -525,6 +586,65 @@ export default function LandingPage() {
               <img src={googlePlayBadge} alt="Get it on Google Play" style={styles.storeBadge} />
             </a>
           </div>
+        </div>
+      </section>
+
+      {/* On-Device AI Section */}
+      <section style={styles.aiSection}>
+        <div style={styles.aiContent}>
+          <h2 style={styles.sectionTitle}>{t.aiTitle}</h2>
+          <p style={styles.sectionSubtitle}>{t.aiSubtitle}</p>
+
+          {/* Privacy badge */}
+          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+            <span style={styles.aiPrivacyBadge}>
+              <FaShieldAlt />
+              {t.aiDesc}
+            </span>
+          </div>
+
+          {/* Feature cards */}
+          <div style={styles.aiFeatureGrid}>
+            {[
+              { Icon: FaListUl, title: t.aiFeature1Title, desc: t.aiFeature1Desc },
+              { Icon: FaBrain, title: t.aiFeature2Title, desc: t.aiFeature2Desc },
+              { Icon: FaComments, title: t.aiFeature3Title, desc: t.aiFeature3Desc },
+              { Icon: FaLanguage, title: t.aiFeature4Title, desc: t.aiFeature4Desc },
+            ].map(({ Icon, title, desc }, i) => (
+              <div key={i} style={styles.aiFeatureCard}>
+                <Icon style={styles.aiFeatureIcon} />
+                <h3 style={styles.featureTitle}>{title}</h3>
+                <p style={styles.featureDesc}>{desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Screenshot gallery */}
+          <div style={styles.aiScreenshotGrid}>
+            {[
+              { src: aiSettings, label: t.aiSettings },
+              { src: aiSummarize1, label: t.aiSummarize1 },
+              { src: aiSummarize2, label: t.aiSummarize2 },
+              { src: aiSummarize3, label: t.aiSummarize3 },
+              { src: aiSignals, label: t.aiSignals },
+              { src: aiChat, label: t.aiChat },
+              { src: aiTranslation, label: t.aiTranslation },
+            ].map(({ src, label }) => (
+              <div key={label} style={styles.mobileScreenshot}>
+                <img
+                  src={src}
+                  alt={label}
+                  style={styles.mobileImage}
+                  onClick={() => setSelectedImage({ src, alt: label })}
+                  onMouseOver={(e) => { e.target.style.transform = 'scale(1.03)'; }}
+                  onMouseOut={(e) => { e.target.style.transform = 'scale(1)'; }}
+                />
+                <p style={styles.mobileLabel}>{label}</p>
+              </div>
+            ))}
+          </div>
+
+          <p style={styles.aiPrivacyNote}>{t.aiPrivacyNote}</p>
         </div>
       </section>
 
