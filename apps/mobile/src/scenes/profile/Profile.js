@@ -1,4 +1,4 @@
-import React, { useContext, useState, useCallback } from 'react'
+import React, { useContext, useState, useCallback, useEffect } from 'react'
 import {
   StyleSheet,
   Text,
@@ -29,15 +29,82 @@ const isTestAccount = (email) => {
   return /^test-\d+@test\.com$/i.test(email)
 }
 
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return ''
+  const KB = 1024
+  const MB = KB * 1024
+  const GB = MB * 1024
+  if (bytes >= GB) return `${(bytes / GB).toFixed(2)} GB`
+  if (bytes >= MB) return `${(bytes / MB).toFixed(0)} MB`
+  if (bytes >= KB) return `${(bytes / KB).toFixed(0)} KB`
+  return `${bytes} B`
+}
+
 export default function Profile() {
   const { user, signOut, getAccessToken, serverUrl } = useContext(UserContext)
   const { feeds, articles, getUnreadCount, resetAll } = useContext(FeedsContext)
   const { isDarkMode, toggleDarkMode, readerFontSize, setFontSize } = useTheme()
   const theme = getThemeColors(isDarkMode)
-  const { llm, settings: aiSettings, updateSettings: updateAiSettings, selectedModel } = useAi()
+  const {
+    llm,
+    settings: aiSettings,
+    updateSettings: updateAiSettings,
+    selectedModel,
+    getModelSize,
+    deleteModel,
+  } = useAi()
   // const { llm, tts, settings: aiSettings, updateSettings: updateAiSettings, selectedModel } = useAi()  // TTS: restore tts when re-enabling
   const [isLoading, setIsLoading] = useState(false)
+  const [modelSizes, setModelSizes] = useState({})
   const isTestUser = isTestAccount(user?.email)
+
+  // Refresh on-disk size for each downloaded model (cheap; runs only when the list changes)
+  const downloadedKey = (aiSettings.downloadedModelIds ?? []).join(',')
+  useEffect(() => {
+    let cancelled = false
+    const ids = aiSettings.downloadedModelIds ?? []
+    if (ids.length === 0) {
+      setModelSizes({})
+      return
+    }
+    Promise.all(ids.map((id) => getModelSize(id).then((bytes) => [id, bytes])))
+      .then((entries) => {
+        if (!cancelled) setModelSizes(Object.fromEntries(entries))
+      })
+      .catch(() => { /* ignore */ })
+    return () => { cancelled = true }
+  }, [downloadedKey, getModelSize])
+
+  const handleDeleteModel = useCallback((model) => {
+    const sizeLabel = formatBytes(modelSizes[model.id])
+    Alert.alert(
+      'Delete Model',
+      `Delete "${model.displayName}"${sizeLabel ? ` (${sizeLabel})` : ''}? You can re-download it later, but it may take several minutes.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true)
+              await deleteModel(model.id)
+              setModelSizes((prev) => {
+                const next = { ...prev }
+                delete next[model.id]
+                return next
+              })
+              showToast({ title: 'Deleted', body: `${model.displayName} removed` })
+            } catch (err) {
+              showErrorToast({ title: 'Error', body: err?.message ?? 'Failed to delete model' })
+            } finally {
+              setIsLoading(false)
+            }
+          },
+        },
+      ],
+    )
+  }, [deleteModel, modelSizes])
 
   // Handle sign out
   const handleSignOut = useCallback(async () => {
@@ -255,6 +322,8 @@ export default function Profile() {
                   const progress = isSelected ? llm.downloadProgress : 0
                   const isDownloading = isSelected && aiSettings.downloadEnabled && progress > 0 && progress < 1
                   const isPending = isSelected && aiSettings.downloadEnabled && !isActive && !isDownloading
+                  const sizeLabel = formatBytes(modelSizes[model.id])
+                  const canDelete = isDownloadedLocally && !isActive && !isDownloading && !isPending
 
                   return (
                     <TouchableOpacity
@@ -277,6 +346,7 @@ export default function Profile() {
                             </Text>
                             <Text style={[styles.modelNote, { color: theme.textMuted }]}>
                               {model.notes}
+                              {sizeLabel ? `  •  ${sizeLabel}` : ''}
                             </Text>
                           </View>
                         </View>
@@ -311,6 +381,16 @@ export default function Profile() {
                             </View>
                           )}
                         </View>
+
+                        {canDelete && (
+                          <TouchableOpacity
+                            style={styles.modelDeleteButton}
+                            onPress={() => handleDeleteModel(model)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Text style={styles.modelDeleteButtonText}>Delete</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </TouchableOpacity>
                   )
@@ -815,6 +895,19 @@ const styles = StyleSheet.create({
   modelStatus: {
     alignItems: 'flex-end',
     marginLeft: 8,
+  },
+  modelDeleteButton: {
+    marginLeft: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.redSecondary,
+  },
+  modelDeleteButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.redSecondary,
   },
   modelStatusText: {
     fontSize: fontSize.small,

@@ -1,11 +1,12 @@
 import React from 'react'
 import {
-  SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { useTheme } from '../../contexts/ThemeContext'
 import { colors, getThemeColors, fontSize } from '../../theme'
@@ -21,7 +22,11 @@ export default function ArticleChatScreen() {
   const ai = useArticleAi(article, readerContent ?? null)
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.card }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.card }]}
+      edges={['top', 'right', 'left', 'bottom']}
+    >
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity

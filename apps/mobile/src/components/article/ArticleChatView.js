@@ -4,6 +4,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import { GiftedChat, Bubble, InputToolbar, Send, Composer, MessageText } from 'react-native-gifted-chat'
@@ -98,7 +99,7 @@ function InlineMarkdown({ text, baseStyle, codeStyle }) {
   )
 }
 
-function MarkdownView({ text, textStyle }) {
+function MarkdownView({ text, textStyle, maxWidth }) {
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace'
   const codeInlineStyle = { fontFamily: monoFont, backgroundColor: 'rgba(0,0,0,0.07)', borderRadius: 3 }
   const lines = text.split('\n')
@@ -161,7 +162,7 @@ function MarkdownView({ text, textStyle }) {
     i++
   }
 
-  return <View style={mdStyles.container}>{elements}</View>
+  return <View style={[mdStyles.container, maxWidth ? { maxWidth } : null]}>{elements}</View>
 }
 
 const mdStyles = StyleSheet.create({
@@ -185,6 +186,10 @@ export default function ArticleChatView({
   const giftedMessages = toGiftedMessages(chatHistory)
   const questions = QUICK_QUESTIONS[outputLanguage] ?? QUICK_QUESTIONS.en
   const placeholder = PLACEHOLDERS[outputLanguage] ?? PLACEHOLDERS.en
+  const { width: windowWidth } = useWindowDimensions()
+  // GiftedChat left bubble has marginRight: 60 + container padding; cap content well inside the bubble
+  const bubbleMaxWidth = Math.max(160, windowWidth - 60 - 32)
+  const isEmpty = giftedMessages.length === 0
 
   const handleSend = useCallback((messages) => {
     if (messages.length > 0 && !isGenerating) {
@@ -220,6 +225,7 @@ export default function ArticleChatView({
         <MarkdownView
           text={props.currentMessage.text}
           textStyle={{ color: theme.text, fontSize: fontSize.normal, lineHeight: 22 }}
+          maxWidth={bubbleMaxWidth}
         />
       )
     }
@@ -259,27 +265,6 @@ export default function ArticleChatView({
     )
   }
 
-  // renderChatEmpty is inside an inverted FlatList → needs scaleY: -1
-  const renderChatEmpty = () => (
-    <View style={styles.emptyOuter}>
-      <Text style={[styles.emptyTitle, { color: theme.textMuted }]}>
-        {EMPTY_TITLES[outputLanguage] ?? EMPTY_TITLES.en}
-      </Text>
-      <View style={styles.chipsContainer}>
-        {questions.map((q) => (
-          <TouchableOpacity
-            key={q}
-            style={[styles.chip, { borderColor: theme.border, backgroundColor: theme.surface }]}
-            onPress={() => handleQuickQuestion(q)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.chipText, { color: theme.text }]}>{q}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  )
-
   const renderChatFooter = () => {
     if (!error) return null
     return (
@@ -288,29 +273,59 @@ export default function ArticleChatView({
   }
 
   return (
-    <GiftedChat
-      messages={giftedMessages}
-      onSend={handleSend}
-      user={{ _id: 1 }}
-      isTyping={isGenerating}
-      placeholder={placeholder}
-      renderBubble={renderBubble}
-      renderMessageText={renderMessageText}
-      renderComposer={renderComposer}
-      renderInputToolbar={renderInputToolbar}
-      renderSend={renderSend}
-      renderChatEmpty={renderChatEmpty}
-      renderChatFooter={renderChatFooter}
-      renderAvatar={null}
-      renderTime={() => null}
-      alwaysShowSend
-      scrollToBottom
-      keyboardShouldPersistTaps="handled"
-    />
+    <View style={styles.root}>
+      <GiftedChat
+        messages={giftedMessages}
+        onSend={handleSend}
+        user={{ _id: 1 }}
+        isTyping={isGenerating}
+        placeholder={placeholder}
+        renderBubble={renderBubble}
+        renderMessageText={renderMessageText}
+        renderComposer={renderComposer}
+        renderInputToolbar={renderInputToolbar}
+        renderSend={renderSend}
+        renderChatFooter={renderChatFooter}
+        renderAvatar={null}
+        renderTime={() => null}
+        alwaysShowSend
+        scrollToBottom
+        keyboardShouldPersistTaps="handled"
+      />
+      {isEmpty && (
+        <View style={styles.emptyOverlay} pointerEvents="box-none">
+          <Text style={[styles.emptyTitle, { color: theme.textMuted }]}>
+            {EMPTY_TITLES[outputLanguage] ?? EMPTY_TITLES.en}
+          </Text>
+          <View style={styles.chipsContainer}>
+            {questions.map((q) => (
+              <TouchableOpacity
+                key={q}
+                style={[styles.chip, { borderColor: theme.border, backgroundColor: theme.surface }]}
+                onPress={() => handleQuickQuestion(q)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.chipText, { color: theme.text }]}>{q}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  emptyOverlay: {
+    position: 'absolute',
+    top: 24,
+    left: 16,
+    right: 16,
+    alignItems: 'center',
+  },
   inputToolbar: {
     borderTopWidth: 1,
     paddingHorizontal: 4,
@@ -353,12 +368,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.small,
     color: colors.redSecondary,
     fontWeight: '600',
-  },
-  emptyOuter: {
-    transform: [{ scaleY: -1 }],
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    alignItems: 'center',
   },
   emptyTitle: {
     fontSize: fontSize.small,

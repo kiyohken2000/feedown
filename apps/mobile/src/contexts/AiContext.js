@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useLLM,
   // TTS: uncomment to re-enable
@@ -12,6 +12,7 @@ import {
   // KOKORO_VOICE_BF_EMMA,
   // KOKORO_VOICE_BM_DANIEL,
 } from 'react-native-executorch'
+import { ExpoResourceFetcher } from 'react-native-executorch-expo-resource-fetcher'
 import {
   FEEDOWN_DEFAULT_LLM_ID,
   FEEDOWN_LLM_MODELS,
@@ -22,6 +23,12 @@ import {
   getAiSettings,
   saveAiSettings,
 } from '../ai/aiStorage'
+
+function modelSources(model) {
+  if (!model?.executorchModel) return []
+  const { modelSource, tokenizerSource, tokenizerConfigSource } = model.executorchModel
+  return [modelSource, tokenizerSource, tokenizerConfigSource].filter(Boolean)
+}
 
 // TTS: uncomment to re-enable
 // const TTS_VOICE_MAP = {
@@ -120,8 +127,51 @@ export function AiProvider({ children }) {
     await saveAiSettings(next)
   }
 
+  // Returns total bytes on disk for the given model, or 0 if not downloaded
+  const getModelSize = useCallback(async (modelId) => {
+    const model = getModelById(modelId)
+    const sources = modelSources(model)
+    if (sources.length === 0) return 0
+    try {
+      return await ExpoResourceFetcher.getFilesTotalSize(...sources)
+    } catch {
+      return 0
+    }
+  }, [])
+
+  // Delete the on-disk files for the given model and update settings
+  const deleteModel = useCallback(async (modelId) => {
+    const model = getModelById(modelId)
+    const sources = modelSources(model)
+    if (sources.length === 0) return
+    await ExpoResourceFetcher.deleteResources(...sources)
+    markedRef.current.delete(modelId)
+    setSettings((prev) => {
+      const next = {
+        ...prev,
+        downloadedModelIds: (prev.downloadedModelIds ?? []).filter((id) => id !== modelId),
+      }
+      // If the deleted model is the currently selected one, also disable auto-load
+      if (prev.selectedModelId === modelId) {
+        next.downloadEnabled = false
+      }
+      saveAiSettings(next)
+      return next
+    })
+  }, [])
+
   return (
-    <AiContext.Provider value={{ llm, settings, updateSettings, selectedModel, initialized }}>
+    <AiContext.Provider
+      value={{
+        llm,
+        settings,
+        updateSettings,
+        selectedModel,
+        initialized,
+        getModelSize,
+        deleteModel,
+      }}
+    >
       {children}
     </AiContext.Provider>
   )
