@@ -65,7 +65,7 @@ export default function SignUp() {
       const randomNum = Math.floor(Math.random() * 1000000)
       const testEmail = `test-${randomNum}@test.com`
       const testPassword = '111111'
-      const testServerUrl = 'https://feedown.pages.dev'
+      const testServerUrl = 'https://feedown.org'
 
       await signUp(testEmail, testPassword, testServerUrl)
       showToast({
