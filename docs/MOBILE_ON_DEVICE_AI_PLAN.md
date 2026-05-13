@@ -507,6 +507,282 @@ LLM プロンプトに含める制約:
 - 翻訳品質が不足する場合、初期リリースでは「実験機能」として扱うか、要約翻訳のみに限定する。
 - ターゲット言語の切り替えは設定画面でのみ可能とし、記事画面からは変更しない (誤操作防止)。
 
+## 機能6: バックグラウンド先回り要約
+
+ユーザーがアプリを開いていない間に、未読記事を端末側 AI で先回りして要約しておく機能。アプリを開いた瞬間に「最新の未読がすでに要約済み」という体験を狙う。要約処理自体は機能1 (視点切り替え要約) のパイプラインをそのまま使い、`brief` 視点の結果を共通キャッシュに書き込む。
+
+バックエンド負荷を抑えるため、1回の実行で叩く API は `/api/refresh` と `/api/articles` の2本のみとし、`/api/article-content` は呼ばない (RSS description のみで要約する)。実装は `expo-background-task` 経由で iOS の `BGProcessingTask`、Android の `WorkManager` を呼び出す。
+
+### 前提タスク: aiCache の 7 日 TTL 改修
+
+機能6 を実装する前に、既存の `aiCache` (機能1〜5 で使用中) に **7 日 TTL ベースの eviction** を入れる必要がある。現状は削除ロジックがなく、容量超過時は `setItem` が静かに失敗するだけで、長期使用で破綻する。
+
+サーバー側の記事 TTL (`functions/api/refresh.ts` 内で `expiresAt = now + 7 日`) と揃える。サーバーに存在しない記事の要約だけが端末に残り続ける問題も同時に解消される。
+
+改修内容:
+
+- `isRecordValid` に「`createdAt` から 7 日経過していたら無効」のチェックを追加 (lazy 失効)
+- `aiCache.js` に `sweepExpiredCache()` 関数を追加: `AsyncStorage.getAllKeys()` で `SUMMARY_PREFIX` / `TRANSLATION_PREFIX` のキーを列挙し、`createdAt` が 7 日以上前のものを `multiRemove` で一括削除
+- `AiContext` mount 時に `sweepExpiredCache()` を呼ぶ (起動時に 1 回、500〜1000 件規模なら数百 ms)
+- インデックスキーは不要 (getAllKeys + filter で十分高速)
+
+これは機能6 専用ではなく、機能1〜5 と機能6 が共通で利用する基盤改修。
+
+### 対象記事
+
+- 未読の新着順で直近 N 件 (デフォルト 20、設定で 5〜50 まで可変)
+- 既にキャッシュ済みの記事はスキップ
+- 「お気に入りフィードのみ」「全フィード」のような切り分けは初期版では行わない
+- 単一フィードが大量に新着を吐いた場合のフィード公平性は考慮しない (新しい順 N 件)
+
+### 実行条件
+
+- OS スケジューラ任せ
+- 将来オプションとして「Wi-Fi 接続中のみ」「充電中のみ」のトグル追加を検討するが、初期版には含めない
+
+### 1回の実行予算
+
+- 件数上限 OR wall-clock 時間上限のどちらか到達で終了
+- デフォルト: 20 件 または 5 分のいずれか早い方
+- ループ冒頭で開始時刻を保持し、各記事生成完了後にチェック
+- iOS の `BGTask.expirationHandler` 発火時も同様に安全停止する
+
+### 実行頻度の制御
+
+バックエンド API 呼び出しを抑えるため、頻度を二層でガードする。
+
+- OS レベル: `expo-background-task` 登録時の `minimumInterval` を設定値と同期
+- アプリレベル: callback 冒頭で `lastRunAt` を読み、設定値より短ければ即終了
+- 設定可能な間隔: 30 分 / 1 時間 / 6 時間 / 12 時間 (デフォルト 30 分)
+
+iOS の `BGProcessingTask` は OS の judgement で発火が決まるため、`minimumInterval` を 30 分に設定しても実際には数時間〜1日に1回程度しか走らないのが普通。これは仕様上避けられないので、設定画面の説明文に明記する。
+
+### データフロー詳細
+
+1 回の task callback 内のシーケンス:
+
+1. 設定読み込み → `enabled` が false なら即終了
+2. `lastRunAt` チェック → 最低間隔未満なら即終了
+3. ロック取得 (`backgroundSummary.lock = { startedAt }`)
+4. `/api/refresh` を **1 バッチだけ** 呼ぶ (offset なし、`while (nextOffset)` ループはしない)
+   - 大多数のユーザーは <20 フィードなので 1 バッチでカバーされる想定
+   - 多フィードユーザーの場合は一部のフィードが取りこぼされるが、次回 foreground refresh で補完
+5. `/api/articles?unreadOnly=true&limit=N` で未読を取得
+6. 既にキャッシュ済みの記事を除外
+7. `LLMModule.fromModelName(selectedModel.executorchModel)` でモデルロード
+8. 各記事ループ (新しい順):
+   - `buildArticleContext` (`/api/article-content` は呼ばない、RSS description のみ)
+   - `buildBriefSummaryMessages` → `await llm.generate(messages)`
+   - JSON パース (失敗時 1 回修復リトライ)
+   - `saveSummaryCache(..., { source: 'background' })`
+   - 件数 ≥ N または elapsed ≥ timeout → break
+9. `llm.delete()` でモデル破棄
+10. `lastRunStats` を更新、`history` に push (FIFO で最大 10 件)
+11. ロック解除 → `BackgroundTask.setTaskCompleted(.Success)`
+
+### エラー戦略
+
+すべてのエラーは **サイレント** に処理する (自動 OFF・通知・リモートログは一切なし)。Profile 画面の「最終実行」「直近の履歴」表示で観測する。
+
+| エラー種別 | 振る舞い |
+|---|---|
+| 認証 401 (リフレッシュトークンも失効) | 諦めて次回に持ち越し |
+| ネットワーク / 5xx | リトライなし、その回の task をスキップして次回 |
+| LLM 推論 JSON パース失敗 (修復リトライもダメ) | 該当 1 件だけスキップして次の記事へ |
+| `LLMModule.fromModelName` 失敗 / 予期せぬ例外 | task 中止、errors に記録、次回は普通に試行 |
+
+`errors` 配列の各エントリは `{ articleId?, stage, message }` の形で保持し、`history` 経由で Profile に表示する。
+
+### 中断シーケンスと AppState 遷移
+
+中断のトリガは 3 種類で、すべて共通のクリーンアップハンドラに集約する:
+
+- AppState が `'active'` に変化 (ユーザーがアプリを開いた)
+- `BGTask.expirationHandler` 発火 (iOS が時間切れ宣告)
+- 件数 / wall-clock 予算超過
+
+共通シーケンス:
+
+1. 生成中なら `llm.interrupt()`
+2. 短い settle 待ち (~100ms) — interrupt 後の 1 トークン残り対策
+3. `llm.delete()` でモデル破棄
+4. 途中まで生成された raw response は捨てる (ExecuTorch は再開不能)
+5. `lastRunStats` を保存、`history` に push
+6. `backgroundSummary.lock` をクリア (delete 完了後にクリア = 二重メモリ防止)
+7. `BackgroundTask.setTaskCompleted(.Success)` で OS に終了通知
+
+`finally` ブロックで包んで、どこで失敗しても 5〜7 は必ず通る。
+
+AppState='active' 遷移時はフォアグラウンドユーザー優先 = メモリを即座に譲る方針。途中まで生成された 1 件は捨てて、次回 background で再試行する。
+
+### AiContext との競合制御
+
+フォアグラウンドで `useLLM` がモデルをメモリに保持している間に background task が `LLMModule` で別インスタンスを作るとメモリが二重になる。
+
+- background task 開始時に AsyncStorage に `backgroundSummary.lock = { startedAt }` を書く
+- `AiContext` 起動時にロックを参照し、生きていれば `useLLM` の `preventLoad` を維持
+- task 終了 (正常 / `expirationHandler` / 例外 / AppState 遷移) で必ずロック解除 (finally で `lock = null`)
+- ロックに古いタイムスタンプ (例: 15 分以上前) があれば停滞ロックと判断して破棄する
+
+### ライフサイクル管理
+
+`AiContext` を register/unregister の単一窓口にする。
+
+- `AiContext` mount 時に `syncBackgroundTask(settings)` を呼ぶ — OS 登録状態と設定値を一致させる
+- `updateSettings` 呼び出し後に `syncBackgroundTask(next)` を再度呼ぶ
+- `signOut` 内で `BackgroundTask.unregisterTaskAsync()` を呼ぶ (認証情報なしで走らせない)
+- AI 機能本体 (機能1〜5) の `enabled` が false / 選択モデルが未ダウンロード / `backgroundSummary.enabled` が false のいずれかでは登録しない
+- 間隔設定が変わったら `unregister → register` し直す
+
+```js
+async function syncBackgroundTask(settings) {
+  const shouldBeRegistered =
+    settings.enabled &&
+    settings.backgroundSummary.enabled &&
+    settings.downloadedModelIds.includes(settings.selectedModelId)
+
+  const registered = await BackgroundTask.getStatusAsync()
+  if (shouldBeRegistered && !registered) {
+    await BackgroundTask.registerTaskAsync('feedown-summary', {
+      minimumInterval: settings.backgroundSummary.minIntervalMinutes,
+    })
+  } else if (!shouldBeRegistered && registered) {
+    await BackgroundTask.unregisterTaskAsync('feedown-summary')
+  }
+  // 間隔変更時は register し直す処理を追加
+}
+```
+
+### デフォルト動作
+
+- デフォルト OFF (opt-in)
+- AI 機能本体 (機能1〜5) とは独立したトグルを設定画面に置く
+- AI 機能本体が OFF のときはトグル自体を表示しない (依存関係)
+
+### iOS 仕様上の前提
+
+- 内部的に `BGProcessingTask` を使用
+- 必要な `Info.plist` 設定: `BGTaskSchedulerPermittedIdentifiers` への識別子追加、`UIBackgroundModes` に `processing` を追加
+- App Store 提出時の説明文に「未読記事のオンデバイス先読み要約のためにバックグラウンド処理を使用」と明記する
+- App Review でフラグが立った場合に備え、Profile 画面で機能の説明と OFF 切り替え手段を明確に提示する
+
+### プライバシー / 開示
+
+- バックグラウンド要約は端末内処理であり、要約結果も AsyncStorage に保存される。外部送信は一切行わない
+- ユーザー向けの説明はダイアログを出さず、設定画面の説明テキストのみで行う
+- 説明テキスト例: 「未読記事を端末側 AI で先回り要約します。実際の実行頻度は iOS/Android の判断で決まり、通常は数時間〜1日に1回程度です。」
+- リモートログ (Sentry / Crashlytics 等) には送信しない
+
+### キャッシュとの関係
+
+- 機能1 (視点切り替え要約) と同じ `aiCache` を使用 (前提タスクで 7 日 TTL を入れた後)
+- `perspective: 'brief'` の結果として保存
+- フォアグラウンドで記事を開いた際の `useArticleAi` フローがそのままキャッシュを拾う
+- ユーザーが手動で別視点を要求した場合は通常通り追加生成する
+
+### 出力形式
+
+機能1 と同じ `PerspectiveSummary` を使用 (`perspective: 'brief'`)。バックグラウンド実行を後から識別できるようにメタデータを1項目追加する。
+
+```ts
+type PerspectiveSummary = {
+  // 既存フィールド...
+  source?: 'foreground' | 'background';
+};
+```
+
+`source` を観測性 (Profile 画面の「直近の要約件数」表示) と将来の品質比較に使う。
+
+### 観測性 / 実行履歴
+
+- `lastRunStats` (直近 1 回) と `history` (直近 10 回、FIFO) を `backgroundSummary` 設定内に持つ
+- リモートログには送らない、端末内のみ
+
+`BackgroundRunStats` のスキーマ:
+
+```ts
+type BackgroundRunStats = {
+  startedAt: string          // ISO
+  durationMs: number
+  fetched: number            // /api/articles で取得した数
+  attempted: number          // LLM 推論を試みた数
+  summarized: number         // 成功した数
+  skippedCached: number
+  errors: Array<{
+    articleId?: string
+    stage: 'auth' | 'refresh' | 'list' | 'model-load' | 'inference' | 'parse'
+    message: string
+  }>
+  endedReason: 'completed' | 'limit-articles' | 'limit-time' | 'expiration' | 'app-foreground' | 'error'
+}
+```
+
+Profile 画面では「最終実行サマリ (X 時間前 / Y 件 / Z 件エラー)」をデフォルト表示し、エラーがあれば赤バッジで強調。「履歴を見る」タップで直近 10 回の一覧を展開表示。
+
+### 設定画面
+
+「On-Device AI」セクション内に「バックグラウンド先回り要約」サブセクションを追加する。
+
+- トグル: 「未読記事を端末側 AI で先回り要約」(デフォルト OFF)
+- 説明テキスト: 「実際の実行頻度は iOS/Android の判断で決まります。通常は数時間〜1日に1回程度です。」
+- 数値入力: 最大件数 (5〜50、デフォルト 20)
+- 数値入力: 最大時間 (1〜10 分、デフォルト 5)
+- ドロップダウン: 最低間隔 (30 分 / 1 時間 / 6 時間 / 12 時間、デフォルト 30 分)
+- 最終実行表示: 「最終実行: X 時間前 / 要約 Y 件 / エラー Z 件」 (エラーがあれば赤バッジ)
+- 「履歴を見る」展開: 直近 10 回のリスト
+- `__DEV__` 時のみ表示: 「今すぐ実行」ボタン (task callback と同一ロジックを foreground で起動、デバッグ用)
+
+### テスト戦略
+
+- iOS 実機: Xcode のデバッガコンソールで `e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"feedown-summary"]` で発火
+- Android 実機/エミュ: `adb shell cmd jobscheduler run -f com.feedown.app <jobId>` で発火
+- 開発ビルド: Profile の dev only「今すぐ実行」ボタンで foreground 実行 (OS スケジューラを介さず、task callback ロジックを直接呼ぶ)
+- E2E 確認項目:
+  - 認証切れ時に `lastRunStats` に記録され、次回も試行されること
+  - AppState='active' 遷移時に即中断されること
+  - 件数上限・時間上限・expiration の 3 経路で同じクリーンアップが走ること
+  - `aiCache` の 7 日 TTL sweep が起動時に動くこと
+
+### リスク
+
+- iOS の発火頻度が想定より低く、「先回り済みになっていない」体験になる可能性
+- バックグラウンド推論によるバッテリー消費が体感できるレベルになる可能性
+- Cold-load 時間が長く、1 回の予算で 1〜2 件しか処理できないケース
+- 認証トークンが切れている場合の無音失敗 (Profile の「最終実行」表示で気づけるようにする)
+
+### 追加パッケージ
+
+```bash
+yarn workspace mobile add expo-background-task
+```
+
+### 追加するファイル
+
+```
+apps/mobile/src/ai/backgroundSummary.js     # task callback 本体 + 共通クリーンアップハンドラ
+apps/mobile/src/ai/backgroundTaskSetup.js   # syncBackgroundTask (register/unregister)
+```
+
+### 修正するファイル
+
+```
+apps/mobile/src/ai/aiCache.js                # 7 日 TTL + sweepExpiredCache 追加 (前提タスク)
+apps/mobile/src/ai/aiStorage.js              # backgroundSummary 設定 + history 追加
+apps/mobile/src/contexts/AiContext.js        # ロック制御 + mount 時 sync / sweep
+apps/mobile/src/contexts/UserContext.js      # signOut 時に unregister
+apps/mobile/src/scenes/profile/Profile.js    # 設定 UI + 履歴表示 + dev only ボタン
+apps/mobile/App.js                           # 起動時に task 登録
+apps/mobile/app.config.js                    # iOS BGTaskSchedulerPermittedIdentifiers / UIBackgroundModes
+```
+
+### 未確定 (実装時に検証)
+
+- `expo-background-task` の `BGProcessingTask` モードで 5 分の実行予算が取れるか実機検証
+- 選択モデル (LFM2.5-1.2B など) の cold-load 実測時間
+- `ExpoResourceFetcher` がローカルキャッシュ済みモデルを background context で参照できるか
+- `useLLM` と `LLMModule` の二重インスタンス時のメモリ挙動 (ロック機構の妥当性検証)
+- AppState='active' 遷移を JS 層で検知してから interrupt まで何 ms 必要か (体感速度に直結)
+
 ## アーキテクチャ
 
 ### 追加するパッケージ
