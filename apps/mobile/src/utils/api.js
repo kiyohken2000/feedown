@@ -4,6 +4,54 @@
  */
 
 import { getServerUrl, getAuthToken, getRefreshToken, saveAuthToken, saveRefreshToken } from './supabase'
+import { appVersion } from '../config'
+
+const FEEDOWN_USER_AGENT = `FeedOwn-Mobile/${appVersion}`
+
+const DEFAULT_API_HEADERS = {
+  'Content-Type': 'application/json',
+  'Accept': 'application/json',
+  'X-Requested-With': 'FeedOwnMobile',
+  'User-Agent': FEEDOWN_USER_AGENT,
+}
+
+// Reads a fetch Response defensively. Never throws on non-JSON bodies — instead
+// returns an actionable error so the UI never shows a raw "JSON Parse error".
+async function safeReadJsonResponse(response) {
+  const contentType = (response.headers.get('content-type') || '').toLowerCase()
+  let text = ''
+  try {
+    text = await response.text()
+  } catch (e) {
+    return {
+      ok: false,
+      data: null,
+      error: `Could not read server response (HTTP ${response.status}). Please check your network connection and try again.`,
+    }
+  }
+
+  if (!text) {
+    return { ok: true, data: null, error: null }
+  }
+
+  if (!contentType.includes('application/json')) {
+    return {
+      ok: false,
+      data: null,
+      error: `The server didn't return a valid response (HTTP ${response.status}, ${contentType || 'unknown content type'}). Please verify the Server URL is correct and try again.`,
+    }
+  }
+
+  try {
+    return { ok: true, data: JSON.parse(text), error: null }
+  } catch (e) {
+    return {
+      ok: false,
+      data: null,
+      error: `The server returned a malformed response (HTTP ${response.status}). Please try again in a moment.`,
+    }
+  }
+}
 
 /**
  * API Client class for making authenticated requests
@@ -33,7 +81,7 @@ class ApiClient {
 
       const response = await fetch(`${baseUrl}/api/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...DEFAULT_API_HEADERS },
         body: JSON.stringify({ refreshToken }),
       })
 
@@ -41,7 +89,11 @@ class ApiClient {
         return null
       }
 
-      const data = await response.json()
+      const parsed = await safeReadJsonResponse(response)
+      if (!parsed.ok || !parsed.data) {
+        return null
+      }
+      const data = parsed.data
       if (data.success && data.token) {
         await saveAuthToken(data.token)
         if (data.refreshToken) {
@@ -62,9 +114,7 @@ class ApiClient {
     try {
       const baseUrl = await this.getServerUrl()
       const token = await this.getAuthToken()
-      const headers = {
-        'Content-Type': 'application/json',
-      }
+      const headers = { ...DEFAULT_API_HEADERS }
 
       if (token) {
         headers['Authorization'] = `Bearer ${token}`
@@ -78,21 +128,8 @@ class ApiClient {
         },
       })
 
-      const contentType = response.headers.get('content-type')
-      const hasJsonContent = contentType && contentType.includes('application/json')
-
-      let data = null
-      if (hasJsonContent) {
-        const text = await response.text()
-        if (text) {
-          try {
-            data = JSON.parse(text)
-          } catch (e) {
-            console.error('Failed to parse JSON response:', e)
-            data = null
-          }
-        }
-      }
+      const parsed = await safeReadJsonResponse(response)
+      const data = parsed.data
 
       // Handle 401 Unauthorized - try to refresh token
       if (response.status === 401 && !isRetry) {
@@ -106,7 +143,7 @@ class ApiClient {
       if (!response.ok) {
         return {
           success: false,
-          error: data?.error || `HTTP ${response.status}: ${response.statusText}`,
+          error: data?.error || parsed.error || `HTTP ${response.status}: ${response.statusText}`,
         }
       }
 
@@ -165,16 +202,21 @@ class AuthAPI {
       const baseUrl = await this.getServerUrl()
       const response = await fetch(`${baseUrl}/api/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...DEFAULT_API_HEADERS },
         body: JSON.stringify({ email, password }),
       })
 
-      const data = await response.json()
+      const parsed = await safeReadJsonResponse(response)
+
+      if (!parsed.ok) {
+        return { success: false, error: parsed.error }
+      }
+      const data = parsed.data || {}
 
       if (!response.ok) {
         return {
           success: false,
-          error: data.error || 'Login failed',
+          error: data.error || `Login failed (HTTP ${response.status})`,
         }
       }
 
@@ -199,16 +241,21 @@ class AuthAPI {
       const baseUrl = await this.getServerUrl()
       const response = await fetch(`${baseUrl}/api/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...DEFAULT_API_HEADERS },
         body: JSON.stringify({ email, password }),
       })
 
-      const data = await response.json()
+      const parsed = await safeReadJsonResponse(response)
+
+      if (!parsed.ok) {
+        return { success: false, error: parsed.error }
+      }
+      const data = parsed.data || {}
 
       if (!response.ok) {
         return {
           success: false,
-          error: data.error || 'Registration failed',
+          error: data.error || `Registration failed (HTTP ${response.status})`,
         }
       }
 
