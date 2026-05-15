@@ -1,109 +1,82 @@
 /**
- * POST /api/auth/login
- * User login endpoint (for mobile app)
+ * /api/auth/login
  *
- * Note: Web app uses Supabase Client SDK directly for authentication.
- * This endpoint is primarily for mobile apps that need server-side auth.
+ * Mobile login. Web app uses Supabase Client SDK directly.
+ *
+ * Routed through `onRequest` (not `onRequestPost`) so any HTTP method reaches
+ * this Function and gets a JSON response. If we only export `onRequestPost`,
+ * non-POST requests fall through to the Pages SPA fallback (index.html / 200)
+ * and the mobile client sees a JSON parser failure. See lib/jsonResponse.ts.
  */
 
 import { createSupabaseAnonClient } from '../../lib/supabase';
+import { jsonResponse, methodNotAllowed, withJsonGuard } from '../../lib/jsonResponse';
 
 interface LoginRequest {
   email?: string;
   password?: string;
-  accessToken?: string; // Optional: if client already has Supabase access token
+  accessToken?: string;
 }
 
-export async function onRequestPost(context: any): Promise<Response> {
+async function handlePost(context: any): Promise<Response> {
+  const { request, env } = context;
+
+  let body: LoginRequest;
   try {
-    const { request, env } = context;
-
-    // Parse request body
-    const body: LoginRequest = await request.json();
-    const { email, password, accessToken } = body;
-
-    const supabase = createSupabaseAnonClient(env);
-
-    // If client provides access token, verify it and return user info
-    if (accessToken) {
-      const { data: { user }, error } = await supabase.auth.getUser(accessToken);
-
-      if (error || !user) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid token' }),
-          { status: 401, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          user: {
-            uid: user.id,
-            email: user.email,
-          },
-          token: accessToken,
-        }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // For email/password login
-    if (!email || !password) {
-      return new Response(
-        JSON.stringify({
-          error: 'Email/password or access token required',
-        }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Sign in with email and password using Supabase Auth
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      console.error('Login failed:', error.message);
-
-      if (error.message.includes('Invalid login credentials')) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid email or password' }),
-          { status: 401, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({ error: 'Login failed' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        user: {
-          uid: data.user.id,
-          email: data.user.email,
-        },
-        token: data.session?.access_token,
-        refreshToken: data.session?.refresh_token,
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
-  } catch (error: any) {
-    console.error('Login error:', error);
-
-    return new Response(
-      JSON.stringify({ error: 'Login failed' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    body = await request.json();
+  } catch (e: any) {
+    return jsonResponse(
+      { success: false, error: `Invalid JSON body: ${e?.message || 'parse error'}` },
+      400
     );
   }
+
+  const { email, password, accessToken } = body || {};
+  const supabase = createSupabaseAnonClient(env);
+
+  if (accessToken) {
+    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    if (error || !user) {
+      return jsonResponse({ success: false, error: 'Invalid token' }, 401);
+    }
+    return jsonResponse({
+      success: true,
+      user: { uid: user.id, email: user.email },
+      token: accessToken,
+    });
+  }
+
+  if (!email || !password) {
+    return jsonResponse(
+      { success: false, error: 'Email/password or access token required' },
+      400
+    );
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    console.error('Login failed:', error.message);
+    if (error.message.includes('Invalid login credentials')) {
+      return jsonResponse({ success: false, error: 'Invalid email or password' }, 401);
+    }
+    return jsonResponse({ success: false, error: 'Login failed' }, 500);
+  }
+
+  return jsonResponse({
+    success: true,
+    user: { uid: data.user.id, email: data.user.email },
+    token: data.session?.access_token,
+    refreshToken: data.session?.refresh_token,
+  });
+}
+
+export async function onRequest(context: any): Promise<Response> {
+  const { request } = context;
+  return withJsonGuard('auth/login', request, async () => {
+    if (request.method !== 'POST') {
+      return methodNotAllowed(request.method, ['POST']);
+    }
+    return handlePost(context);
+  });
 }

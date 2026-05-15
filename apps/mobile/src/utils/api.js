@@ -15,10 +15,27 @@ const DEFAULT_API_HEADERS = {
   'User-Agent': FEEDOWN_USER_AGENT,
 }
 
+// Compresses a content-type into a short tag for error messages, so toast
+// truncation doesn't hide the diagnostic information.
+function shortContentType(ct) {
+  if (!ct) return 'none'
+  const lower = ct.toLowerCase()
+  if (lower.includes('application/json')) return 'json'
+  if (lower.includes('text/html')) return 'html'
+  if (lower.includes('text/plain')) return 'text'
+  if (lower.includes('xml')) return 'xml'
+  return lower.split(';')[0].trim() || 'unknown'
+}
+
 // Reads a fetch Response defensively. Never throws on non-JSON bodies — instead
 // returns an actionable error so the UI never shows a raw "JSON Parse error".
-async function safeReadJsonResponse(response) {
+// The error string is intentionally short so it survives toast truncation: the
+// HTTP status, content-type tag, and request method are always visible.
+async function safeReadJsonResponse(response, requestMethod = '') {
   const contentType = (response.headers.get('content-type') || '').toLowerCase()
+  const ctTag = shortContentType(contentType)
+  const methodTag = requestMethod ? ` ${requestMethod}` : ''
+
   let text = ''
   try {
     text = await response.text()
@@ -26,7 +43,7 @@ async function safeReadJsonResponse(response) {
     return {
       ok: false,
       data: null,
-      error: `Could not read server response (HTTP ${response.status}). Please check your network connection and try again.`,
+      error: `Network read failed (HTTP ${response.status}${methodTag}). Please retry.`,
     }
   }
 
@@ -35,20 +52,30 @@ async function safeReadJsonResponse(response) {
   }
 
   if (!contentType.includes('application/json')) {
+    console.log('[api] non-JSON response', {
+      status: response.status,
+      contentType,
+      method: requestMethod,
+      bodyPreview: text.slice(0, 200),
+    })
     return {
       ok: false,
       data: null,
-      error: `The server didn't return a valid response (HTTP ${response.status}, ${contentType || 'unknown content type'}). Please verify the Server URL is correct and try again.`,
+      error: `Unexpected ${ctTag} response (HTTP ${response.status}${methodTag}). Please retry.`,
     }
   }
 
   try {
     return { ok: true, data: JSON.parse(text), error: null }
   } catch (e) {
+    console.log('[api] JSON parse failed', {
+      status: response.status,
+      bodyPreview: text.slice(0, 200),
+    })
     return {
       ok: false,
       data: null,
-      error: `The server returned a malformed response (HTTP ${response.status}). Please try again in a moment.`,
+      error: `Malformed JSON (HTTP ${response.status}${methodTag}). Please retry.`,
     }
   }
 }
@@ -58,6 +85,7 @@ async function safeReadJsonResponse(response) {
 // (HTTP 401 with a JSON body) are NOT retried — they pass through immediately.
 async function fetchJsonWithRetry(url, options) {
   const RETRY_DELAY_MS = 1500
+  const method = (options && options.method) || 'GET'
   let attempt = 0
   let response = null
   let parsed = null
@@ -79,7 +107,7 @@ async function fetchJsonWithRetry(url, options) {
       break
     }
 
-    parsed = await safeReadJsonResponse(response)
+    parsed = await safeReadJsonResponse(response, method)
     if (parsed.ok) {
       return { response, parsed, networkError: null }
     }

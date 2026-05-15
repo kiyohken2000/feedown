@@ -10,12 +10,14 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import TextInputBox from '../../components/TextInputBox'
 import { loginButtonStatus } from './functions'
 import { showErrorToast } from '../../utils/showToast'
+import ConnectionHintBox from '../../components/ConnectionHintBox'
 
 export default function SignIn() {
   const [serverUrl, setServerUrl] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [hasFailed, setHasFailed] = useState(false)
   const { signIn, serverUrl: savedServerUrl } = useContext(UserContext)
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
@@ -54,6 +56,7 @@ export default function SignIn() {
       // Navigation is handled automatically by UserContext
     } catch (e) {
       console.log('on sign in error', e)
+      setHasFailed(true)
       showErrorToast({
         title: 'Sign In Failed',
         body: e.message || 'Please check your credentials',
@@ -141,6 +144,7 @@ export default function SignIn() {
               isLoading={false}
             />
           </View>
+          {hasFailed && <ConnectionHintBox />}
         </View>
       </KeyboardAwareScrollView>
     </ScreenTemplate>

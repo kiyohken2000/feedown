@@ -10,6 +10,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import TextInputBox from '../../components/TextInputBox'
 import { loginButtonStatus } from '../signin/functions'
 import { showToast, showErrorToast } from '../../utils/showToast'
+import ConnectionHintBox from '../../components/ConnectionHintBox'
 
 export default function SignUp() {
   const route = useRoute()
@@ -17,6 +18,7 @@ export default function SignUp() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [hasFailed, setHasFailed] = useState(false)
   const { signUp, serverUrl: savedServerUrl } = useContext(UserContext)
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
@@ -50,6 +52,7 @@ export default function SignUp() {
       // Navigation is handled automatically by UserContext
     } catch (e) {
       console.log('on sign up error', e)
+      setHasFailed(true)
       showErrorToast({
         title: 'Sign Up Failed',
         body: e.message || 'Please try again',
@@ -74,6 +77,7 @@ export default function SignUp() {
       })
     } catch (e) {
       console.log('on quick create error', e)
+      setHasFailed(true)
       showErrorToast({
         title: 'Quick Create Failed',
         body: e.message || 'Please try again',
@@ -175,6 +179,7 @@ export default function SignUp() {
               Test accounts are limited to 3 feeds and 10 favorites.
             </Text>
           </View>
+          {hasFailed && <ConnectionHintBox />}
         </View>
       </KeyboardAwareScrollView>
     </ScreenTemplate>
