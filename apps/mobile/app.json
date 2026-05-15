@@ -7,7 +7,7 @@
       "ios",
       "android"
     ],
-    "version": "1.0.8",
+    "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/images/AppIcon_2.png",
     "splash": {
@@ -30,7 +30,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "net.votepurchase.feedown",
-      "buildNumber": "12",
+      "buildNumber": "13",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Use the photo library to change your avatar.",
         "NSCameraUsageDescription": "QRコードをスキャンして簡単にログインするためにカメラを使用します。",
@@ -41,7 +41,7 @@
     },
     "android": {
       "package": "net.votepurchase.feedown",
-      "versionCode": 9,
+      "versionCode": 10,
       "userInterfaceStyle": "automatic",
       "softwareKeyboardLayoutMode": "pan",
       "permissions": [

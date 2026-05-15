@@ -53,6 +53,48 @@ async function safeReadJsonResponse(response) {
   }
 }
 
+// Wraps fetch + safeReadJsonResponse with one transparent retry when an edge
+// component (e.g. CDN bot challenge) returns a non-JSON body. Real auth errors
+// (HTTP 401 with a JSON body) are NOT retried — they pass through immediately.
+async function fetchJsonWithRetry(url, options) {
+  const RETRY_DELAY_MS = 1500
+  let attempt = 0
+  let response = null
+  let parsed = null
+  let networkError = null
+
+  while (attempt < 2) {
+    networkError = null
+    try {
+      response = await fetch(url, options)
+    } catch (e) {
+      networkError = e
+      response = null
+      parsed = null
+      if (attempt === 0) {
+        attempt += 1
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS))
+        continue
+      }
+      break
+    }
+
+    parsed = await safeReadJsonResponse(response)
+    if (parsed.ok) {
+      return { response, parsed, networkError: null }
+    }
+
+    if (attempt === 0) {
+      attempt += 1
+      await new Promise(r => setTimeout(r, RETRY_DELAY_MS))
+      continue
+    }
+    break
+  }
+
+  return { response, parsed, networkError }
+}
+
 /**
  * API Client class for making authenticated requests
  */
@@ -79,18 +121,20 @@ class ApiClient {
         return null
       }
 
-      const response = await fetch(`${baseUrl}/api/auth/refresh`, {
-        method: 'POST',
-        headers: { ...DEFAULT_API_HEADERS },
-        body: JSON.stringify({ refreshToken }),
-      })
+      const { response, parsed } = await fetchJsonWithRetry(
+        `${baseUrl}/api/auth/refresh`,
+        {
+          method: 'POST',
+          headers: { ...DEFAULT_API_HEADERS },
+          body: JSON.stringify({ refreshToken }),
+        }
+      )
 
-      if (!response.ok) {
+      if (!response || !response.ok) {
         return null
       }
 
-      const parsed = await safeReadJsonResponse(response)
-      if (!parsed.ok || !parsed.data) {
+      if (!parsed || !parsed.ok || !parsed.data) {
         return null
       }
       const data = parsed.data
@@ -120,22 +164,30 @@ class ApiClient {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${baseUrl}${endpoint}`, {
-        ...options,
-        headers: {
-          ...headers,
-          ...options.headers,
-        },
-      })
+      const { response, parsed, networkError } = await fetchJsonWithRetry(
+        `${baseUrl}${endpoint}`,
+        {
+          ...options,
+          headers: {
+            ...headers,
+            ...options.headers,
+          },
+        }
+      )
 
-      const parsed = await safeReadJsonResponse(response)
-      const data = parsed.data
+      if (!response) {
+        return {
+          success: false,
+          error: networkError?.message || 'Network error. Please check your connection and try again.',
+        }
+      }
+
+      const data = parsed?.data
 
       // Handle 401 Unauthorized - try to refresh token
       if (response.status === 401 && !isRetry) {
         const newToken = await this.refreshToken()
         if (newToken) {
-          // Retry the request with new token
           return this.request(endpoint, options, true)
         }
       }
@@ -143,7 +195,7 @@ class ApiClient {
       if (!response.ok) {
         return {
           success: false,
-          error: data?.error || parsed.error || `HTTP ${response.status}: ${response.statusText}`,
+          error: data?.error || parsed?.error || `HTTP ${response.status}: ${response.statusText}`,
         }
       }
 
@@ -200,13 +252,21 @@ class AuthAPI {
   async login(email, password) {
     try {
       const baseUrl = await this.getServerUrl()
-      const response = await fetch(`${baseUrl}/api/auth/login`, {
-        method: 'POST',
-        headers: { ...DEFAULT_API_HEADERS },
-        body: JSON.stringify({ email, password }),
-      })
+      const { response, parsed, networkError } = await fetchJsonWithRetry(
+        `${baseUrl}/api/auth/login`,
+        {
+          method: 'POST',
+          headers: { ...DEFAULT_API_HEADERS },
+          body: JSON.stringify({ email, password }),
+        }
+      )
 
-      const parsed = await safeReadJsonResponse(response)
+      if (!response) {
+        return {
+          success: false,
+          error: networkError?.message || 'Network error. Please check your connection and try again.',
+        }
+      }
 
       if (!parsed.ok) {
         return { success: false, error: parsed.error }
@@ -239,13 +299,21 @@ class AuthAPI {
   async register(email, password) {
     try {
       const baseUrl = await this.getServerUrl()
-      const response = await fetch(`${baseUrl}/api/auth/register`, {
-        method: 'POST',
-        headers: { ...DEFAULT_API_HEADERS },
-        body: JSON.stringify({ email, password }),
-      })
+      const { response, parsed, networkError } = await fetchJsonWithRetry(
+        `${baseUrl}/api/auth/register`,
+        {
+          method: 'POST',
+          headers: { ...DEFAULT_API_HEADERS },
+          body: JSON.stringify({ email, password }),
+        }
+      )
 
-      const parsed = await safeReadJsonResponse(response)
+      if (!response) {
+        return {
+          success: false,
+          error: networkError?.message || 'Network error. Please check your connection and try again.',
+        }
+      }
 
       if (!parsed.ok) {
         return { success: false, error: parsed.error }
