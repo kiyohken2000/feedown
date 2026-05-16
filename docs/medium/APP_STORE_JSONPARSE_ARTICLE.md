@@ -1,10 +1,10 @@
-# How a Cloudflare Pages SPA Fallback Got My App Rejected 4 Times by the App Store
+# How a One-Year-Old Cloudflare Country Block Got My App Rejected 5 Times by the App Store
 
-*A 4-rejection journey from "JSON Parse error" to a one-line export bug*
+*A 5-rejection journey, 4 wrong diagnoses, and the GraphQL query that finally surfaced the real cause*
 
 ---
 
-> **Status (2026-05-16)**: Build 1.0.9 has been submitted but not yet reviewed. This article documents the investigation and fix. The "did it actually pass?" follow-up will be appended once Apple decides.
+> **Status (2026-05-16)**: After 5 rejections, the actual root cause has been identified and fixed. A re-review has been requested via Resolution Center against the existing build (1.0.7, build 11). This article documents the full investigation — including the wrong turns. The "did it actually pass?" follow-up will be appended once Apple decides.
 
 ---
 
@@ -39,7 +39,7 @@ The catch: **it worked everywhere else**. Every device I owned. Every TestFlight
 
 It even worked **on App Review's own network previously**. The same authentication flow — same backend, same client code path — had cleared four prior App Store reviews without a single rejection. Then, on this submission, it suddenly didn't. The app hadn't changed in any way that touched auth. The reviewers hadn't (visibly) changed. Yet from this round on, the very same flow was hitting `JSON Parse error` reliably enough that Apple kept rejecting on it.
 
-This article is the story of the four rejections it took to figure out why, and the one-line bug at the bottom of it.
+This article is the story of the five rejections it took to find the actual cause, four wrong diagnoses along the way, and the GraphQL query that finally surfaced what had been hiding in plain sight for a year.
 
 ---
 
@@ -48,7 +48,7 @@ This article is the story of the four rejections it took to figure out why, and 
 I built [FeedOwn](https://github.com/kiyohken2000/feedown), a self-hosted RSS reader with a React Native (Expo) mobile app and a Cloudflare Pages backend. The auth layer is a thin proxy in front of Supabase, served from `functions/api/auth/login.ts` and friends:
 
 ```ts
-// functions/api/auth/login.ts (the buggy version)
+// functions/api/auth/login.ts (the original version)
 export async function onRequestPost(context) {
   const { email, password } = await context.request.json()
   const result = await supabase.auth.signInWithPassword({ email, password })
@@ -105,9 +105,9 @@ Same rejection. Quick Create button — which uses a hardcoded test account and 
 
 This was rejection 3, and I had run out of cheap theories.
 
-## Rejection 4: Going to the Logs
+## Rejection 4: Going to the Logs (and reaching the wrong conclusion)
 
-I requested Apple Analytics permissions on a fresh Cloudflare API token and queried the GraphQL Analytics API for the review window (the timestamps come from App Store Connect's review status):
+I issued a fresh Cloudflare API token with Analytics permissions and queried the GraphQL Analytics API for the review window (the timestamps come from App Store Connect's review status):
 
 ```graphql
 query ReviewWindow($zoneTag: string!, $start: Time!, $end: Time!) {
@@ -125,7 +125,6 @@ query ReviewWindow($zoneTag: string!, $start: Time!, $end: Time!) {
           clientRequestHTTPMethodName
           clientRequestPath
           edgeResponseStatus
-          edgeResponseContentTypeName
         }
         count
       }
@@ -138,7 +137,7 @@ The result during Apple's review window: **zero `/api/auth/*` POST requests**. N
 
 That confirmed `api.feedown.org` was correctly bypassing the Cloudflare zone (otherwise the requests would show up in zone analytics). The traffic was going directly to Pages — and dying somewhere I couldn't see from the zone log.
 
-So I went back to the basics and ran curl manually:
+So I went back to basics and ran curl manually:
 
 ```bash
 $ curl -i https://api.feedown.org/api/auth/login
@@ -150,9 +149,9 @@ content-type: text/html; charset=utf-8
 
 A `GET` request to my POST endpoint returned **`200 OK` with `text/html`**. Not 405. Not 404. A 200 response with the React app's `index.html`.
 
-That's when it clicked.
+And here is where I made a mistake that cost me one more rejection: I thought I'd found the smoking gun.
 
-## The Bug: SPA Fallback ate my API route
+### The (wrong) SPA-fallback hypothesis
 
 Cloudflare Pages has two layers:
 
@@ -161,15 +160,18 @@ Cloudflare Pages has two layers:
 
 When you export `onRequestPost`, the Function only handles **POST**. Any other method to that path **doesn't reach the Function at all** — it falls through to the static asset layer, which can't find a literal file at `/api/auth/login`, so it serves the SPA fallback (`index.html`) with `200 OK`.
 
-For my own usage, this never mattered. My mobile app sends POST. My curl tests sent POST. Production users send POST. **Everyone sent POST.**
+I theorised: **something** in Apple's review network path was rewriting POST into another method. Maybe a TLS-intercepting proxy. Maybe an HTTP/2 downgrade. Maybe an iOS URLSession quirk. Whatever it was, the request was arriving at Cloudflare as not-POST, falling through to SPA fallback, and returning HTML 200 — which the mobile client then tried to parse as JSON.
 
-Except, apparently, something in Apple's review network path. I still don't know exactly what — a TLS-intercepting proxy that retries with a different verb? An HTTP/2 to HTTP/1.1 downgrade that mangled the method? An iOS URLSession quirk under specific network conditions? Whatever it is, the request arrived at Cloudflare as something other than POST, fell through to the SPA fallback, and Apple's reviewer saw the React app's index page instead of an auth response.
+This story **fit the evidence I had**:
+- The reviewer saw a JSON parse error consistent with HTML being parsed
+- My curl test confirmed non-POST requests returned HTML 200
+- Zero `/api/auth/*` POST requests appeared in zone analytics (which I read as "the request never reached me as POST")
 
-The mobile app then ran `JSON.parse('<!doctype html>...')` and threw exactly the error in their screenshot.
+The trouble: I missed an alternative explanation that fit the same evidence, and only later realised it fit much better.
 
-## The Fix: `onRequest` + Defense in Depth
+### The "fix" I shipped (still useful, just not the actual fix)
 
-**Step 1**: Replace `onRequestPost` with `onRequest`, so the Function catches **every** method:
+I replaced `onRequestPost` with `onRequest` and added a `withJsonGuard` helper that guarantees a JSON body even on unhandled exceptions:
 
 ```ts
 // functions/api/auth/login.ts (after)
@@ -186,25 +188,8 @@ export async function onRequest(context) {
 }
 ```
 
-**Step 2**: A shared `withJsonGuard` helper that **guarantees** a JSON response — even if the handler throws:
-
 ```ts
 // functions/lib/jsonResponse.ts
-export function jsonResponse(data, status = 200, extraHeaders = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'content-type': 'application/json', ...extraHeaders }
-  })
-}
-
-export function methodNotAllowed(method, allowed) {
-  return jsonResponse(
-    { error: `Method ${method} not allowed`, allowed },
-    405,
-    { allow: allowed.join(', ') }
-  )
-}
-
 export async function withJsonGuard(label, request, handler) {
   logRequestDiag(label, request)
   try {
@@ -216,133 +201,220 @@ export async function withJsonGuard(label, request, handler) {
 }
 ```
 
-**Step 3**: Diagnostic logging in `logRequestDiag` so the next time a weirdly-shaped request arrives, I can see it:
-
-```ts
-export function logRequestDiag(label, request) {
-  console.log(`[${label}]`, {
-    method: request.method,
-    country: request.headers.get('cf-ipcountry'),
-    ip: request.headers.get('cf-connecting-ip'),
-    ua: request.headers.get('user-agent'),
-    contentType: request.headers.get('content-type'),
-    accept: request.headers.get('accept'),
-  })
-}
-```
-
-**Step 4**: Tighten the client-side error message so even a truncated toast shows the diagnostic:
+I also tightened the client-side error message so a truncated toast still shows the diagnostic:
 
 ```js
 throw new Error(
   `Unexpected ${shortContentType(ct)} response (HTTP ${status} ${method}). Please retry.`
 )
-// → "Unexpected html response (HTTP 200 POST). Please retry."
+// → "Unexpected html response (HTTP 403 POST). Please retry."
 ```
 
-Now, regardless of what the reviewer's network does to the request, **HTML can never be returned**. The symptom is sealed even if the underlying cause never gets identified.
+For the record: this fix is genuinely good. It closes a real, separate bug (any non-POST request to those endpoints was indeed returning HTML, which is bad regardless of who triggers it). The `withJsonGuard` and tightened error format both pay off in rejection 5 below. They just weren't the fix for the symptom Apple was hitting.
 
-## Verification
+## Rejection 5: Same Symptom, Better Error Message
 
-Before:
+Submitted with the SPA-fallback fix. Confident again. Wrong again.
+
+![Rejection 5: Sign In Failed — Unexpected html response (HTTP 403 POST)](apple-review-403-post.png)
+*Rejection 5 (2026-05-16). The Server URL is still `https://api.feedown.org`, but now the toast carries our new tightened error format: `Unexpected html response (HTTP 403 POST)`. Three diagnostics jump out: (1) the method **is** `POST` — the SPA-fallback hypothesis was wrong, because we'd assumed Apple's network was rewriting POST into something else; (2) the response is `403` — something is actively rejecting the request, not silently returning a fallback; (3) the content is `html` — almost certainly a Cloudflare challenge interstitial.*
+
+This screenshot is essentially the entire post-mortem in one frame.
+
+The previous theory (SPA fallback) **predicted** that the request would arrive as something other than POST. The new error says **POST POST POST**, with status **403**. The SPA fallback returns 200, not 403. So the previous theory was structurally wrong, not just incomplete.
+
+Something was actively returning a 403 HTML body to a POST request to `api.feedown.org/api/auth/login`. From Apple's network. Specifically.
+
+## Back to the Logs (correctly this time)
+
+The thing I'd missed in round 4: when `api.feedown.org` is grey-cloud, requests **don't appear in zone analytics**, but **user-scope rules can still fire**. So "zero `/api/auth/*` requests in zone analytics" doesn't mean "no Cloudflare layer touched the request." It only means "the zone proxy didn't see it." There are other Cloudflare layers.
+
+I switched `api.feedown.org` back to orange-cloud (proxied) so future requests would at least show up in zone analytics. Then I went back to the **previous** rounds — specifically rounds 2 and 3, when the demo server was `feedown.org` (which had always been orange-clouded). Those requests **were** in zone analytics. They had been all along. I just hadn't looked at them through the right lens.
+
+I queried `httpRequestsAdaptiveGroups` per day (the free plan caps each query at 24 hours):
+
+```graphql
+query {
+  viewer {
+    zones(filter: { zoneTag: "..." }) {
+      httpRequestsAdaptiveGroups(
+        filter: {
+          datetime_geq: "2026-05-14T00:00:00Z"
+          datetime_leq: "2026-05-14T23:59:59Z"
+          clientRequestPath: "/api/auth/login"
+        }
+        limit: 500
+      ) {
+        dimensions {
+          datetimeMinute
+          clientRequestHTTPHost
+          edgeResponseStatus
+          clientCountryName
+          clientRequestHTTPMethodName
+        }
+        count
+      }
+    }
+  }
+}
+```
+
+Result for May 14:
+
+| Time (UTC) | Host | Method | Status | Country | Count |
+|---|---|---|---|---|---|
+| 02:42–02:43 | feedown.org | POST | **403** | **SG** | 6 |
+| 02:50–03:36 | feedown.org | POST | 200 / 401 | JP | (me testing) |
+
+And May 15:
+
+| Time (UTC) | Host | Method | Status | Country | Count |
+|---|---|---|---|---|---|
+| 03:34–03:35 | feedown.org | POST | **403** | **SG** | 3 |
+
+Six POST requests from Singapore to `/api/auth/login`, all returning 403. The timestamps line up exactly with Apple's review windows. I'd been staring at the wrong day all along.
+
+Next, the firewall events for those same windows:
+
+```graphql
+firewallEventsAdaptive(filter: {
+  datetime_geq: "2026-05-14T02:30:00Z"
+  datetime_leq: "2026-05-14T03:00:00Z"
+  clientCountryName: "SG"
+}) {
+  datetime clientIP clientRequestHTTPHost clientRequestPath
+  clientRequestHTTPMethodName userAgent
+  action source ruleId rayName
+}
+```
+
+```json
+{
+  "action": "challenge",
+  "clientIP": "17.84.123.163",
+  "clientRequestHTTPHost": "feedown.org",
+  "clientRequestPath": "/api/auth/login",
+  "clientRequestHTTPMethodName": "POST",
+  "userAgent": "FeedOwn/7 CFNetwork/3860.500.112 Darwin/25.4.0",
+  "source": "country",
+  "ruleId": "forceroute",
+  ...
+}
+```
+
+`17.0.0.0/8` is Apple's IP range (AS714). The `source: country` + `ruleId: forceroute` combination means a country-targeted rule was matching the request and issuing a managed challenge — which, to a mobile client that's expecting JSON, looks exactly like a 403 with an HTML body.
+
+There it was.
+
+## The Actual Root Cause
+
+I went into the Cloudflare dashboard's IP Access Rules and found six rules, all created on **2025-06-02** — almost a year before any of this started:
+
+| Country | Action | Created |
+|---|---|---|
+| **SG** | challenge | 2025-06-02 |
+| **US** | challenge | 2025-05-31 |
+| LU | challenge | 2025-06-03 |
+| NO | challenge | 2025-06-02 |
+| GB | challenge | 2025-06-02 |
+| DE | challenge | 2025-06-02 |
+
+All user-scoped. All issuing managed challenges. I'd added them a year earlier as anti-bot hardening for WordPress probe traffic from those countries and completely forgotten about them.
+
+**Apple App Review traffic comes from Singapore (and sometimes Cupertino, US) data centres.** Every POST from Apple's reviewer was hitting the SG country rule, getting a managed challenge HTML body served back, and the mobile client was parsing that HTML as JSON and failing.
+
+A few details that made this especially hard to spot:
+
+1. **User-scope rules apply at the CF edge globally**, not at a specific zone proxy. They fire on grey-cloud Pages traffic too. That's why rounds 4 and 5 (with grey-clouded `api.feedown.org`) still got challenged, even though `api.feedown.org` didn't appear in zone analytics — the analytics namespace is zone-bound, but the rule lives on the edge.
+2. **`security_level=essentially_off` and `Bot Fight Mode=off` do nothing to IP Access Rules.** They're independent layers. I'd turned off the things I thought were doing the blocking, and the actual blocker kept running.
+3. **The rule had been there for a year without causing problems**, because the previous four App Store reviews evidently didn't route through SG/US for the auth endpoint, or routed through a path I never tested. The "what changed?" question — the one I'd been asking the whole time — was the wrong question. The right one was "what's been there all along that I forgot about?"
+
+## The Real Fix
 
 ```bash
-$ curl -i https://api.feedown.org/api/auth/login
+# Delete the SG country challenge rule
+curl -X DELETE \
+  "https://api.cloudflare.com/client/v4/user/firewall/access_rules/rules/<sg-rule-id>" \
+  -H "X-Auth-Email: ..." -H "X-Auth-Key: ..."
+
+# Delete the US country challenge rule
+curl -X DELETE \
+  "https://api.cloudflare.com/client/v4/user/firewall/access_rules/rules/<us-rule-id>" \
+  -H "X-Auth-Email: ..." -H "X-Auth-Key: ..."
+```
+
+One curl. Two rules. Done.
+
+A quick verification from my own laptop:
+
+```bash
+$ curl -i -X POST https://api.feedown.org/api/auth/login \
+    -H "content-type: application/json" \
+    -H "user-agent: FeedOwn-Mobile/1.0.9" \
+    -d '{"email":"test1@test.com","password":"111111"}'
+
 HTTP/2 200
-content-type: text/html; charset=utf-8
-<!doctype html>...
+content-type: application/json; charset=utf-8
+cf-ray: 9fc8a2f3386ceb2a-SJC
+{"success":true,"user":{...},"token":"eyJ..."}
 ```
 
-After:
+No new build needed; the failure was purely server-side. The reply to Apple's Resolution Center now reads (paraphrased): *"We identified that this account was rejecting requests from Singapore data centres, including yours, via an outdated Cloudflare country challenge rule. The rule has been removed. Please retry with the existing build (1.0.7, build 11). Server URL unchanged."*
 
-```bash
-$ curl -i https://api.feedown.org/api/auth/login
-HTTP/2 405
-content-type: application/json
-allow: POST
-{"error":"Method GET not allowed","allowed":["POST"]}
-```
+Pending Apple's re-review, but the diagnostic side is settled.
 
-```bash
-$ curl -i -X PUT https://api.feedown.org/api/auth/login
-HTTP/2 405
-content-type: application/json
-{"error":"Method PUT not allowed","allowed":["POST"]}
-```
+## A note on the SPA-fallback "fix"
 
-Every method returns JSON. Mission accomplished — for this symptom at least.
+The `onRequest` + `withJsonGuard` change from round 4 is staying in. It addressed a real and separate bug — any non-POST request to those endpoints really was returning HTML 200, which is bad for any caller, just not the caller Apple was using. And the tightened error format (`Unexpected html response (HTTP 403 POST)`) is **the only reason rejection 5 was diagnosable in a single screenshot**. Without it, I'd have seen another "JSON Parse error: Unexpected character: <" and lost another day guessing.
+
+So: wrong diagnosis, but the fix was independently worth shipping. I'll take that.
 
 ## Lessons
 
-### 1. `onRequestPost` is a footgun on Cloudflare Pages
+### 1. Read the error message structurally
 
-If your Pages project also serves a SPA, **never use `onRequestPost`** (or `onRequestGet`, etc.) on its own. Always export `onRequest` and check the method inside. Otherwise, any non-matching method silently falls through to your SPA fallback and returns HTML 200 — the worst possible failure mode because nothing about it looks like an error to a CDN, a load balancer, or a monitoring tool.
+The rejection 5 error — `Unexpected html response (HTTP 403 POST)` — encoded three facts: the method (POST), the status (403), and the body type (HTML). Each fact constrained the space of explanations.
 
-I'd argue this is a documentation gap on Cloudflare's side. The `onRequest*` family is presented as a convenience, not as a footgun. The footgun-ness is entirely emergent from the SPA fallback behavior.
+`HTTP 403` + `HTML body` together is essentially the signature of a Cloudflare managed challenge. `POST` ruled out the SPA-fallback theory. If I'd built the tightened error format earlier (it took me until round 4 to add it), I would have realised the round-4 theory was wrong before submitting it.
 
-### 2. Production works ≠ Apple's reviewer's network works
+**Make your errors encode enough state to falsify your own hypotheses.**
 
-The Apple review network is its own beast. It's not your home Wi-Fi. It's not your office. It's not even a normal mobile carrier. There are reports of:
+### 2. "The request didn't reach my analytics" doesn't mean "the request didn't hit Cloudflare"
 
-- TLS-intercepting proxies (especially for apps that hit non-standard ports — Agora WebRTC apps have hit this)
-- IPv6-only paths
-- VPN egress from unexpected geos
-- Behavior that only triggers on **first launch** of a freshly-installed binary
+Zone analytics covers the zone proxy. Cloudflare has many other layers that can act on a request: account-scope rules, user-scope rules, Pages-internal protections, DDoS L7 mitigation, Workers in the path. A grey-clouded custom domain bypasses **the zone proxy specifically**, not the edge as a whole. Don't conclude "no request reached me" from "no request reached this one log surface."
 
-If your app fails on review but nowhere else, **don't assume it's a fluke**. There's a real bug; you just need a network condition pathological enough to surface it.
+### 3. When the obvious recent change isn't to blame, look at old config
 
-### 3. Defensive JSON parsing > debugging mystery 5xx errors
+I spent four rejections asking "what changed?" There were no recent changes that explained the regression. The answer turned out to be a rule from twelve months ago — older than the last successful App Store review, older than half the dependencies in the project. It had presumably always been a latent bug; some shift in Apple's review network routing during this submission cycle just made it observable. **Untouched config can break too**, if the world around it changes.
 
-When you don't know **why** a non-JSON response is reaching your client, the highest-leverage fix is to make sure your server **physically cannot** return non-JSON. That eliminates the entire failure class even if you never figure out the root cause.
+### 4. Cloudflare GraphQL Analytics + firewall events is the right tool here
 
-```js
-// Bad: assume the response is JSON
-const data = await response.json()
+If you're on Cloudflare and a request is mysteriously failing, two queries cover most of the territory:
 
-// Good: read text, try parse, throw a useful error if not
-const text = await response.text()
-try { return JSON.parse(text) }
-catch { throw new Error(`Non-JSON response (HTTP ${status} ${ct})`) }
-```
+- `httpRequestsAdaptiveGroups` — did the request reach the zone, and what status did it get?
+- `firewallEventsAdaptive` — did any firewall/WAF/managed rule act on it, and which one?
 
-### 4. Cloudflare GraphQL Analytics is underrated for this
+The Free plan caps each query at 24 hours, so for multi-day investigations you have to loop, but the data is there. The API token wants `Zone → Analytics → Read` + `Account → Analytics → Read`; dashboard-generated tokens often don't include both.
 
-If you're on Cloudflare and you suspect "the request isn't reaching my server," the GraphQL Analytics API can tell you definitively whether the zone saw the request. The catch is the API token needs:
+### 5. User-scope rules are sneaky
 
-- Zone → Analytics → Read
-- Account → Analytics → Read
-- Cloudflare Pages → Read
+The rule that bit me was user-scope, which means it applies across every zone in the account, doesn't show up in any single zone's WAF view as obviously "yours," and can't be edited via API tokens — only via the legacy Global API Key. If you've ever added country/IP rules in the IP Access Rules section of any zone, audit them periodically. They outlive the projects you added them for.
 
-…and the default tokens generated through the dashboard usually don't have all three. Make a fresh one for incident response.
+### 6. Defense in depth is good even when it doesn't fix the bug you thought it would
 
-### 5. Reviewer-friendly UI hints can't hurt
+The round-4 `onRequest` + `withJsonGuard` work didn't fix Apple's symptom, but it did:
 
-After this incident, I added an inline hint that appears below the Sign In form on **any** auth failure:
+- Close a real (separate) bug
+- Make the round-5 error message diagnosable in one screenshot
+- Add structured per-request logging that'll help with future incidents
 
-```
-⚠ Connection issue
-If sign-in keeps failing, try one of these:
-• Disable VPN if enabled
-• Switch between Wi-Fi and cellular
-• Try again in a moment
-```
-
-This won't fix the bug, but it gives the reviewer (and any future user behind a flaky network) a concrete next step instead of just a red toast.
-
-## What I'd Do Differently
-
-If I were starting this project today:
-
-1. **Default to `onRequest` from day one.** The savings from `onRequestPost`'s built-in method check aren't worth the SPA fallback risk.
-2. **Wrap every Function in a `withJsonGuard`-style helper.** Internal errors should produce JSON 500s, not crash the worker.
-3. **Set up a synthetic monitor that hits each API endpoint with multiple methods**, alerting if any of them returns `text/html`.
-4. **Test on a network you don't control before the first App Store submission.** A coffee shop Wi-Fi with a captive portal, a corporate VPN, anything weird.
+If you ship a fix that turns out to be unrelated to the root cause, it's not wasted as long as the fix was justifiable on its own merits. The wasted-effort failure mode is shipping a fix you only justified by "it might fix the bug."
 
 ## Status
 
-As of writing (2026-05-16), build 1.0.9 with all of the above is submitted and waiting for review. I'll update this article with the outcome — whether it's "finally approved" or "rejection 5, deeper rabbit hole."
+As of writing (2026-05-16): the SG and US country rules are deleted, a reply has been sent through App Store Connect's Resolution Center pointing Apple at the existing build (1.0.7, build 11), and I'm now polling `firewallEventsAdaptive` during the next review window to confirm there are no challenges firing on Apple's IPs. I'll update this article with the outcome.
 
-If you've hit a similar `JSON Parse error: Unexpected character: <` on Apple Review specifically, I'd love to hear about it. Hard to find people who chased this down to the same root cause.
+If you've hit a similar `JSON Parse error: Unexpected character: <` on Apple Review specifically — particularly on a Cloudflare-fronted backend — I'd love to hear about it. Country rules from years ago, hitting App Review's Singapore exit, is a niche enough story that I'm sure other people have lost weekends to the same shape of bug.
 
 ---
 
