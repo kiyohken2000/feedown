@@ -70,7 +70,12 @@
         }
       ],
       "expo-sqlite",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false
+        }
+      ],
       "expo-video"
     ],
     "extra": {
