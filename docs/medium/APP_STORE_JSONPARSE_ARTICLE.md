@@ -1,10 +1,6 @@
-# How a One-Year-Old Cloudflare Country Block Got My App Rejected 5 Times by the App Store
+# How a One-Year-Old Cloudflare Country Block Got My App Rejected 6 Times by the App Store
 
-*A 5-rejection journey, 4 wrong diagnoses, and the GraphQL query that finally surfaced the real cause*
-
----
-
-> **Status (2026-05-16)**: After 5 rejections, the actual root cause has been identified and fixed. A re-review has been requested via Resolution Center against the existing build (1.0.7, build 11). This article documents the full investigation — including the wrong turns. The "did it actually pass?" follow-up will be appended once Apple decides.
+*A 6-rejection journey, several wrong diagnoses, and the GraphQL query that finally surfaced the real cause*
 
 ---
 
@@ -31,7 +27,7 @@ The first rejection arrived under **Guideline 2.1(a) — Performance — App Com
 …and one screenshot:
 
 ![Reviewer's screenshot: Sign In Failed — JSON Parse error: Unexpected character: <](apple-review-jsonparse-error.png)
-*Apple Review's screenshot from the first rejection (2026-05-10). Server URL is `https://feedown.pages.dev`. The toast shows React Native's verbatim `JSON Parse error: Unexpected character: <` — meaning `JSON.parse()` was handed a payload starting with `<`, which is almost always HTML.*
+*Apple Review's screenshot from the first rejection. Server URL is `https://feedown.pages.dev`. The toast shows React Native's verbatim `JSON Parse error: Unexpected character: <` — meaning `JSON.parse()` was handed a payload starting with `<`, which is almost always HTML.*
 
 That's it. No stack trace, no network log, no indication of what the request looked like on their end. Just a screenshot saying "your app's sign-in is broken on our network."
 
@@ -39,7 +35,7 @@ The catch: **it worked everywhere else**. Every device I owned. Every TestFlight
 
 It even worked **on App Review's own network previously**. The same authentication flow — same backend, same client code path — had cleared four prior App Store reviews without a single rejection. Then, on this submission, it suddenly didn't. The app hadn't changed in any way that touched auth. The reviewers hadn't (visibly) changed. Yet from this round on, the very same flow was hitting `JSON Parse error` reliably enough that Apple kept rejecting on it.
 
-This article is the story of the five rejections it took to find the actual cause, four wrong diagnoses along the way, and the GraphQL query that finally surfaced what had been hiding in plain sight for a year.
+This is the story of the six rejections it took to find the actual cause, the wrong diagnoses along the way, and the GraphQL query that finally surfaced what had been hiding in plain sight for a year.
 
 ---
 
@@ -217,7 +213,7 @@ For the record: this fix is genuinely good. It closes a real, separate bug (any 
 Submitted with the SPA-fallback fix. Confident again. Wrong again.
 
 ![Rejection 5: Sign In Failed — Unexpected html response (HTTP 403 POST)](apple-review-403-post.png)
-*Rejection 5 (2026-05-16). The Server URL is still `https://api.feedown.org`, but now the toast carries our new tightened error format: `Unexpected html response (HTTP 403 POST)`. Three diagnostics jump out: (1) the method **is** `POST` — the SPA-fallback hypothesis was wrong, because we'd assumed Apple's network was rewriting POST into something else; (2) the response is `403` — something is actively rejecting the request, not silently returning a fallback; (3) the content is `html` — almost certainly a Cloudflare challenge interstitial.*
+*Rejection 5. The Server URL is still `https://api.feedown.org`, but now the toast carries the new tightened error format: `Unexpected html response (HTTP 403 POST)`. Three diagnostics jump out: (1) the method **is** `POST` — the SPA-fallback hypothesis was wrong, because we'd assumed Apple's network was rewriting POST into something else; (2) the response is `403` — something is actively rejecting the request, not silently returning a fallback; (3) the content is `html` — almost certainly a Cloudflare challenge interstitial.*
 
 This screenshot is essentially the entire post-mortem in one frame.
 
@@ -306,9 +302,9 @@ firewallEventsAdaptive(filter: {
 
 There it was.
 
-## The Actual Root Cause
+## The Apparent Root Cause
 
-I went into the Cloudflare dashboard's IP Access Rules and found six rules, all created on **2025-06-02** — almost a year before any of this started:
+I went into the Cloudflare dashboard's IP Access Rules and found six rules, all created almost a year before any of this started:
 
 | Country | Action | Created |
 |---|---|---|
@@ -318,6 +314,9 @@ I went into the Cloudflare dashboard's IP Access Rules and found six rules, all 
 | NO | challenge | 2025-06-02 |
 | GB | challenge | 2025-06-02 |
 | DE | challenge | 2025-06-02 |
+
+![Cloudflare Dashboard: IP Access Rules with country-scoped challenge entries](cloudflare-ip-access-rules.png)
+*The Cloudflare dashboard view of country-scoped IP Access Rules — Security → WAF → Tools → IP Access Rules. Note the "適用先" (Applies to) column reading "アカウントにあるすべての Web サイト" (All websites in your account), which is what identifies these as **user-scope** rules — the kind that fire on every zone, including grey-cloud DNS-only ones. Recreated for the screenshot after the originals were deleted; only 3 of the original 6 countries are shown (the deleted SG/US/GB are excluded from this recreation to avoid impacting any future App Review run from those datacenters).*
 
 All user-scoped. All issuing managed challenges. I'd added them a year earlier as anti-bot hardening for WordPress probe traffic from those countries and completely forgotten about them.
 
@@ -329,7 +328,9 @@ A few details that made this especially hard to spot:
 2. **`security_level=essentially_off` and `Bot Fight Mode=off` do nothing to IP Access Rules.** They're independent layers. I'd turned off the things I thought were doing the blocking, and the actual blocker kept running.
 3. **The rule had been there for a year without causing problems**, because the previous four App Store reviews evidently didn't route through SG/US for the auth endpoint, or routed through a path I never tested. The "what changed?" question — the one I'd been asking the whole time — was the wrong question. The right one was "what's been there all along that I forgot about?"
 
-## The Real Fix
+## The First Fix
+
+I deleted the two rules I was certain mattered — SG and US:
 
 ```bash
 # Delete the SG country challenge rule
@@ -343,9 +344,11 @@ curl -X DELETE \
   -H "X-Auth-Email: ..." -H "X-Auth-Key: ..."
 ```
 
-One curl. Two rules. Done.
+One curl. Two rules. I left LU / NO / GB / DE in place, reasoning that those countries were irrelevant to App Review.
 
-A quick verification from my own laptop:
+That last sentence — leaving the other four rules in place — turned out to be wrong, and is the reason this story has a sixth rejection in it. More on that shortly.
+
+A quick verification from my own laptop confirmed the auth endpoint was healthy:
 
 ```bash
 $ curl -i -X POST https://api.feedown.org/api/auth/login \
@@ -359,11 +362,65 @@ cf-ray: 9fc8a2f3386ceb2a-SJC
 {"success":true,"user":{...},"token":"eyJ..."}
 ```
 
-No new build needed; the failure was purely server-side. The reply to Apple's Resolution Center now reads (paraphrased): *"We identified that this account was rejecting requests from Singapore data centres, including yours, via an outdated Cloudflare country challenge rule. The rule has been removed. Please retry with the existing build (1.0.7, build 11). Server URL unchanged."*
+No new build needed; the failure was purely server-side. I replied through App Store Connect's Resolution Center pointing Apple at the existing build (1.0.7, build 11) with a paraphrased: *"We identified that this account was rejecting requests from Singapore data centres, including yours, via an outdated Cloudflare country challenge rule. The rule has been removed. Please retry."*
 
-Pending Apple's re-review, but the diagnostic side is settled.
+## Re-Review: Sign-In Passed, but a Different Bug Surfaced
 
-## A note on the SPA-fallback "fix"
+Apple re-reviewed against the same build. **Sign-in passed cleanly.** The CF logs during the review window confirmed it — no challenge events on Apple's IPs.
+
+But the reviewer kept going into the app and hit a separate rejection: **Guideline 2.5.4 — `UIBackgroundModes` declares `audio` but the app has no persistent audio feature**.
+
+This had nothing to do with the Cloudflare story. The cause was the `expo-audio` Expo Config Plugin, whose `enableBackgroundPlayback: true` default silently writes `"audio"` into `UIBackgroundModes` even for apps that never play audio in the background. FeedOwn's Read Aloud feature is foreground-only, so the declaration was inaccurate.
+
+Apple offered the "Bug Fix Submission" path: reply, and they'd approve the current build with the issue queued to be fixed in the next update. I replied with a one-line Japanese equivalent of "This is a bug fix." (Spoiler: that wasn't enough — coming back to it below.)
+
+The Cloudflare bug was, at this point, supposedly dead. The story should have ended there. It didn't.
+
+## Rejection 6: The Same Bug, From a Country I'd Dismissed
+
+The next day, Apple re-reviewed and rejected with the **exact same** `JSON Parse error / unable to sign in` symptom from rejections 1–5.
+
+The CF logs for the review window were unambiguous:
+
+| Time (UTC) | clientIP | Country | Path | Action | Rule |
+|---|---|---|---|---|---|
+| 2026-05-18 11:24–11:25 | 17.232.74.245 | **GB** | /api/auth/login, /api/auth/register | challenge | source=country, ruleId=forceroute |
+
+A different Apple datacenter — the UK this time, AS714 IP `17.232.74.245`, user-agent `FeedOwn-Mobile/1.0.9` — had hit the residual **GB** rule and received the same managed challenge HTML body. Same bug, different country.
+
+This was the consequence of the judgement call I flagged earlier: "I left LU / NO / GB / DE in place, reasoning that those countries were irrelevant to App Review." That reasoning was wrong. Apple App Review can come from at least SG, US, **and GB** — and probably other regions I still haven't observed.
+
+I deleted the remaining four rules and verified all three rule scopes (user-scope / zone-scope / account-scope) were empty. No country-based block or challenge rules anywhere.
+
+## The 2.5.4 Re-Rejection and the Parallel-Build Strategy
+
+Apple re-reviewed the SignIn fix and, as expected, sign-in worked. But the same submission was now also carrying the 2.5.4 (`UIBackgroundModes audio`) issue from before — and to my surprise, Apple re-rejected on 2.5.4 even though I'd already replied "This is a bug fix" through the Resolution Center.
+
+The minimal reply hadn't been enough on its own. With nothing else in the reply, the reviewer had no way to evaluate whether the next update would actually fix the declaration. So they re-flagged it.
+
+This time I stopped relying on the Bug Fix Submission path alone and pursued both paths in parallel:
+
+1. **Resolution Center reply** with the specific code-level remediation spelled out:
+   > *This is a bug fix.*
+
+2. **Re-built and resubmitted as `1.0.9 / build 12`** with the `enableBackgroundPlayback: false` change actually applied, so the Info.plist in the new binary no longer declared `audio` in `UIBackgroundModes`.
+
+Apple approved shortly after. Which path Apple actually evaluated — the Bug Fix Submission reply against build 11, or the freshly built binary 12 with the issue genuinely removed — I have no way to tell. But submitting both ensured that *neither* was a single point of failure.
+
+## Final Outcome
+
+**Approved.** Sign-in was resolved server-side without any binary change (the original `1.0.7 / build 11` was sufficient once the Cloudflare rules were gone). The `UIBackgroundModes` issue was resolved by a combination of Resolution Center reply + the resubmitted `1.0.9 / build 12` binary in parallel.
+
+Final tally:
+
+- **6 SignIn rejections** caused by the year-old country challenge rules (5 from the SG/US rules + 1 from the residual GB rule). Resolved entirely server-side — no rebuild needed.
+- **2 bg_audio rejections** from the unrelated `UIBackgroundModes` issue. Resolved via specific Bug Fix reply + a parallel rebuild as `1.0.9 / build 12` carrying `enableBackgroundPlayback: false`.
+- **3 actual code-level fixes shipped**:
+  1. `withJsonGuard` round-4 defense in `functions/lib/jsonResponse.ts` (still useful)
+  2. Deletion of all six country IP Access Rules across all rule scopes
+  3. `enableBackgroundPlayback: false` in `app.json`, shipped in build 12
+
+## A Note on the SPA-fallback "Fix"
 
 The `onRequest` + `withJsonGuard` change from round 4 is staying in. It addressed a real and separate bug — any non-POST request to those endpoints really was returning HTML 200, which is bad for any caller, just not the caller Apple was using. And the tightened error format (`Unexpected html response (HTTP 403 POST)`) is **the only reason rejection 5 was diagnosable in a single screenshot**. Without it, I'd have seen another "JSON Parse error: Unexpected character: <" and lost another day guessing.
 
@@ -410,11 +467,23 @@ The round-4 `onRequest` + `withJsonGuard` work didn't fix Apple's symptom, but i
 
 If you ship a fix that turns out to be unrelated to the root cause, it's not wasted as long as the fix was justifiable on its own merits. The wasted-effort failure mode is shipping a fix you only justified by "it might fix the bug."
 
-## Status
+### 7. Never leave partial country rules
 
-As of writing (2026-05-16): the SG and US country rules are deleted, a reply has been sent through App Store Connect's Resolution Center pointing Apple at the existing build (1.0.7, build 11), and I'm now polling `firewallEventsAdaptive` during the next review window to confirm there are no challenges firing on Apple's IPs. I'll update this article with the outcome.
+The judgement "LU/NO/GB/DE are irrelevant to Apple Review" turned out to cost an entire additional rejection round. Apple App Review can come from at least **SG, US, and GB**, and almost certainly other regions I haven't observed yet. If you're going to keep any country-based challenge or block rule, treat Apple Review as if it could come from any datacenter in the world. The safer move is to delete every country-scoped rule and rebuild whatever controls you actually need as explicit allow rules in a custom WAF ruleset.
 
-If you've hit a similar `JSON Parse error: Unexpected character: <` on Apple Review specifically — particularly on a Cloudflare-fronted backend — I'd love to hear about it. Country rules from years ago, hitting App Review's Singapore exit, is a niche enough story that I'm sure other people have lost weekends to the same shape of bug.
+When you're also chasing a separate bug at the same time (like the bg_audio issue in my case), the temptation to leave "probably irrelevant" rules alone is even higher — you've already changed enough, you want a clean A/B. Resist it. Half-cleaned configuration is worse than untouched configuration, because the next failure looks like the old one came back.
+
+### 8. When the Bug Fix Submission path isn't working, ship a fixed build in parallel
+
+App Store's Bug Fix Submission path is generous — Apple explicitly invites a one-line reply, and they'll often approve the current build with the fix queued for the next update. But it isn't reliable for everything. A one-line "This is a bug fix" reply on a 2.5.x declaration issue can still be re-rejected, because the reviewer has no way to evaluate whether the next update will actually fix it.
+
+When the first Bug Fix reply gets re-rejected, the temptation is to write a more detailed reply and wait again. That works, but it's also slow and uncertain. The strategy that actually moved my submission to approval was to do *both* in parallel: send a more specific Resolution Center reply *and* upload a freshly built binary with the fix genuinely applied. Either path alone is fragile; together they're redundant in the safe direction.
+
+I genuinely don't know which path Apple evaluated to approve my submission — the specific reply against build 11, or the new build 12 with `enableBackgroundPlayback: false` shipped. That's fine. The point of running both is precisely to not have to know.
+
+---
+
+If you've hit a similar `JSON Parse error: Unexpected character: <` on Apple Review specifically — particularly on a Cloudflare-fronted backend — I'd love to hear about it. Country rules from years ago, hitting App Review's Singapore or UK exits, is a niche enough story that I'm sure other people have lost weekends to the same shape of bug.
 
 ---
 
