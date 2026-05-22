@@ -23,11 +23,14 @@
 +EMBED_ASM="./cpp/ggml-metal/ggml-metal-embed.s"
 +METAL_FILE="./cpp/ggml-metal/ggml-metal.metal"
 +{
-+  echo '.section __DATA,__lm_ggml_metallib'
++  # Mach-O section name limit is 16 chars; drop the LM_ prefix here (only the
++  # exported symbols carry it). Matches upstream llama.cpp's __ggml_metallib.
++  echo '.section __DATA,__ggml_metallib'
 +  echo '.globl _lm_ggml_metallib_start'
 +  echo '_lm_ggml_metallib_start:'
 +  # 16 bytes per line, .byte 0xNN,0xNN,...,0xNN
-+  od -An -vtx1 -w16 "$METAL_FILE" | awk 'NF>0 {
++  # (no -w16: macOS BSD od rejects it; both GNU od and BSD od default to 16 bytes/line)
++  od -An -vtx1 "$METAL_FILE" | awk 'NF>0 {
 +    printf ".byte 0x%s", $1
 +    for (i=2; i<=NF; i++) printf ",0x%s", $i
 +    printf "\n"
