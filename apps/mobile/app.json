@@ -37,6 +37,10 @@
         "CFBundleDevelopmentRegion": "ja_JP",
         "ITSAppUsesNonExemptEncryption": false
       },
+      "entitlements": {
+        "com.apple.developer.kernel.extended-virtual-addressing": true,
+        "com.apple.developer.kernel.increased-memory-limit": true
+      },
       "userInterfaceStyle": "automatic"
     },
     "android": {
@@ -76,7 +80,15 @@
           "enableBackgroundPlayback": false
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "llama.rn",
+        {
+          "enableEntitlements": true,
+          "entitlementsProfile": ["production", "development", "preview"],
+          "forceCxx20": true
+        }
+      ]
     ],
     "extra": {
       "eas": {

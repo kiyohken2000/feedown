@@ -19,6 +19,7 @@ import { FEEDOWN_LLM_MODELS } from '../../ai/models'
 import { OUTPUT_LANGUAGES, TTS_VOICE_OPTIONS } from '../../ai/aiStorage'
 import { createApiClient } from '../../utils/api'
 import ScreenTemplate from '../../components/ScreenTemplate'
+import LlamaPocCard from '../../components/llama/LlamaPocCard'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import Spinner from 'react-native-loading-spinner-overlay'
 import { appVersion } from '../../config'
@@ -446,6 +447,9 @@ export default function Profile() {
             )}
           </View>
         </View>
+
+        {/* PoC: llama.rn + Gemma 4 E2B. Delete this block (and the LlamaPocCard/llamaRnPoC files) when done. */}
+        <LlamaPocCard theme={theme} />
 
         {/* TTS: uncomment to re-enable Read Aloud section
         <View style={styles.section}>
