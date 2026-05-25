@@ -20,6 +20,7 @@ import { OUTPUT_LANGUAGES, TTS_VOICE_OPTIONS } from '../../ai/aiStorage'
 import { createApiClient } from '../../utils/api'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import LlamaPocCard from '../../components/llama/LlamaPocCard'
+import ExecutorchBenchCard from '../../components/llama/ExecutorchBenchCard'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import Spinner from 'react-native-loading-spinner-overlay'
 import { appVersion } from '../../config'
@@ -450,6 +451,9 @@ export default function Profile() {
 
         {/* PoC: llama.rn + Gemma 4 E2B. Delete this block (and the LlamaPocCard/llamaRnPoC files) when done. */}
         <LlamaPocCard theme={theme} />
+
+        {/* PoC Phase D: executorch tok/s comparison. Delete with ExecutorchBenchCard when done. */}
+        <ExecutorchBenchCard theme={theme} />
 
         {/* TTS: uncomment to re-enable Read Aloud section
         <View style={styles.section}>

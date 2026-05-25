@@ -73,7 +73,21 @@ export const POC_MODELS = [
     displayName: 'Gemma 4 E2B-it Q4_K_M',
     url: 'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf',
     expectedBytes: 3_110_000_000, // ~3.11 GB
-    note: 'Multimodal (Any-to-Any). PoC main target.',
+    note: 'Multimodal. OOM on iPhone 13 mini (A15/4GB): weights 2948MB > 2863MB working set.',
+  },
+  {
+    id: 'gemma-4-E2B-it-Q3_K_M',
+    displayName: 'Gemma 4 E2B-it Q3_K_M',
+    url: 'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q3_K_M.gguf',
+    expectedBytes: 2_540_000_000, // ~2.54 GB
+    note: 'Smaller quant. Testing if it fits the A15 working set where Q4_K_M OOMs.',
+  },
+  {
+    id: 'gemma-4-E2B-it-UD-Q2_K_XL',
+    displayName: 'Gemma 4 E2B-it UD-Q2_K_XL',
+    url: 'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-UD-Q2_K_XL.gguf',
+    expectedBytes: 2_400_000_000, // ~2.40 GB
+    note: 'Unsloth Dynamic 2-bit. Most headroom; fallback if Q3_K_M still OOMs.',
   },
   {
     id: 'Qwen3-0.6B-Q4_K_M',
@@ -90,8 +104,9 @@ export const POC_MODEL = POC_MODELS[0]
 const MODELS_DIR = `${FileSystem.documentDirectory}llama-models/`
 const modelPathFor = (model) => `${MODELS_DIR}${model.id}.gguf`
 
-// fixed prompt used for the load+run benchmark
-const BENCH_MESSAGES = [
+// fixed prompt used for the load+run benchmark (exported so the executorch
+// comparison card runs the identical prompt for an apples-to-apples tok/s)
+export const BENCH_MESSAGES = [
   {
     role: 'system',
     content:
