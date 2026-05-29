@@ -67,7 +67,61 @@ export async function probeBackends() {
   }
 }
 
+// --- Translation bench (Hy-MT2) -------------------------------------------
+// Realistic multi-paragraph EN article (~1.1k chars), mirrors the real
+// translation chunk size (limitParagraphsForTranslation caps at 2500 chars).
+// Exported so the executorch comparison card translates the IDENTICAL source.
+export const BENCH_TRANSLATE_SOURCE = `Apple unveiled iOS 27 today at its annual developer conference, headlining a wave of on-device artificial intelligence features that run entirely on the iPhone without sending data to the cloud. The company says the new models can summarize long articles, draft replies, and translate text between dozens of languages even when the device is offline.
+
+Battery life also sees a significant upgrade. Apple claims the redesigned power management system extends typical usage by up to two hours on the latest hardware, thanks to a more efficient neural engine and smarter background task scheduling.
+
+The update introduces a redesigned lock screen with interactive widgets that can display live information from third-party apps. Developers gain access to the new APIs starting today, while the public release is scheduled for this fall. Analysts note that the heavy emphasis on local processing reflects growing consumer concern over privacy and the rising cost of cloud inference.`
+
+// Same source split into paragraphs — feeds the app's real buildTranslationMessages().
+export const BENCH_TRANSLATE_PARAGRAPHS = BENCH_TRANSLATE_SOURCE.split('\n\n')
+
+// Hy-MT2 official prompt template for non-Chinese pairs (EN->JA): single user
+// turn, no system prompt, literal markdown bolding kept to match training.
+// Source: tencent/Hy-MT2-1.8B model card.
+export const BENCH_TRANSLATE_MESSAGES = [
+  {
+    role: 'user',
+    content: `Translate the following text into Japanese. Note that you should **only output the translated result without any additional explanation**:\n\n${BENCH_TRANSLATE_SOURCE}`,
+  },
+]
+
+// Sampling recommended by the Hy-MT2 model card.
+const HY_MT2_SAMPLING = {
+  n_predict: 512,
+  temperature: 0.7,
+  top_p: 0.6,
+  top_k: 20,
+  penalty_repeat: 1.05,
+}
+
 export const POC_MODELS = [
+  {
+    id: 'Hy-MT2-1.8B-Q4_K_M',
+    displayName: 'Hy-MT2 1.8B Q4_K_M (translation)',
+    url: 'https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q4_K_M.gguf',
+    expectedBytes: 1_133_000_000, // ~1.13 GB
+    note: 'Tencent translation-specialized. EN->JA bench. Fits A15/4GB with room to spare.',
+    benchMessages: BENCH_TRANSLATE_MESSAGES,
+    benchSampling: HY_MT2_SAMPLING,
+  },
+  {
+    id: 'Hy-MT2-1.8B-Q6_K',
+    displayName: 'Hy-MT2 1.8B Q6_K (translation)',
+    url: 'https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q6_K.gguf',
+    expectedBytes: 1_475_000_000, // ~1.47 GB
+    note: 'Standard Q6_K. Higher-quality fallback if Q4_K_M quality is borderline.',
+    benchMessages: BENCH_TRANSLATE_MESSAGES,
+    benchSampling: HY_MT2_SAMPLING,
+  },
+  // NOTE: AngelSlim 2-bit / 1.25-bit GGUFs do NOT load in llama.rn 0.12.4's
+  // bundled llama.cpp — they use a custom ultra-low-bit quant format that fails
+  // GGUF parsing ("tensor blk.0.attn_k_norm.weight has offset X, expected Y").
+  // Only the standard tencent quants (Q4_K_M / Q6_K / Q8_0) are usable here.
   {
     id: 'gemma-4-E2B-it-Q4_K_M',
     displayName: 'Gemma 4 E2B-it Q4_K_M',
@@ -310,13 +364,17 @@ export async function runBenchmark(opts = {}) {
   }
 
   try {
+    const messages = opts.messages ?? model.benchMessages ?? BENCH_MESSAGES
+    const s = model.benchSampling ?? { n_predict: 256, temperature: 0.7, top_p: 0.9 }
     const genStart = Date.now()
     const completion = await ctx.completion({
-      messages: BENCH_MESSAGES,
-      n_predict: 256,
-      temperature: 0.7,
-      top_p: 0.9,
-      stop: ['</s>', '<|endoftext|>', '<end_of_turn>'],
+      messages,
+      n_predict: s.n_predict ?? 256,
+      temperature: s.temperature ?? 0.7,
+      top_p: s.top_p ?? 0.9,
+      ...(s.top_k != null ? { top_k: s.top_k } : {}),
+      ...(s.penalty_repeat != null ? { penalty_repeat: s.penalty_repeat } : {}),
+      stop: ['</s>', '<|endoftext|>', '<end_of_turn>', '<|eos|>'],
     })
     const generateMs = Date.now() - genStart
 
@@ -327,6 +385,10 @@ export async function runBenchmark(opts = {}) {
       0
     const tokensPerSec =
       tokenCount > 0 && generateMs > 0 ? (tokenCount * 1000) / generateMs : 0
+
+    console.log(
+      `[llamaRnPoC] ===== OUTPUT (${model.displayName}, ${tokensPerSec.toFixed(1)} tok/s, loadMs=${loadMs}) =====\n${text}\n[llamaRnPoC] ===== END =====`,
+    )
 
     return {
       ok: true,
