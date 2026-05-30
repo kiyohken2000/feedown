@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics'
 import { useAi } from '../contexts/AiContext'
 import { buildArticleContext } from './articleContext'
 import { buildSummaryMessages, buildSignalsMessages, buildChatMessagesForGenerate, buildRepairPromptMessages } from './prompts'
-import { parseSummaryOutput, parseSignalsOutput } from './jsonOutput'
+import { parseSummaryOutput, parseSignalsOutput, stripThinkTags } from './jsonOutput'
 import { getSummaryCache, saveSummaryCache, getSignalsCache, saveSignalsCache } from './aiCache'
 
 export const PERSPECTIVES = ['brief', 'technical', 'critical']
@@ -208,7 +208,11 @@ export function useArticleAi(article, readerContent = null) {
   }
 
   function handleChatComplete(rawResponse, pending) {
-    const trimmed = rawResponse?.trim()
+    // Reasoning models (Qwen3 etc.) prepend <think>...</think> before the
+    // visible answer; strip those so the user never sees the internal
+    // reasoning leak through.
+    const cleaned = stripThinkTags(rawResponse)
+    const trimmed = cleaned?.trim()
     if (!trimmed) {
       setChatError('No response received. Please try again.')
       setIsLoadingChat(false)

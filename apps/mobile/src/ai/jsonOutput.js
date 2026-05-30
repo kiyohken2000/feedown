@@ -1,3 +1,19 @@
+// Reasoning models (Qwen3 family, some Llama 3 variants) emit
+// <think>...</think> blocks before the visible answer. They leak into:
+//   - chat replies (user sees the reasoning)
+//   - summary / signals JSON (parser may still recover via extractJson
+//     since the JSON is after </think>, but a stray { inside the think
+//     block can fool the extractor)
+// Strip them defensively at every visible / parsed boundary.
+export function stripThinkTags(text) {
+  if (!text) return text
+  let result = text.replace(/<think>[\s\S]*?<\/think>/gi, '')
+  // Handle unclosed tags (generation cut off mid-think): drop everything
+  // from the opening <think> to the end.
+  result = result.replace(/<think>[\s\S]*$/i, '')
+  return result.trim()
+}
+
 function extractJsonArray(rawText) {
   if (!rawText) return ''
   const fenced = rawText.match(/```(?:json)?\s*([\s\S]*?)```/)
@@ -28,7 +44,7 @@ const VALID_SIGNAL_TYPES = ['fact', 'claim', 'speculation', 'quote', 'promotion'
 const VALID_CONFIDENCES = ['high', 'medium', 'low']
 
 export function parseSummaryOutput(rawText) {
-  const jsonStr = extractJson(rawText)
+  const jsonStr = extractJson(stripThinkTags(rawText))
   let parsed
   try {
     parsed = JSON.parse(jsonStr)
@@ -51,7 +67,7 @@ export function parseSummaryOutput(rawText) {
 }
 
 export function parseTranslationOutput(rawText) {
-  const jsonStr = extractJsonArray(rawText)
+  const jsonStr = extractJsonArray(stripThinkTags(rawText))
   let parsed
   try {
     parsed = JSON.parse(jsonStr)
@@ -81,7 +97,7 @@ export function buildTranslationRepairMessages(originalMessages, brokenRaw) {
 }
 
 export function parseSignalsOutput(rawText) {
-  const jsonStr = extractJson(rawText)
+  const jsonStr = extractJson(stripThinkTags(rawText))
   let parsed
   try {
     parsed = JSON.parse(jsonStr)
