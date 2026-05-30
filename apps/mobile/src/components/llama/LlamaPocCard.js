@@ -23,6 +23,8 @@ import {
   enableNativeLog,
   probeBackends,
   probeModelInfo,
+  getDeviceRamBytes,
+  canRunPocModel,
 } from '../../ai/llamaRnPoC'
 
 function formatBytes(bytes) {
@@ -43,6 +45,12 @@ export default function LlamaPocCard({ theme }) {
   const [progress, setProgress] = useState(null)
   const [bench, setBench] = useState(null)
   const [error, setError] = useState(null)
+
+  // Device RAM gate (option A). Computed once per mount; expo-device reads
+  // are synchronous and safe to call at render time.
+  const deviceRamBytes = getDeviceRamBytes()
+  const deviceRamGB = deviceRamBytes != null ? (deviceRamBytes / 1024 ** 3).toFixed(1) : '?'
+  const gate = canRunPocModel(activeModel, deviceRamBytes)
 
   const refreshStatus = useCallback(async (model = activeModel) => {
     try {
@@ -177,10 +185,18 @@ export default function LlamaPocCard({ theme }) {
         llama.rn PoC (temporary)
       </Text>
       <View style={[styles.card, { backgroundColor: theme.card }]}>
-        {/* Model picker */}
+        {/* Device RAM tier */}
+        <Text style={[styles.hint, { color: theme.textMuted }]}>
+          Device RAM: {deviceRamGB} GB (Device.totalMemory)
+        </Text>
+
+        {/* Model picker — incompatible models are dimmed but still selectable
+            so you can inspect the gate reason without losing the picker UX. */}
         <View style={styles.pickerRow}>
           {POC_MODELS.map((m) => {
             const selected = m.id === activeModel.id
+            const compat = canRunPocModel(m, deviceRamBytes).ok
+            const dim = !compat && !selected
             return (
               <TouchableOpacity
                 key={m.id}
@@ -190,7 +206,7 @@ export default function LlamaPocCard({ theme }) {
                     backgroundColor: selected ? '#3478f6' : 'transparent',
                     borderColor: selected ? '#3478f6' : theme.textMuted,
                   },
-                  busy && { opacity: 0.5 },
+                  (busy || dim) && { opacity: dim ? 0.4 : 0.5 },
                 ]}
                 disabled={busy}
                 onPress={() => setActiveModel(m)}
@@ -202,7 +218,7 @@ export default function LlamaPocCard({ theme }) {
                     fontWeight: '600',
                   }}
                 >
-                  {m.displayName}
+                  {compat ? '' : '🚫 '}{m.displayName}
                 </Text>
               </TouchableOpacity>
             )
@@ -211,20 +227,26 @@ export default function LlamaPocCard({ theme }) {
         <Text style={[styles.hint, { color: theme.textMuted }]}>
           {activeModel.note}
         </Text>
+        {!gate.ok && (
+          <Text style={[styles.hint, { color: '#c0392b' }]}>
+            ⚠ {gate.reason}
+          </Text>
+        )}
         <Text style={[styles.hint, { color: theme.textMuted }]}>
           {status.downloaded
             ? `Downloaded · ${formatBytes(status.bytes)}`
             : `Not downloaded · ~${formatBytes(activeModel.expectedBytes)}`}
         </Text>
 
-        {/* Download */}
+        {/* Download — blocked when device RAM gate fails (prevents wasting
+            ~GB of cellular data on a model that can't load anyway). */}
         <TouchableOpacity
           style={[
             styles.button,
             { backgroundColor: status.downloaded ? '#888' : '#3478f6' },
-            busy && { opacity: 0.5 },
+            (busy || !gate.ok) && { opacity: 0.5 },
           ]}
-          disabled={busy || status.downloaded}
+          disabled={busy || status.downloaded || !gate.ok}
           onPress={handleDownload}
         >
           {phase === 'downloading' ? (
@@ -244,14 +266,15 @@ export default function LlamaPocCard({ theme }) {
           )}
         </TouchableOpacity>
 
-        {/* Run benchmark */}
+        {/* Run benchmark — also blocked by gate (defence in depth: even if
+            the file was already on disk from a prior tier check). */}
         <TouchableOpacity
           style={[
             styles.button,
             { backgroundColor: '#22a06b' },
-            (!status.downloaded || busy) && { opacity: 0.5 },
+            (!status.downloaded || busy || !gate.ok) && { opacity: 0.5 },
           ]}
-          disabled={!status.downloaded || busy}
+          disabled={!status.downloaded || busy || !gate.ok}
           onPress={handleRun}
         >
           {phase === 'running' ? (

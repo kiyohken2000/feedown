@@ -3,6 +3,7 @@
 // Remove this file (and the Profile.js card that calls it) once the PoC verdict is made.
 
 import * as FileSystem from 'expo-file-system/legacy'
+import * as Device from 'expo-device'
 import {
   initLlama,
   releaseAllLlama,
@@ -11,6 +12,51 @@ import {
   loadLlamaModelInfo,
   getBackendDevicesInfo,
 } from 'llama.rn'
+
+// --- Device RAM gating (option A) -----------------------------------------
+// iOS Device.totalMemory returns USABLE RAM (~90% of physical). iPhone 13
+// mini (4GB physical) reports 3.6GB. So tier thresholds are set just below
+// the expected reported value of each class:
+//   TIER_4GB  → 3.5GB  (catches 4GB physical / 3.6GB reported, e.g. iPhone 13 mini)
+//   TIER_6GB  → 5.3GB  (catches 6GB physical / ~5.4GB reported, e.g. iPhone 14 Pro)
+//   TIER_8GB  → 7.0GB  (catches 8GB physical / ~7.2GB reported, e.g. iPhone 15 Pro)
+// Calibrated against iPhone 13 mini (A15, 4GB): Metal working set = 2863MB,
+// app baseline + KV/compute ≈ 1GB, so safe weight cap is ~1.8GB on 4GB devices.
+// 6GB/8GB tiers are extrapolated and conservative — recalibrate when measured.
+export const RAM_TIER = {
+  TIER_4GB: 3.5 * 1024 ** 3,
+  TIER_6GB: 5.3 * 1024 ** 3,
+  TIER_8GB: 7.0 * 1024 ** 3,
+}
+
+// Returns physical RAM in bytes, or null if unavailable (web, sim quirks).
+export function getDeviceRamBytes() {
+  return Device.totalMemory ?? null
+}
+
+// Maps the (slightly-below-class) threshold value back to the physical-class
+// label, so the user-facing message says "Needs ~6GB+" not "Needs ~5GB+".
+const RAM_TIER_LABEL = new Map([
+  [RAM_TIER.TIER_4GB, '4'],
+  [RAM_TIER.TIER_6GB, '6'],
+  [RAM_TIER.TIER_8GB, '8'],
+])
+
+// Returns { ok, reason } — ok=false → grey out, show reason to user.
+export function canRunPocModel(model, ramBytes = getDeviceRamBytes()) {
+  if (model?.minDeviceRamBytes == null) return { ok: true }
+  if (ramBytes == null) {
+    return { ok: false, reason: 'Device RAM unknown — cannot verify capacity' }
+  }
+  if (ramBytes < model.minDeviceRamBytes) {
+    const need =
+      RAM_TIER_LABEL.get(model.minDeviceRamBytes) ??
+      Math.round(model.minDeviceRamBytes / 1024 ** 3).toString()
+    const have = (ramBytes / 1024 ** 3).toFixed(1)
+    return { ok: false, reason: `Needs ~${need}GB+ RAM (this device: ${have}GB)` }
+  }
+  return { ok: true }
+}
 
 // Enable verbose llama.cpp logging + pipe to JS console.
 // Idempotent — safe to call multiple times.
@@ -105,6 +151,7 @@ export const POC_MODELS = [
     displayName: 'Hy-MT2 1.8B Q4_K_M (translation)',
     url: 'https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q4_K_M.gguf',
     expectedBytes: 1_133_000_000, // ~1.13 GB
+    minDeviceRamBytes: RAM_TIER.TIER_4GB, // proven on A15/4GB
     note: 'Tencent translation-specialized. EN->JA bench. Fits A15/4GB with room to spare.',
     benchMessages: BENCH_TRANSLATE_MESSAGES,
     benchSampling: HY_MT2_SAMPLING,
@@ -114,9 +161,18 @@ export const POC_MODELS = [
     displayName: 'Hy-MT2 1.8B Q6_K (translation)',
     url: 'https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q6_K.gguf',
     expectedBytes: 1_475_000_000, // ~1.47 GB
+    minDeviceRamBytes: RAM_TIER.TIER_4GB, // tight on 4GB but should fit (~1.5GB weights)
     note: 'Standard Q6_K. Higher-quality fallback if Q4_K_M quality is borderline.',
     benchMessages: BENCH_TRANSLATE_MESSAGES,
     benchSampling: HY_MT2_SAMPLING,
+  },
+  {
+    id: 'gemma-3-1B-it-Q4_K_M',
+    displayName: 'Gemma 3 1B-IT Q4_K_M (general)',
+    url: 'https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf',
+    expectedBytes: 806_000_000, // ~806 MB
+    minDeviceRamBytes: RAM_TIER.TIER_4GB, // 806MB weights, easy fit
+    note: 'General-purpose. Compare summary/chat quality vs executorch LFM2.5-1.2B.',
   },
   // NOTE: AngelSlim 2-bit / 1.25-bit GGUFs do NOT load in llama.rn 0.12.4's
   // bundled llama.cpp — they use a custom ultra-low-bit quant format that fails
@@ -127,6 +183,7 @@ export const POC_MODELS = [
     displayName: 'Gemma 4 E2B-it Q4_K_M',
     url: 'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf',
     expectedBytes: 3_110_000_000, // ~3.11 GB
+    minDeviceRamBytes: RAM_TIER.TIER_8GB, // proved OOM on 4GB; 8GB tier conservative
     note: 'Multimodal. OOM on iPhone 13 mini (A15/4GB): weights 2948MB > 2863MB working set.',
   },
   {
@@ -134,6 +191,7 @@ export const POC_MODELS = [
     displayName: 'Gemma 4 E2B-it Q3_K_M',
     url: 'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q3_K_M.gguf',
     expectedBytes: 2_540_000_000, // ~2.54 GB
+    minDeviceRamBytes: RAM_TIER.TIER_6GB, // OOM'd on 4GB even at 2.54GB
     note: 'Smaller quant. Testing if it fits the A15 working set where Q4_K_M OOMs.',
   },
   {
@@ -141,6 +199,7 @@ export const POC_MODELS = [
     displayName: 'Gemma 4 E2B-it UD-Q2_K_XL',
     url: 'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-UD-Q2_K_XL.gguf',
     expectedBytes: 2_400_000_000, // ~2.40 GB
+    minDeviceRamBytes: RAM_TIER.TIER_6GB, // OOM'd on 4GB even at 2.40GB
     note: 'Unsloth Dynamic 2-bit. Most headroom; fallback if Q3_K_M still OOMs.',
   },
   {
@@ -148,6 +207,7 @@ export const POC_MODELS = [
     displayName: 'Qwen3 0.6B Q4_K_M (sanity test)',
     url: 'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
     expectedBytes: 460_000_000, // ~460 MB
+    minDeviceRamBytes: RAM_TIER.TIER_4GB,
     note: 'Text-only, known-good. If this loads but Gemma 4 doesnt, Gemma 4 is the problem.',
   },
 ]
