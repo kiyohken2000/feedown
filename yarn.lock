@@ -7591,6 +7591,11 @@ listr2@^3.2.2:
     through "^2.3.8"
     wrap-ansi "^7.0.0"
 
+llama.rn@0.12.4:
+  version "0.12.4"
+  resolved "https://registry.yarnpkg.com/llama.rn/-/llama.rn-0.12.4.tgz#3bb0fca305f1c2d03827359afc6ee04d65cf6818"
+  integrity sha512-53oQKv2rzYbsSfFMONcj+KnFfAJ9S5gO9l1FyRi35Zmh8PeLUa7Zzh0FUQ6/+LwZH5SYnCulMeA94GS+ls/y7w==
+
 locate-path@^3.0.0:
   version "3.0.0"
   resolved "https://registry.npmjs.org/locate-path/-/locate-path-3.0.0.tgz"
