@@ -277,6 +277,7 @@ export default function ArticleReader({ article, onLinkPress, translation }) {
       <View style={styles.content}>
         {translation?.showTranslated && translation.translatedParagraphs ? (
           <ArticleTranslatedView
+            blocks={translation.translatedBlocks}
             paragraphs={translation.translatedParagraphs}
             theme={theme}
             fontConfig={fontConfig}

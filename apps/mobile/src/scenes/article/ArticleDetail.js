@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState, useCallback } from 'react'
+import React, { useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   StyleSheet,
   Text,
@@ -19,8 +19,19 @@ import ScreenTemplate from '../../components/ScreenTemplate'
 import ArticleReader from '../../components/ArticleReader'
 import ArticleAiPanel from '../../components/article/ArticleAiPanel'
 import { useArticleTranslation } from '../../ai/useArticleTranslation'
+import { useAi } from '../../contexts/AiContext'
+import { detectLanguage } from '../../ai/languageDetect'
+import { OUTPUT_LANGUAGES } from '../../ai/aiStorage'
 import { createApiClient } from '../../utils/api'
 import { showToast, showErrorToast } from '../../utils/showToast'
+
+function getLanguageNativeName(code) {
+  return OUTPUT_LANGUAGES.find((l) => l.code === code)?.nativeLabel ?? code
+}
+
+function getLanguageEnglishName(code) {
+  return OUTPUT_LANGUAGES.find((l) => l.code === code)?.label ?? code
+}
 
 export default function ArticleDetail() {
   const navigation = useNavigation()
@@ -42,8 +53,32 @@ export default function ArticleDetail() {
   const [readerContent, setReaderContent] = useState(null)
   const [isLoadingReader, setIsLoadingReader] = useState(false)
   const [readerError, setReaderError] = useState(null)
+  const [translateBannerDismissed, setTranslateBannerDismissed] = useState(false)
+  // Set when user taps the banner — once reader content loads and the
+  // translation hook reports ready, the effect below fires translation
+  // exactly once and clears this flag.
+  const [autoTranslateRequested, setAutoTranslateRequested] = useState(false)
+  const autoTranslatedRef = useRef(false)
 
   const translation = useArticleTranslation(article, readerContent)
+  const { settings: aiSettings } = useAi()
+
+  // Detect article language from the title + description (cheap; no reader
+  // content needed). Used by the translate banner to decide whether to
+  // surface translation at all.
+  const detectedArticleLang = useMemo(() => {
+    const sample = `${article.title ?? ''} ${article.description ?? ''}`.trim()
+    if (sample.length < 30) return null
+    return detectLanguage(sample)
+  }, [article.title, article.description])
+
+  const targetLang = aiSettings.outputLanguage ?? 'ja'
+  const showTranslateBanner =
+    !readerMode &&
+    !translateBannerDismissed &&
+    aiSettings.enabled &&
+    detectedArticleLang &&
+    detectedArticleLang !== targetLang
 
   const isFavorited = favoritedArticles.has(article.id)
 
@@ -80,6 +115,44 @@ export default function ArticleDetail() {
       }
     }
   }, [article.url])
+
+  // Banner: tap → enter reader (fetches content if needed) + remember
+  // that translation should auto-start once everything is ready.
+  const handleTranslateFromBanner = useCallback(() => {
+    autoTranslatedRef.current = false
+    setAutoTranslateRequested(true)
+    setTranslateBannerDismissed(true)
+    // handleReaderMode handles the fetch + setReaderMode(true). Defined below.
+    handleReaderMode()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleDismissTranslateBanner = useCallback(() => {
+    setTranslateBannerDismissed(true)
+  }, [])
+
+  // Fires translation exactly once after the banner-triggered reader load
+  // finishes. Skipped if a translation already exists for this article
+  // (cache will return immediately anyway, but we keep the guard for
+  // clarity).
+  useEffect(() => {
+    if (!autoTranslateRequested) return
+    if (autoTranslatedRef.current) return
+    if (!readerContent) return
+    if (!translation.isModelReady) return
+    if (!translation.paragraphs.length) return
+    if (translation.translatedParagraphs) return
+    autoTranslatedRef.current = true
+    setAutoTranslateRequested(false)
+    translation.translate()
+  }, [
+    autoTranslateRequested,
+    readerContent,
+    translation.isModelReady,
+    translation.paragraphs.length,
+    translation.translatedParagraphs,
+    translation,
+  ])
 
   // Handle Reader Mode toggle
   const handleReaderMode = useCallback(async () => {
@@ -207,6 +280,32 @@ export default function ArticleDetail() {
                 style={styles.heroImage}
                 resizeMode="cover"
               />
+            )}
+
+            {/* Translate suggestion banner */}
+            {showTranslateBanner && (
+              <TouchableOpacity
+                style={[styles.translateBanner, { backgroundColor: isDarkMode ? '#1a2a3a' : '#e8f1fb', borderColor: colors.bluePrimary || '#007AFF' }]}
+                onPress={handleTranslateFromBanner}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.translateBannerIcon}>🌐</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.translateBannerTitle, { color: theme.text }]}>
+                    This article is in {getLanguageEnglishName(detectedArticleLang)}
+                  </Text>
+                  <Text style={[styles.translateBannerSub, { color: colors.bluePrimary || '#007AFF' }]}>
+                    Read in {getLanguageNativeName(targetLang)} →
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handleDismissTranslateBanner}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  style={styles.translateBannerDismiss}
+                >
+                  <Text style={[styles.translateBannerDismissText, { color: theme.textMuted }]}>✕</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
             )}
 
             {/* Article Meta */}
@@ -460,5 +559,37 @@ const styles = StyleSheet.create({
   urlText: {
     fontSize: fontSize.small,
     color: colors.gray,
+  },
+  translateBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  translateBannerIcon: {
+    fontSize: 22,
+    marginRight: 12,
+  },
+  translateBannerTitle: {
+    fontSize: fontSize.small,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  translateBannerSub: {
+    fontSize: fontSize.normal,
+    fontWeight: '600',
+  },
+  translateBannerDismiss: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 6,
+  },
+  translateBannerDismissText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 })

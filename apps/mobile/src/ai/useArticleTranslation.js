@@ -31,8 +31,27 @@ function limitParagraphsForTranslation(paragraphs, maxChars = 2500) {
   return result.length > 0 ? result : paragraphs.slice(0, 1)
 }
 
-function extractParagraphs(html) {
-  let text = html
+// Walks reader HTML and emits an ordered block list of text paragraphs and
+// images. Used by the Translated view to interleave images at their original
+// position — Original (HTML render) shows them inline, so Translated should
+// too.
+//
+// Images are extracted FIRST as sentinels, then the existing tag-strip /
+// entity-decode logic runs on the rest, then we re-split into text/image
+// blocks in order.
+function extractBlocks(html) {
+  const imageStore = []
+  let normalized = html.replace(/<img\s+[^>]*>/gi, (match) => {
+    const srcMatch = match.match(/src=["']([^"']+)["']/i)
+    const altMatch = match.match(/alt=["']([^"']*)["']/i)
+    const src = srcMatch?.[1] ?? ''
+    if (!src) return ''
+    const idx = imageStore.length
+    imageStore.push({ src, alt: altMatch?.[1] ?? '' })
+    return `\n\n[[__IMG_${idx}__]]\n\n`
+  })
+
+  normalized = normalized
     .replace(/<\/?(p|h[1-6]|li|blockquote|div|article|section|header|footer|br\s*\/?)(\s[^>]*)?>|<br\s*\/?>/gi, '\n\n')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
@@ -42,13 +61,51 @@ function extractParagraphs(html) {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
 
-  return text
+  const segments = normalized
     .split(/\n{2,}/)
     .map((s) => s.replace(/\s+/g, ' ').trim())
-    .filter((s) => s.length >= 30)
-    // Hy-MT2 path translates full article; LFM2.5 path caps inside
-    // limitParagraphsForTranslation. Keep the upper bound here generous.
-    .slice(0, 200)
+    .filter(Boolean)
+
+  const blocks = []
+  for (const seg of segments) {
+    const imgMatch = seg.match(/^\[\[__IMG_(\d+)__\]\]$/)
+    if (imgMatch) {
+      const img = imageStore[parseInt(imgMatch[1], 10)]
+      if (img) blocks.push({ type: 'image', src: img.src, alt: img.alt })
+      continue
+    }
+    if (seg.length >= 30) {
+      blocks.push({ type: 'text', content: seg })
+    }
+  }
+  // Generous safety cap; matches the previous .slice(0, 200) bound but
+  // counts both text and image blocks.
+  return blocks.slice(0, 250)
+}
+
+// From the block list, derive the paragraph array (text-only, in order)
+// AND a Map<paragraphIndex, image[]> recording which images immediately
+// follow each paragraph. Images preceding the first paragraph are kept
+// separately so the renderer can hoist them to the top.
+function deriveBlockMappings(blocks) {
+  const paragraphs = []
+  const imagesAfterParagraph = new Map()
+  const imagesBeforeFirstParagraph = []
+  let lastParaIdx = -1
+  for (const b of blocks) {
+    if (b.type === 'text') {
+      paragraphs.push(b.content)
+      lastParaIdx = paragraphs.length - 1
+    } else if (b.type === 'image') {
+      if (lastParaIdx === -1) {
+        imagesBeforeFirstParagraph.push(b)
+      } else {
+        if (!imagesAfterParagraph.has(lastParaIdx)) imagesAfterParagraph.set(lastParaIdx, [])
+        imagesAfterParagraph.get(lastParaIdx).push(b)
+      }
+    }
+  }
+  return { paragraphs, imagesAfterParagraph, imagesBeforeFirstParagraph }
 }
 
 function readerHash(content) {
@@ -64,6 +121,10 @@ function readerHash(content) {
 export function useArticleTranslation(article, readerContent) {
   const { llm, settings, selectedModel, runWithLlamaRn } = useAi()
   const [translatedParagraphs, setTranslatedParagraphs] = useState(null)
+  // The chunks used to translate (Hy-MT2 path only). Lets the Translated
+  // view know which source paragraphs each translation entry covers, so
+  // we can interleave the corresponding images at the right boundaries.
+  const [translationChunks, setTranslationChunks] = useState(null)
   const [isTranslating, setIsTranslating] = useState(false)
   const [error, setError] = useState(null)
   const [showTranslated, setShowTranslated] = useState(false)
@@ -75,10 +136,13 @@ export function useArticleTranslation(article, readerContent) {
   const useSpecialized =
     settings.translationEngine === 'hy-mt2' && settings.hyMt2Downloaded === true
 
-  const paragraphs = useMemo(() => {
+  const blocks = useMemo(() => {
     if (!readerContent?.content) return []
-    return extractParagraphs(readerContent.content)
+    return extractBlocks(readerContent.content)
   }, [readerContent?.content])
+
+  const blockMappings = useMemo(() => deriveBlockMappings(blocks), [blocks])
+  const paragraphs = blockMappings.paragraphs
 
   const sourceLang = useMemo(() => {
     if (!paragraphs.length) return 'en'
@@ -93,6 +157,7 @@ export function useArticleTranslation(article, readerContent) {
   // Reset when article changes
   useEffect(() => {
     setTranslatedParagraphs(null)
+    setTranslationChunks(null)
     setIsTranslating(false)
     setError(null)
     setShowTranslated(false)
@@ -118,6 +183,10 @@ export function useArticleTranslation(article, readerContent) {
       const modelId = selectedModel?.id ?? 'unknown'
       saveTranslationCache(article.id, pending.contentHash, modelId, targetLang, parsed.data)
       setTranslatedParagraphs(parsed.data)
+      // LFM path: 1 translated entry per source paragraph (capped earlier).
+      // Build a virtual chunk array so the renderer can place images by
+      // the same logic as the Hy-MT2 path.
+      setTranslationChunks(parsed.data.map((_, i) => ({ paragraphIndices: [i] })))
       setIsTranslating(false)
       setShowTranslated(true)
       pendingRef.current = null
@@ -147,6 +216,7 @@ export function useArticleTranslation(article, readerContent) {
       const cached = await getTranslationCache(article.id, contentHash, modelId, targetLang)
       if (cached) {
         setTranslatedParagraphs(cached)
+        setTranslationChunks(cached.map((_, i) => ({ paragraphIndices: [i] })))
         setIsTranslating(false)
         setShowTranslated(true)
         return
@@ -175,6 +245,10 @@ export function useArticleTranslation(article, readerContent) {
       const cached = await getTranslationCache(article.id, contentHash, engineId, targetLang)
       if (cached) {
         setTranslatedParagraphs(cached)
+        // Re-derive chunk structure from current paragraphs — the contentHash
+        // match guarantees the source paragraphs (and therefore the chunk
+        // boundaries) are identical to when this cache was written.
+        setTranslationChunks(splitParagraphsIntoChunks(paragraphs, 2500))
         setIsTranslating(false)
         setShowTranslated(true)
         return
@@ -188,6 +262,7 @@ export function useArticleTranslation(article, readerContent) {
     setIsTranslating(true)
     setShowTranslated(true)
     setTranslatedParagraphs([])
+    setTranslationChunks(chunks)
     setProgress({ current: 0, total: chunks.length })
     cancelRef.current = false
 
@@ -257,9 +332,35 @@ export function useArticleTranslation(article, readerContent) {
   const needsTranslation = paragraphs.length > 0 && sourceLang !== targetLang
   const isModelReady = useSpecialized ? settings.hyMt2Downloaded === true : llm.isReady
 
+  // Combine translated text with image blocks at their original positions,
+  // ready for the Translated view to render with no extra logic.
+  const translatedBlocks = useMemo(() => {
+    if (!translatedParagraphs || !translationChunks) return null
+    const result = []
+    for (const img of blockMappings.imagesBeforeFirstParagraph) {
+      result.push({ type: 'image', src: img.src, alt: img.alt })
+    }
+    for (let i = 0; i < translatedParagraphs.length; i++) {
+      const text = translatedParagraphs[i]
+      if (typeof text === 'string' && text.length > 0) {
+        result.push({ type: 'text', content: text })
+      }
+      const indices = translationChunks[i]?.paragraphIndices ?? []
+      const lastIdx = indices.length ? Math.max(...indices) : -1
+      if (lastIdx >= 0) {
+        const imgs = blockMappings.imagesAfterParagraph.get(lastIdx) ?? []
+        for (const img of imgs) {
+          result.push({ type: 'image', src: img.src, alt: img.alt })
+        }
+      }
+    }
+    return result
+  }, [translatedParagraphs, translationChunks, blockMappings])
+
   return {
     paragraphs,
     translatedParagraphs,
+    translatedBlocks,
     isTranslating: isTranslating || (llm.isGenerating && !!pendingRef.current),
     error,
     showTranslated,
