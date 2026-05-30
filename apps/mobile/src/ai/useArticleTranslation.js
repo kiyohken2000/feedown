@@ -2,10 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as Haptics from 'expo-haptics'
 import { useAi } from '../contexts/AiContext'
 import { detectLanguage } from './languageDetect'
-import { buildTranslationMessages } from './prompts'
+import { buildTranslationMessages, buildHyMt2TranslationMessages } from './prompts'
 import { parseTranslationOutput, buildTranslationRepairMessages } from './jsonOutput'
 import { getTranslationCache, saveTranslationCache } from './aiCache'
+import { splitParagraphsIntoChunks } from './translationChunks'
+import { HY_MT2_TRANSLATION_MODEL, HY_MT2_SAMPLING } from './llama/models'
 
+// LFM2.5 path keeps a hard 2500-char cap because JSON-formatted output
+// degrades with longer inputs (Phase E). Hy-MT2 path translates the full
+// article via chunking — see translateWithHyMt2.
 function limitParagraphsForTranslation(paragraphs, maxChars = 2500) {
   const result = []
   let total = 0
@@ -32,7 +37,9 @@ function extractParagraphs(html) {
     .split(/\n{2,}/)
     .map((s) => s.replace(/\s+/g, ' ').trim())
     .filter((s) => s.length >= 30)
-    .slice(0, 20)
+    // Hy-MT2 path translates full article; LFM2.5 path caps inside
+    // limitParagraphsForTranslation. Keep the upper bound here generous.
+    .slice(0, 200)
 }
 
 function readerHash(content) {
@@ -46,14 +53,18 @@ function readerHash(content) {
 }
 
 export function useArticleTranslation(article, readerContent) {
-  const { llm, settings, selectedModel } = useAi()
+  const { llm, settings, selectedModel, runWithLlamaRn } = useAi()
   const [translatedParagraphs, setTranslatedParagraphs] = useState(null)
   const [isTranslating, setIsTranslating] = useState(false)
   const [error, setError] = useState(null)
   const [showTranslated, setShowTranslated] = useState(false)
-  const pendingRef = useRef(null)
+  const [progress, setProgress] = useState({ current: 0, total: 0 })
+  const pendingRef = useRef(null) // LFM2.5 path (executorch async polling)
+  const cancelRef = useRef(false) // Hy-MT2 path (chunk loop break)
 
   const targetLang = settings.outputLanguage ?? 'ja'
+  const useSpecialized =
+    settings.translationEngine === 'hy-mt2' && settings.hyMt2Downloaded === true
 
   const paragraphs = useMemo(() => {
     if (!readerContent?.content) return []
@@ -76,17 +87,20 @@ export function useArticleTranslation(article, readerContent) {
     setIsTranslating(false)
     setError(null)
     setShowTranslated(false)
+    setProgress({ current: 0, total: 0 })
     pendingRef.current = null
+    cancelRef.current = false
   }, [article?.id])
 
+  // LFM2.5 path: poll for executorch completion
   useEffect(() => {
     if (!llm.isGenerating && pendingRef.current) {
-      handleComplete(llm.response)
+      handleLfmComplete(llm.response)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [llm.isGenerating])
 
-  function handleComplete(rawResponse) {
+  function handleLfmComplete(rawResponse) {
     const pending = pendingRef.current
     if (!pending) return
 
@@ -115,12 +129,9 @@ export function useArticleTranslation(article, readerContent) {
     }
   }
 
-  const translate = async ({ force = false } = {}) => {
-    if (!settings.enabled || !llm.isReady || llm.isGenerating || !paragraphs.length) return
-
-    setError(null)
-    setIsTranslating(true)
-
+  // LFM2.5 (executorch) — short article, 1 LLM call, JSON I/O.
+  async function translateWithLfm({ force }) {
+    if (!llm.isReady || llm.isGenerating) return
     const modelId = selectedModel?.id ?? 'unknown'
 
     if (!force) {
@@ -133,6 +144,8 @@ export function useArticleTranslation(article, readerContent) {
       }
     }
 
+    setError(null)
+    setIsTranslating(true)
     const limitedParagraphs = limitParagraphsForTranslation(paragraphs)
     const messages = buildTranslationMessages(limitedParagraphs, targetLang)
     pendingRef.current = { contentHash, messages, retrying: false }
@@ -144,8 +157,87 @@ export function useArticleTranslation(article, readerContent) {
     })
   }
 
+  // Hy-MT2 (llama.rn) — full article, chunked, progressive, cancellable.
+  async function translateWithHyMt2({ force }) {
+    const engineId = HY_MT2_TRANSLATION_MODEL.id
+
+    if (!force) {
+      const cached = await getTranslationCache(article.id, contentHash, engineId, targetLang)
+      if (cached) {
+        setTranslatedParagraphs(cached)
+        setIsTranslating(false)
+        setShowTranslated(true)
+        return
+      }
+    }
+
+    const chunks = splitParagraphsIntoChunks(paragraphs, 2500)
+    if (chunks.length === 0) return
+
+    setError(null)
+    setIsTranslating(true)
+    setShowTranslated(true)
+    setTranslatedParagraphs([])
+    setProgress({ current: 0, total: chunks.length })
+    cancelRef.current = false
+
+    try {
+      const collected = await runWithLlamaRn({
+        model: HY_MT2_TRANSLATION_MODEL,
+        contextParams: { n_ctx: 4096 },
+        onSession: async (ctx) => {
+          const out = []
+          for (let i = 0; i < chunks.length; i++) {
+            if (cancelRef.current) break
+            const messages = buildHyMt2TranslationMessages(chunks[i].text, targetLang)
+            const completion = await ctx.completion({
+              messages,
+              n_predict: 2048,
+              temperature: HY_MT2_SAMPLING.temperature,
+              top_p: HY_MT2_SAMPLING.top_p,
+              top_k: HY_MT2_SAMPLING.top_k,
+              penalty_repeat: HY_MT2_SAMPLING.penalty_repeat,
+              stop: ['</s>', '<|endoftext|>', '<end_of_turn>', '<|eos|>'],
+            })
+            if (cancelRef.current) break
+            const text = (completion?.text ?? completion?.content ?? '').trim()
+            out.push(text)
+            setTranslatedParagraphs((prev) => [...(prev ?? []), text])
+            setProgress({ current: i + 1, total: chunks.length })
+          }
+          return out
+        },
+      })
+
+      if (!cancelRef.current && collected.length === chunks.length) {
+        await saveTranslationCache(article.id, contentHash, engineId, targetLang, collected)
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      }
+    } catch (err) {
+      console.error('[useArticleTranslation] hy-mt2 error:', err)
+      setError(err?.message ?? 'Translation failed. Please try again.')
+    } finally {
+      setIsTranslating(false)
+      cancelRef.current = false
+    }
+  }
+
+  const translate = async ({ force = false } = {}) => {
+    if (!settings.enabled || !paragraphs.length) return
+    if (useSpecialized) {
+      await translateWithHyMt2({ force })
+    } else {
+      await translateWithLfm({ force })
+    }
+  }
+
   const interrupt = () => {
-    if (llm.isGenerating) {
+    if (useSpecialized) {
+      // Set the flag; the chunk loop exits between chunks. Mid-chunk
+      // ctx.completion cannot be interrupted in this version (would need
+      // a separate ctx.stopCompletion path).
+      cancelRef.current = true
+    } else if (llm.isGenerating) {
       llm.interrupt()
       setIsTranslating(false)
       pendingRef.current = null
@@ -153,6 +245,7 @@ export function useArticleTranslation(article, readerContent) {
   }
 
   const needsTranslation = paragraphs.length > 0 && sourceLang !== targetLang
+  const isModelReady = useSpecialized ? settings.hyMt2Downloaded === true : llm.isReady
 
   return {
     paragraphs,
@@ -164,8 +257,10 @@ export function useArticleTranslation(article, readerContent) {
     sourceLang,
     targetLang,
     needsTranslation,
-    isModelReady: llm.isReady,
+    isModelReady,
     translate,
     interrupt,
+    progress,
+    engine: useSpecialized ? 'hy-mt2' : 'lfm',
   }
 }

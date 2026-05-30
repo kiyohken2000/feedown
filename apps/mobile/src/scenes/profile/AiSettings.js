@@ -18,6 +18,14 @@ import { FEEDOWN_LLM_MODELS } from '../../ai/models'
 import { OUTPUT_LANGUAGES, TTS_VOICE_OPTIONS } from '../../ai/aiStorage'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import Spinner from 'react-native-loading-spinner-overlay'
+import {
+  HY_MT2_TRANSLATION_MODEL,
+  canRunOnDevice,
+  getDeviceRamBytes,
+  downloadModel as downloadLlamaModel,
+  deleteModel as deleteLlamaModel,
+  getModelStatus as getLlamaModelStatus,
+} from '../../ai/llama'
 
 function formatBytes(bytes) {
   if (!bytes || bytes <= 0) return ''
@@ -44,6 +52,12 @@ export default function AiSettings() {
   // const { llm, tts, settings: aiSettings, updateSettings: updateAiSettings } = useAi()  // TTS: restore tts when re-enabling
   const [isLoading, setIsLoading] = useState(false)
   const [modelSizes, setModelSizes] = useState({})
+  // Hy-MT2 (translation specialist) — separate DL flow from executorch models.
+  const [hyMt2Status, setHyMt2Status] = useState({ downloaded: false, bytes: 0 })
+  const [hyMt2DlProgress, setHyMt2DlProgress] = useState(0)
+  const [hyMt2Downloading, setHyMt2Downloading] = useState(false)
+  const ramBytes = getDeviceRamBytes()
+  const ramGate = canRunOnDevice(HY_MT2_TRANSLATION_MODEL, ramBytes)
 
   const downloadedKey = (aiSettings.downloadedModelIds ?? []).join(',')
   useEffect(() => {
@@ -60,6 +74,76 @@ export default function AiSettings() {
       .catch(() => { /* ignore */ })
     return () => { cancelled = true }
   }, [downloadedKey, getModelSize])
+
+  // Refresh Hy-MT2 on-disk status when the screen mounts or after DL/delete.
+  const refreshHyMt2Status = useCallback(async () => {
+    const status = await getLlamaModelStatus(HY_MT2_TRANSLATION_MODEL)
+    setHyMt2Status(status)
+  }, [])
+  useEffect(() => { refreshHyMt2Status() }, [refreshHyMt2Status])
+
+  const startHyMt2Download = useCallback(async () => {
+    setHyMt2Downloading(true)
+    setHyMt2DlProgress(0)
+    try {
+      await downloadLlamaModel(HY_MT2_TRANSLATION_MODEL, ({ percent }) => {
+        setHyMt2DlProgress(percent)
+      })
+      await refreshHyMt2Status()
+      await updateAiSettings({ hyMt2Downloaded: true, translationEngine: 'hy-mt2' })
+      showToast({ title: 'Downloaded', body: 'Hy-MT2 translation model ready' })
+    } catch (err) {
+      showErrorToast({ title: 'Download Failed', body: err?.message ?? 'Try again later' })
+    } finally {
+      setHyMt2Downloading(false)
+      setHyMt2DlProgress(0)
+    }
+  }, [refreshHyMt2Status, updateAiSettings])
+
+  const handleToggleHyMt2 = useCallback(async (value) => {
+    if (value) {
+      if (!ramGate.ok) {
+        Alert.alert('Not supported on this device', ramGate.reason)
+        return
+      }
+      if (hyMt2Status.downloaded) {
+        await updateAiSettings({ hyMt2Downloaded: true, translationEngine: 'hy-mt2' })
+      } else {
+        // Auto-start DL on toggle ON. translationEngine flips after DL success.
+        startHyMt2Download()
+      }
+    } else {
+      await updateAiSettings({ translationEngine: 'lfm' })
+    }
+  }, [ramGate, hyMt2Status, updateAiSettings, startHyMt2Download])
+
+  const handleDeleteHyMt2 = useCallback(() => {
+    const sizeLabel = formatBytes(hyMt2Status.bytes)
+    Alert.alert(
+      'Delete Translation Model',
+      `Delete Hy-MT2 1.8B${sizeLabel ? ` (${sizeLabel})` : ''}? Translation will fall back to the general LFM2.5 model until you re-download.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true)
+              await deleteLlamaModel(HY_MT2_TRANSLATION_MODEL)
+              await refreshHyMt2Status()
+              await updateAiSettings({ hyMt2Downloaded: false, translationEngine: 'lfm' })
+              showToast({ title: 'Deleted', body: 'Hy-MT2 removed' })
+            } catch (err) {
+              showErrorToast({ title: 'Error', body: err?.message ?? 'Failed to delete' })
+            } finally {
+              setIsLoading(false)
+            }
+          },
+        },
+      ],
+    )
+  }, [hyMt2Status, refreshHyMt2Status, updateAiSettings])
 
   const handleDeleteModel = useCallback((model) => {
     const sizeLabel = formatBytes(modelSizes[model.id])
@@ -267,6 +351,67 @@ export default function AiSettings() {
                     : 'Tap "Download Model" to begin. Wi-Fi recommended. Download may take several minutes.'}
                 </Text>
               </>
+            )}
+          </View>
+        </View>
+
+        {/* Translation Engine — Hy-MT2 (llama.rn, opt-in) */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Translation</Text>
+          <View style={[styles.card, { backgroundColor: theme.card }]}>
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={[styles.toggleLabel, { color: theme.text }]}>
+                  Specialized Translation Model
+                </Text>
+                <Text style={[styles.toggleDescription, { color: theme.textMuted }]}>
+                  Hy-MT2 1.8B (1.13 GB) — translates full articles with better
+                  paragraph structure and detail than the general LFM2.5 model.
+                </Text>
+              </View>
+              <Switch
+                value={aiSettings.translationEngine === 'hy-mt2'}
+                onValueChange={handleToggleHyMt2}
+                disabled={hyMt2Downloading || !ramGate.ok}
+                trackColor={{ false: '#767577', true: colors.primary }}
+                thumbColor={aiSettings.translationEngine === 'hy-mt2' ? colors.white : '#f4f3f4'}
+              />
+            </View>
+
+            {!ramGate.ok && (
+              <Text style={[styles.modelHint, { color: colors.redSecondary, marginTop: 8 }]}>
+                ⚠ {ramGate.reason}
+              </Text>
+            )}
+
+            {hyMt2Downloading && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={[styles.modelHint, { color: theme.textMuted, marginTop: 0 }]}>
+                  Downloading… {Math.round(hyMt2DlProgress * 100)}%
+                </Text>
+              </View>
+            )}
+
+            {ramGate.ok && hyMt2Status.downloaded && !hyMt2Downloading && (
+              <View style={styles.hyMt2InfoRow}>
+                <Text style={[styles.modelHint, { color: theme.textMuted, marginTop: 0, fontStyle: 'normal' }]}>
+                  Downloaded · {formatBytes(hyMt2Status.bytes)}
+                </Text>
+                <TouchableOpacity
+                  onPress={handleDeleteHyMt2}
+                  style={styles.hyMt2DeleteButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.hyMt2DeleteText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {ramGate.ok && !hyMt2Status.downloaded && !hyMt2Downloading && (
+              <Text style={[styles.modelHint, { color: theme.textMuted }]}>
+                Turn on to download (Wi-Fi recommended; ~1.13 GB). Falls back to
+                LFM2.5 if turned off.
+              </Text>
             )}
           </View>
         </View>
@@ -529,4 +674,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   downloadButtonText: { fontSize: fontSize.normal, fontWeight: '600' },
+  hyMt2InfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  hyMt2DeleteButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.redSecondary,
+  },
+  hyMt2DeleteText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.redSecondary,
+  },
 })

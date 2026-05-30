@@ -158,6 +158,19 @@ Output format (JSON array only, no code block):
   ]
 }
 
+// Hy-MT2's official prompt template for non-Chinese targets: single user
+// turn, no system prompt, literal markdown bolding kept to match training.
+// Used by the llama.rn translation path (chunk-by-chunk).
+export function buildHyMt2TranslationMessages(plainText, targetLanguage) {
+  const langName = getLanguageName(targetLanguage)
+  return [
+    {
+      role: 'user',
+      content: `Translate the following text into ${langName}. Note that you should **only output the translated result without any additional explanation**:\n\n${plainText}`,
+    },
+  ]
+}
+
 export function buildRepairPromptMessages(originalMessages, brokenRaw) {
   return [
     ...originalMessages,

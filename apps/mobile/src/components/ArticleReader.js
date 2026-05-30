@@ -225,13 +225,30 @@ export default function ArticleReader({ article, onLinkPress, translation }) {
                     Translated
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => translation.translate({ force: true })}
-                  style={styles.regenButton}
-                  disabled={translation.isTranslating}
-                >
-                  <Text style={[styles.regenText, { color: theme.textMuted }]}>↺</Text>
-                </TouchableOpacity>
+                {translation.isTranslating ? (
+                  <View style={styles.translatingRow}>
+                    {translation.progress?.total > 0 && (
+                      <Text style={[styles.progressText, { color: theme.textMuted }]}>
+                        {translation.progress.current}/{translation.progress.total}
+                      </Text>
+                    )}
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <TouchableOpacity
+                      onPress={translation.interrupt}
+                      style={styles.cancelButton}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={[styles.cancelText, { color: theme.textMuted }]}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => translation.translate({ force: true })}
+                    style={styles.regenButton}
+                  >
+                    <Text style={[styles.regenText, { color: theme.textMuted }]}>↺</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
               <TouchableOpacity
@@ -333,6 +350,24 @@ const styles = StyleSheet.create({
   },
   regenText: {
     fontSize: 16,
+  },
+  translatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  progressText: {
+    fontSize: fontSize.small,
+    fontWeight: '600',
+    marginRight: 6,
+  },
+  cancelButton: {
+    marginLeft: 8,
+    paddingHorizontal: 4,
+  },
+  cancelText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   translateButton: {
     alignSelf: 'flex-start',

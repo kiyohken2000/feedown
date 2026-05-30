@@ -13,6 +13,7 @@ import {
   // KOKORO_VOICE_BM_DANIEL,
 } from 'react-native-executorch'
 import { ExpoResourceFetcher } from 'react-native-executorch-expo-resource-fetcher'
+import { initLlama } from 'llama.rn'
 import {
   FEEDOWN_DEFAULT_LLM_ID,
   FEEDOWN_LLM_MODELS,
@@ -23,6 +24,7 @@ import {
   getAiSettings,
   saveAiSettings,
 } from '../ai/aiStorage'
+import { modelPathFor, toNativePath } from '../ai/llama'
 
 function modelSources(model) {
   if (!model?.executorchModel) return []
@@ -46,6 +48,11 @@ const AiContext = createContext(null)
 export function AiProvider({ children }) {
   const [settings, setSettings] = useState(DEFAULT_AI_SETTINGS)
   const [initialized, setInitialized] = useState(false)
+  // While a llama.rn session is active we MUST suspend executorch so two
+  // engines do not contend for the iOS Metal working set (jetsam OOM risk
+  // on 4GB devices). Reflects the orchestrator state below.
+  const [llamaActive, setLlamaActive] = useState(false)
+  const llamaActiveRef = useRef(false)
   // セッション中に「ダウンロード済み登録済み」かどうかを追跡 (重複 AsyncStorage 書き込み防止)
   const markedRef = useRef(new Set())
 
@@ -62,9 +69,10 @@ export function AiProvider({ children }) {
   )
 
   // preventLoad: AI 無効 / 初期化未完了 / ユーザーが Download を押していない
+  // / llama.rn セッションが GPU を占有中
   const llm = useLLM({
     model: selectedModel?.executorchModel ?? FEEDOWN_LLM_MODELS[0].executorchModel,
-    preventLoad: !initialized || !settings.enabled || !settings.downloadEnabled,
+    preventLoad: !initialized || !settings.enabled || !settings.downloadEnabled || llamaActive,
   })
 
   // TTS: uncomment to re-enable
@@ -139,6 +147,51 @@ export function AiProvider({ children }) {
     }
   }, [])
 
+  // Run a llama.rn (GGUF) session — used by the translation feature with
+  // Hy-MT2. Swaps the GPU owner: executorch is suspended (preventLoad=true
+  // → useLLM cleanup releases its Metal allocations), then llama.cpp loads
+  // the GGUF, the caller drives one or more completions inside `onSession`,
+  // then the ctx is released and executorch is allowed to reload (eager on
+  // the next render — fine for warm Metal cache).
+  //
+  // Reject concurrent sessions: callers must serialize.
+  //
+  // contextParams: passed to initLlama (n_ctx, n_gpu_layers, sampling, ...).
+  // onSession(ctx): receives the llama.rn ctx; can call ctx.completion()
+  // multiple times. Whatever it returns becomes runWithLlamaRn's return value.
+  const runWithLlamaRn = useCallback(async ({ model, contextParams = {}, onSession }) => {
+    if (llamaActiveRef.current) {
+      throw new Error('llama.rn session already in progress')
+    }
+    llamaActiveRef.current = true
+    setLlamaActive(true)
+
+    // Give executorch a moment to flush its Metal allocations before
+    // llama.cpp asks for the GPU working set. Without this the two
+    // engines can briefly coexist and trip jetsam on 4GB devices.
+    const swapDelayMs = 400
+
+    let ctx = null
+    try {
+      await new Promise((r) => setTimeout(r, swapDelayMs))
+      ctx = await initLlama({
+        model: toNativePath(modelPathFor(model)),
+        n_ctx: 4096,
+        n_gpu_layers: 99,
+        ...contextParams,
+      })
+      return await onSession(ctx)
+    } finally {
+      try {
+        if (ctx) await ctx.release()
+      } catch (e) {
+        console.warn('[AiContext] llama ctx release failed:', e?.message ?? e)
+      }
+      llamaActiveRef.current = false
+      setLlamaActive(false)
+    }
+  }, [])
+
   // Delete the on-disk files for the given model and update settings
   const deleteModel = useCallback(async (modelId) => {
     const model = getModelById(modelId)
@@ -170,6 +223,8 @@ export function AiProvider({ children }) {
         initialized,
         getModelSize,
         deleteModel,
+        runWithLlamaRn,
+        llamaActive,
       }}
     >
       {children}

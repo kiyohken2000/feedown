@@ -20,6 +20,13 @@ export const DEFAULT_AI_SETTINGS = {
   ttsDownloadEnabled: false,
   ttsVoiceId: 'af_heart',
   ttsDownloadedVoiceIds: [],
+  // Translation engine: 'lfm' = executorch LFM2.5 (default, current behavior)
+  // 'hy-mt2' = llama.rn Hy-MT2 1.8B Q4_K_M (opt-in, requires 1.13GB DL).
+  // Default OFF for graceful upgrade — existing users keep their current
+  // translation behavior until they explicitly opt in.
+  translationEngine: 'lfm',
+  // True once the Hy-MT2 GGUF has finished downloading on this device.
+  hyMt2Downloaded: false,
 }
 
 export const TTS_VOICE_OPTIONS = [
