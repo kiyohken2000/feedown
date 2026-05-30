@@ -330,9 +330,13 @@ const translatedBlocks = useMemo(() => {
 
 LFM 翻訳パスは「1翻訳 = 1段落」なので画像位置は完全一致。Hy-MT2 のチャンク翻訳は ±1-2 段落のズレが生じうるが、視覚的には許容範囲。
 
-| Original | Translated |
-|----------|------------|
-| ![元記事](./4_article_original.png) | ![翻訳済](./5_article_translated.png) |
+**Original タブ**
+
+![元記事](./4_article_original.png)
+
+**Translated タブ**
+
+![翻訳済](./5_article_translated.png)
 
 ---
 
