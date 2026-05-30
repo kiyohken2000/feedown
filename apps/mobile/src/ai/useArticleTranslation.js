@@ -12,8 +12,8 @@ import { HY_MT2_TRANSLATION_MODEL, HY_MT2_SAMPLING } from './llama/models'
 // temperature reduces parse-failure rate (same rationale as
 // useArticleAi's STRUCTURED_GENERATION_CONFIG).
 const LFM_TRANSLATION_GENERATION_CONFIG = {
-  temperature: 0.2,
-  topP: 0.5,
+  temperature: 0.3,
+  topP: 0.6,
   repetitionPenalty: 1.05,
 }
 

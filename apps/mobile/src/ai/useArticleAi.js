@@ -11,12 +11,17 @@ export const PERSPECTIVES = ['brief', 'technical', 'critical']
 // Sampling tuned for JSON-structured output: summary / signals / repair
 // all produce a strict JSON shape. The default executorch sampling
 // (temp ~0.7) is stochastic enough that small models occasionally drift
-// off the JSON contract (extra preamble, truncated arrays, etc.),
-// which is what the user observed as "fails the first time, succeeds
-// on retry". Lower temperature + tighter top-p cuts that variance.
+// off the JSON contract (extra preamble, truncated arrays, etc.).
+// Lower temperature + tighter top-p cuts that variance.
+//
+// temp=0.3 (not 0.2): at 0.2 the model gets "lazy" about cross-language
+// output and mirrors the article language, ignoring the "Output language:
+// ja" instruction. 0.3 still cuts JSON-format drift but keeps enough
+// flexibility to follow the language switch. Prompt-side fixes
+// (language-localized JSON examples) carry the rest of the weight.
 const STRUCTURED_GENERATION_CONFIG = {
-  temperature: 0.2,
-  topP: 0.5,
+  temperature: 0.3,
+  topP: 0.6,
   repetitionPenalty: 1.05,
 }
 

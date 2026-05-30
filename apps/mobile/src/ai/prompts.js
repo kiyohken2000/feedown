@@ -4,6 +4,22 @@ function getLanguageName(code) {
   return OUTPUT_LANGUAGES.find((l) => l.code === code)?.label ?? 'Japanese'
 }
 
+// Placeholder phrases used in JSON examples — they must be IN the target
+// language so the model sees a same-language continuation as the obvious
+// completion. Without this, small models at low temperature mirror the
+// article language instead of the requested output language (the example
+// values "point 1", "point 2" anchored them to English).
+const LANGUAGE_EXAMPLES = {
+  ja: { summary: '要点', caveat: '注意点', signalFact: '事実', signalClaim: '主張' },
+  en: { summary: 'key point', caveat: 'caveat', signalFact: 'fact', signalClaim: 'claim' },
+  ko: { summary: '요점', caveat: '주의사항', signalFact: '사실', signalClaim: '주장' },
+  zh: { summary: '要点', caveat: '注意事项', signalFact: '事实', signalClaim: '主张' },
+}
+
+function getLanguageExamples(code) {
+  return LANGUAGE_EXAMPLES[code] ?? LANGUAGE_EXAMPLES.ja
+}
+
 function buildArticleBlock(articleCtx) {
   const publishedStr = articleCtx.publishedAt
     ? new Date(articleCtx.publishedAt).toLocaleDateString('en-US')
@@ -24,13 +40,14 @@ Follow these rules strictly:
 
 export function buildBriefSummaryMessages(articleCtx, outputLanguage = 'ja') {
   const langName = getLanguageName(outputLanguage)
-  const systemContent = `${BASE_SYSTEM}\n- Output language: ${langName}`
+  const ex = getLanguageExamples(outputLanguage)
+  const systemContent = `${BASE_SYSTEM}\n- Output language: ${langName} (all values inside the JSON arrays MUST be written in ${langName})`
   const userContent = `Summarize the following article in 3–5 bullet points in ${langName}.
 
 ${buildArticleBlock(articleCtx)}
 
-Output format (JSON only, no code block):
-{"summary":["point 1","point 2","point 3"],"caveats":["note 1"]}`
+Write the summary in ${langName}. Output JSON only, no code block:
+{"summary":["${ex.summary} 1","${ex.summary} 2","${ex.summary} 3"],"caveats":["${ex.caveat} 1"]}`
 
   return [
     { role: 'system', content: systemContent },
@@ -40,15 +57,16 @@ Output format (JSON only, no code block):
 
 export function buildTechnicalSummaryMessages(articleCtx, outputLanguage = 'ja') {
   const langName = getLanguageName(outputLanguage)
-  const systemContent = `${BASE_SYSTEM}\n- Output language: ${langName}`
+  const ex = getLanguageExamples(outputLanguage)
+  const systemContent = `${BASE_SYSTEM}\n- Output language: ${langName} (all values inside the JSON arrays MUST be written in ${langName})`
   const userContent = `Analyze the following article from a technical perspective in ${langName}.
 Focus on: technologies mentioned, implementation details, specifications, architectural decisions, and technical trade-offs.
 Provide 3–5 bullet points.
 
 ${buildArticleBlock(articleCtx)}
 
-Output format (JSON only, no code block):
-{"summary":["technical point 1","technical point 2","technical point 3"],"caveats":["note 1"]}`
+Write the analysis in ${langName}. Output JSON only, no code block:
+{"summary":["${ex.summary} 1","${ex.summary} 2","${ex.summary} 3"],"caveats":["${ex.caveat} 1"]}`
 
   return [
     { role: 'system', content: systemContent },
@@ -58,15 +76,16 @@ Output format (JSON only, no code block):
 
 export function buildCriticalSummaryMessages(articleCtx, outputLanguage = 'ja') {
   const langName = getLanguageName(outputLanguage)
-  const systemContent = `${BASE_SYSTEM}\n- Output language: ${langName}`
+  const ex = getLanguageExamples(outputLanguage)
+  const systemContent = `${BASE_SYSTEM}\n- Output language: ${langName} (all values inside the JSON arrays MUST be written in ${langName})`
   const userContent = `Critically analyze the following article in ${langName}.
 Focus on: claims that lack evidence, potential biases, missing context, conflicting information, and questions left unanswered.
 Provide 3–5 bullet points.
 
 ${buildArticleBlock(articleCtx)}
 
-Output format (JSON only, no code block):
-{"summary":["critical point 1","critical point 2","critical point 3"],"caveats":["note 1"]}`
+Write the analysis in ${langName}. Output JSON only, no code block:
+{"summary":["${ex.summary} 1","${ex.summary} 2","${ex.summary} 3"],"caveats":["${ex.caveat} 1"]}`
 
   return [
     { role: 'system', content: systemContent },
@@ -82,7 +101,8 @@ export function buildSummaryMessages(articleCtx, perspective, outputLanguage = '
 
 export function buildSignalsMessages(articleCtx, outputLanguage = 'ja') {
   const langName = getLanguageName(outputLanguage)
-  const systemContent = `${BASE_SYSTEM}\n- Output language: ${langName}`
+  const ex = getLanguageExamples(outputLanguage)
+  const systemContent = `${BASE_SYSTEM}\n- Output language: ${langName} (every "text" field MUST be written in ${langName}; "type" and "confidence" stay in English as enum values)`
   const userContent = `Analyze the following article and classify its content by signal type in ${langName}.
 
 Signal types to detect:
@@ -102,8 +122,8 @@ Rules:
 
 ${buildArticleBlock(articleCtx)}
 
-Output format (JSON only, no code block):
-{"signals":[{"type":"fact","text":"...","confidence":"high"},{"type":"claim","text":"...","confidence":"medium"}],"insufficient":false}`
+Write all "text" values in ${langName}. Output JSON only, no code block:
+{"signals":[{"type":"fact","text":"${ex.signalFact} 1","confidence":"high"},{"type":"claim","text":"${ex.signalClaim} 1","confidence":"medium"}],"insufficient":false}`
 
   return [
     { role: 'system', content: systemContent },
