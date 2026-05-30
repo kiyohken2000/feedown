@@ -8,6 +8,25 @@ import { getSummaryCache, saveSummaryCache, getSignalsCache, saveSignalsCache } 
 
 export const PERSPECTIVES = ['brief', 'technical', 'critical']
 
+// Sampling tuned for JSON-structured output: summary / signals / repair
+// all produce a strict JSON shape. The default executorch sampling
+// (temp ~0.7) is stochastic enough that small models occasionally drift
+// off the JSON contract (extra preamble, truncated arrays, etc.),
+// which is what the user observed as "fails the first time, succeeds
+// on retry". Lower temperature + tighter top-p cuts that variance.
+const STRUCTURED_GENERATION_CONFIG = {
+  temperature: 0.2,
+  topP: 0.5,
+  repetitionPenalty: 1.05,
+}
+
+// Chat keeps a more conversational sampling — JSON-style determinism
+// would make replies feel robotic.
+const CHAT_GENERATION_CONFIG = {
+  temperature: 0.7,
+  topP: 0.9,
+}
+
 export function useArticleAi(article, readerContent = null) {
   const { llm, settings, selectedModel } = useAi()
 
@@ -222,6 +241,7 @@ export function useArticleAi(article, readerContent = null) {
 
     const messages = buildChatMessagesForGenerate(articleCtx, nextHistory)
     pendingRef.current = { feature: 'chat', articleCtx }
+    llm.configure({ generationConfig: CHAT_GENERATION_CONFIG })
     llm.generate(messages).catch((err) => {
       console.warn('LLM chat generate failed:', err)
       if (pendingRef.current?.feature !== 'chat') return
@@ -263,6 +283,7 @@ export function useArticleAi(article, readerContent = null) {
 
     const messages = buildSummaryMessages(articleCtx, perspective, outputLanguage)
     pendingRef.current = { feature: 'summary', articleCtx, messages, perspective, outputLanguage, retrying: false }
+    llm.configure({ generationConfig: STRUCTURED_GENERATION_CONFIG })
     llm.generate(messages).catch((err) => {
       console.warn('LLM summary generate failed:', err)
       if (pendingRef.current?.feature !== 'summary') return
@@ -301,6 +322,7 @@ export function useArticleAi(article, readerContent = null) {
 
     const messages = buildSignalsMessages(articleCtx, outputLanguage)
     pendingRef.current = { feature: 'signals', articleCtx, messages, outputLanguage, retrying: false }
+    llm.configure({ generationConfig: STRUCTURED_GENERATION_CONFIG })
     llm.generate(messages).catch((err) => {
       console.warn('LLM signals generate failed:', err)
       if (pendingRef.current?.feature !== 'signals') return

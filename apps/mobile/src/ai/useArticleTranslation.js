@@ -8,6 +8,15 @@ import { getTranslationCache, saveTranslationCache } from './aiCache'
 import { splitParagraphsIntoChunks } from './translationChunks'
 import { HY_MT2_TRANSLATION_MODEL, HY_MT2_SAMPLING } from './llama/models'
 
+// Translation outputs a strict JSON array via the LFM2.5 path; low
+// temperature reduces parse-failure rate (same rationale as
+// useArticleAi's STRUCTURED_GENERATION_CONFIG).
+const LFM_TRANSLATION_GENERATION_CONFIG = {
+  temperature: 0.2,
+  topP: 0.5,
+  repetitionPenalty: 1.05,
+}
+
 // LFM2.5 path keeps a hard 2500-char cap because JSON-formatted output
 // degrades with longer inputs (Phase E). Hy-MT2 path translates the full
 // article via chunking — see translateWithHyMt2.
@@ -149,6 +158,7 @@ export function useArticleTranslation(article, readerContent) {
     const limitedParagraphs = limitParagraphsForTranslation(paragraphs)
     const messages = buildTranslationMessages(limitedParagraphs, targetLang)
     pendingRef.current = { contentHash, messages, retrying: false }
+    llm.configure({ generationConfig: LFM_TRANSLATION_GENERATION_CONFIG })
     llm.generate(messages).catch((err) => {
       console.error('Translation generate error:', err)
       setError('Translation failed. Please try again.')
