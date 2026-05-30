@@ -28,7 +28,8 @@
         "autoIncrement": true
       },
       "android": {
-        "autoIncrement": true
+        "autoIncrement": true,
+        "resourceClass": "large"
       }
     }
   },
