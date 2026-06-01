@@ -118,8 +118,21 @@ function readerHash(content) {
   return (h >>> 0).toString(36)
 }
 
+// Cached translation result is either:
+//   { title: string | null, paragraphs: string[] }   (v2, after title support)
+//   string[]                                          (v1, legacy — title null)
+// Normalize to v2 shape so call sites don't need to branch.
+function normalizeCachedResult(cached) {
+  if (Array.isArray(cached)) return { title: null, paragraphs: cached }
+  if (cached && Array.isArray(cached.paragraphs)) {
+    return { title: cached.title ?? null, paragraphs: cached.paragraphs }
+  }
+  return null
+}
+
 export function useArticleTranslation(article, readerContent) {
   const { llm, settings, selectedModel, runWithLlamaRn } = useAi()
+  const [translatedTitle, setTranslatedTitle] = useState(null)
   const [translatedParagraphs, setTranslatedParagraphs] = useState(null)
   // The chunks used to translate (Hy-MT2 path only). Lets the Translated
   // view know which source paragraphs each translation entry covers, so
@@ -156,6 +169,7 @@ export function useArticleTranslation(article, readerContent) {
 
   // Reset when article changes
   useEffect(() => {
+    setTranslatedTitle(null)
     setTranslatedParagraphs(null)
     setTranslationChunks(null)
     setIsTranslating(false)
@@ -181,12 +195,19 @@ export function useArticleTranslation(article, readerContent) {
     const parsed = parseTranslationOutput(rawResponse)
     if (parsed.ok) {
       const modelId = selectedModel?.id ?? 'unknown'
-      saveTranslationCache(article.id, pending.contentHash, modelId, targetLang, parsed.data)
-      setTranslatedParagraphs(parsed.data)
+      // If title was prepended, peel it off the front of the response.
+      const title = pending.hasTitle ? (parsed.data[0] ?? null) : null
+      const paragraphs = pending.hasTitle ? parsed.data.slice(1) : parsed.data
+      saveTranslationCache(article.id, pending.contentHash, modelId, targetLang, {
+        title,
+        paragraphs,
+      })
+      setTranslatedTitle(title)
+      setTranslatedParagraphs(paragraphs)
       // LFM path: 1 translated entry per source paragraph (capped earlier).
       // Build a virtual chunk array so the renderer can place images by
       // the same logic as the Hy-MT2 path.
-      setTranslationChunks(parsed.data.map((_, i) => ({ paragraphIndices: [i] })))
+      setTranslationChunks(paragraphs.map((_, i) => ({ paragraphIndices: [i] })))
       setIsTranslating(false)
       setShowTranslated(true)
       pendingRef.current = null
@@ -213,10 +234,12 @@ export function useArticleTranslation(article, readerContent) {
     const modelId = selectedModel?.id ?? 'unknown'
 
     if (!force) {
-      const cached = await getTranslationCache(article.id, contentHash, modelId, targetLang)
+      const rawCached = await getTranslationCache(article.id, contentHash, modelId, targetLang)
+      const cached = normalizeCachedResult(rawCached)
       if (cached) {
-        setTranslatedParagraphs(cached)
-        setTranslationChunks(cached.map((_, i) => ({ paragraphIndices: [i] })))
+        setTranslatedTitle(cached.title)
+        setTranslatedParagraphs(cached.paragraphs)
+        setTranslationChunks(cached.paragraphs.map((_, i) => ({ paragraphIndices: [i] })))
         setIsTranslating(false)
         setShowTranslated(true)
         return
@@ -226,8 +249,12 @@ export function useArticleTranslation(article, readerContent) {
     setError(null)
     setIsTranslating(true)
     const limitedParagraphs = limitParagraphsForTranslation(paragraphs)
-    const messages = buildTranslationMessages(limitedParagraphs, targetLang)
-    pendingRef.current = { contentHash, messages, retrying: false }
+    // Prepend the title as paragraph[0] so it gets translated in the same
+    // round-trip. handleLfmComplete peels it back off.
+    const hasTitle = typeof article?.title === 'string' && article.title.trim().length > 0
+    const inputItems = hasTitle ? [article.title.trim(), ...limitedParagraphs] : limitedParagraphs
+    const messages = buildTranslationMessages(inputItems, targetLang)
+    pendingRef.current = { contentHash, messages, retrying: false, hasTitle }
     llm.configure({ generationConfig: LFM_TRANSLATION_GENERATION_CONFIG })
     llm.generate(messages).catch((err) => {
       console.error('Translation generate error:', err)
@@ -242,9 +269,11 @@ export function useArticleTranslation(article, readerContent) {
     const engineId = HY_MT2_TRANSLATION_MODEL.id
 
     if (!force) {
-      const cached = await getTranslationCache(article.id, contentHash, engineId, targetLang)
+      const rawCached = await getTranslationCache(article.id, contentHash, engineId, targetLang)
+      const cached = normalizeCachedResult(rawCached)
       if (cached) {
-        setTranslatedParagraphs(cached)
+        setTranslatedTitle(cached.title)
+        setTranslatedParagraphs(cached.paragraphs)
         // Re-derive chunk structure from current paragraphs — the contentHash
         // match guarantees the source paragraphs (and therefore the chunk
         // boundaries) are identical to when this cache was written.
@@ -258,9 +287,12 @@ export function useArticleTranslation(article, readerContent) {
     const chunks = splitParagraphsIntoChunks(paragraphs, 2500)
     if (chunks.length === 0) return
 
+    const hasTitle = typeof article?.title === 'string' && article.title.trim().length > 0
+
     setError(null)
     setIsTranslating(true)
     setShowTranslated(true)
+    setTranslatedTitle(null)
     setTranslatedParagraphs([])
     setTranslationChunks(chunks)
     setProgress({ current: 0, total: chunks.length })
@@ -271,6 +303,22 @@ export function useArticleTranslation(article, readerContent) {
         model: HY_MT2_TRANSLATION_MODEL,
         contextParams: { n_ctx: 4096 },
         onSession: async (ctx) => {
+          let title = null
+          if (hasTitle && !cancelRef.current) {
+            const titleMessages = buildHyMt2TranslationMessages(article.title.trim(), targetLang)
+            const titleCompletion = await ctx.completion({
+              messages: titleMessages,
+              n_predict: 256,
+              temperature: HY_MT2_SAMPLING.temperature,
+              top_p: HY_MT2_SAMPLING.top_p,
+              top_k: HY_MT2_SAMPLING.top_k,
+              penalty_repeat: HY_MT2_SAMPLING.penalty_repeat,
+              stop: ['</s>', '<|endoftext|>', '<end_of_turn>', '<|eos|>'],
+            })
+            title = (titleCompletion?.text ?? titleCompletion?.content ?? '').trim() || null
+            if (title) setTranslatedTitle(title)
+          }
+
           const out = []
           for (let i = 0; i < chunks.length; i++) {
             if (cancelRef.current) break
@@ -290,12 +338,15 @@ export function useArticleTranslation(article, readerContent) {
             setTranslatedParagraphs((prev) => [...(prev ?? []), text])
             setProgress({ current: i + 1, total: chunks.length })
           }
-          return out
+          return { title, paragraphs: out }
         },
       })
 
-      if (!cancelRef.current && collected.length === chunks.length) {
-        await saveTranslationCache(article.id, contentHash, engineId, targetLang, collected)
+      if (!cancelRef.current && collected.paragraphs.length === chunks.length) {
+        await saveTranslationCache(article.id, contentHash, engineId, targetLang, {
+          title: collected.title,
+          paragraphs: collected.paragraphs,
+        })
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       }
     } catch (err) {
@@ -359,6 +410,7 @@ export function useArticleTranslation(article, readerContent) {
 
   return {
     paragraphs,
+    translatedTitle,
     translatedParagraphs,
     translatedBlocks,
     isTranslating: isTranslating || (llm.isGenerating && !!pendingRef.current),

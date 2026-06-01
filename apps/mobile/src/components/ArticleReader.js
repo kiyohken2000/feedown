@@ -191,11 +191,17 @@ export default function ArticleReader({ article, onLinkPress, translation }) {
     >
       {/* Article Header */}
       <View style={styles.header}>
-        {article.title && (
-          <Text style={[styles.title, { color: theme.text }]}>
-            {article.title}
-          </Text>
-        )}
+        {(() => {
+          const displayTitle = translation?.showTranslated && translation?.translatedTitle
+            ? translation.translatedTitle
+            : article.title
+          if (!displayTitle) return null
+          return (
+            <Text style={[styles.title, { color: theme.text }]}>
+              {displayTitle}
+            </Text>
+          )
+        })()}
         {(article.byline || article.siteName) && (
           <Text style={[styles.meta, { color: theme.textMuted }]}>
             {article.byline && article.byline}
