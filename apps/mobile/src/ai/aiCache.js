@@ -1,5 +1,6 @@
 import { AI_KEYS, getCacheRecord, saveCacheRecord, deleteCacheRecord } from './aiStorage'
 import { MODEL_DEFINITION_VERSION } from './models'
+import { normalizeSignalsShape } from './jsonOutput'
 
 function buildSummaryCacheKey(articleId, contentHash, modelId, perspective, outputLanguage) {
   return `${articleId}:${contentHash}:${modelId}:${perspective}:${outputLanguage}`
@@ -45,7 +46,10 @@ export async function getSignalsCache(articleId, contentHash, modelId, outputLan
   const key = buildSignalsCacheKey(articleId, contentHash, modelId, outputLanguage)
   const record = await getCacheRecord(AI_KEYS.SUMMARY_PREFIX, key)
   if (!isRecordValid(record, contentHash)) return null
-  return record.result
+  // Migrate legacy {signals:[{type,text,confidence}]} cache entries to the
+  // new {facts, claims, quotes} shape on read so existing caches keep working.
+  const normalized = normalizeSignalsShape(record.result)
+  return normalized ?? record.result
 }
 
 export async function saveSignalsCache(articleId, contentHash, modelId, outputLanguage, result) {

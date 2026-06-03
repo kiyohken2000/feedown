@@ -9,30 +9,12 @@ import {
 import { colors, fontSize } from '../../theme'
 
 const SIGNAL_META = {
-  fact:        { label: 'Fact',        color: '#2563EB' },
-  claim:       { label: 'Claim',       color: '#7C3AED' },
-  speculation: { label: 'Speculation', color: '#D97706' },
-  quote:       { label: 'Quote',       color: '#059669' },
-  promotion:   { label: 'Promotion',   color: '#DC2626' },
-  unclear:     { label: 'Unclear',     color: '#6B7280' },
+  facts:  { label: 'Facts',  color: '#2563EB' },
+  claims: { label: 'Claims', color: '#7C3AED' },
+  quotes: { label: 'Quotes', color: '#059669' },
 }
 
-const SIGNAL_ORDER = ['fact', 'claim', 'speculation', 'quote', 'promotion', 'unclear']
-
-const CONFIDENCE_STYLE = {
-  high:   { bg: 'rgba(5,150,105,0.12)',  text: '#059669' },
-  medium: { bg: 'rgba(217,119,6,0.12)',  text: '#D97706' },
-  low:    { bg: 'rgba(107,114,128,0.12)', text: '#6B7280' },
-}
-
-function ConfidenceBadge({ confidence }) {
-  const style = CONFIDENCE_STYLE[confidence] ?? CONFIDENCE_STYLE.low
-  return (
-    <View style={[styles.badge, { backgroundColor: style.bg }]}>
-      <Text style={[styles.badgeText, { color: style.text }]}>{confidence}</Text>
-    </View>
-  )
-}
+const SIGNAL_ORDER = ['facts', 'claims', 'quotes']
 
 function SignalGroup({ type, items, theme }) {
   const meta = SIGNAL_META[type]
@@ -42,10 +24,9 @@ function SignalGroup({ type, items, theme }) {
       <View style={[styles.groupHeader, { borderLeftColor: meta.color }]}>
         <Text style={[styles.groupLabel, { color: meta.color }]}>{meta.label}</Text>
       </View>
-      {items.map((signal, i) => (
+      {items.map((text, i) => (
         <View key={i} style={[styles.signalRow, { borderBottomColor: theme.border }]}>
-          <Text style={[styles.signalText, { color: theme.text }]}>{signal.text}</Text>
-          <ConfidenceBadge confidence={signal.confidence} />
+          <Text style={[styles.signalText, { color: theme.text }]}>{text}</Text>
         </View>
       ))}
     </View>
@@ -92,7 +73,7 @@ export default function ArticleSignalsView({
     return (
       <View style={styles.stateContainer}>
         <Text style={[styles.stateText, { color: theme.textMuted }]}>
-          Classify article content by signal type — facts, claims, speculation, and more
+          Classify article content into facts, claims, and quotes
         </Text>
         <TouchableOpacity
           style={[styles.actionButton, { borderColor: colors.primary }]}
@@ -104,7 +85,9 @@ export default function ArticleSignalsView({
     )
   }
 
-  if (result.insufficient || result.signals.length === 0) {
+  const isEmpty =
+    !result.facts?.length && !result.claims?.length && !result.quotes?.length
+  if (isEmpty) {
     return (
       <View style={styles.stateContainer}>
         <Text style={[styles.stateText, { color: theme.textMuted }]}>
@@ -117,18 +100,13 @@ export default function ArticleSignalsView({
     )
   }
 
-  // Group signals by type in defined order
-  const grouped = {}
-  for (const signal of result.signals) {
-    if (!grouped[signal.type]) grouped[signal.type] = []
-    grouped[signal.type].push(signal)
-  }
-
   return (
     <View>
-      {SIGNAL_ORDER.filter((t) => grouped[t]?.length > 0).map((type) => (
-        <SignalGroup key={type} type={type} items={grouped[type]} theme={theme} />
-      ))}
+      {SIGNAL_ORDER.map((type) => {
+        const items = result[type] ?? []
+        if (items.length === 0) return null
+        return <SignalGroup key={type} type={type} items={items} theme={theme} />
+      })}
       <TouchableOpacity style={styles.regenerateRow} onPress={() => onGenerate({ force: true })}>
         <Text style={[styles.regenerateText, { color: theme.textMuted }]}>Regenerate</Text>
       </TouchableOpacity>
@@ -176,29 +154,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   signalRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
   },
   signalText: {
-    flex: 1,
     fontSize: fontSize.normal,
     lineHeight: 22,
-  },
-  badge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 2,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
   regenerateRow: {
     alignItems: 'flex-end',

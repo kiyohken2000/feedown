@@ -19,9 +19,15 @@ export const PERSPECTIVES = ['brief', 'technical', 'critical']
 // ja" instruction. 0.3 still cuts JSON-format drift but keeps enough
 // flexibility to follow the language switch. Prompt-side fixes
 // (language-localized JSON examples) carry the rest of the weight.
+//
+// minP=0.1: added in v0.9.0. Filters tokens whose probability is < 10%
+// of the top token, regardless of temperature. Cuts the long-tail
+// junk tokens (random punctuation, stray ASCII) that occasionally
+// derail JSON output even at low temperature.
 const STRUCTURED_GENERATION_CONFIG = {
   temperature: 0.3,
   topP: 0.6,
+  minP: 0.1,
   repetitionPenalty: 1.05,
 }
 

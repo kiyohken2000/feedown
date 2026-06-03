@@ -5635,6 +5635,15 @@ expo-audio@~55.0.14:
   resolved "https://registry.yarnpkg.com/expo-audio/-/expo-audio-55.0.14.tgz#2a2b8f420eb860f15f2de9ffaedf21156139a889"
   integrity sha512-Biy6ffKXrnKHgcWSVWLKVdWLNhV/pj1JWJeotY6nDR6fVe8mjXQDCvi6EbaSFPdffVHym6UB2siKzWUNSnG+kQ==
 
+expo-build-properties@~55.0.14:
+  version "55.0.14"
+  resolved "https://registry.yarnpkg.com/expo-build-properties/-/expo-build-properties-55.0.14.tgz#2906668de26b0eac4956829ec15c4cf043e34d1b"
+  integrity sha512-5wopuLXlzFpDnCfsIjgAcj4yKnVTYg3XYGnYV5Hqi7u6jJipLG4fwtUqxVIFqBj7vEHXjd4zYCyXjp39AtAD7w==
+  dependencies:
+    "@expo/schema-utils" "^55.0.4"
+    resolve-from "^5.0.0"
+    semver "^7.6.0"
+
 expo-camera@~55.0.18:
   version "55.0.18"
   resolved "https://registry.yarnpkg.com/expo-camera/-/expo-camera-55.0.18.tgz#c7d6e67ae5d8b3434d1c8b6d8c4b9f3cc6e772a3"
@@ -8704,11 +8713,6 @@ pngjs@^3.3.0:
   resolved "https://registry.npmjs.org/pngjs/-/pngjs-3.4.0.tgz"
   integrity sha512-NCrCHhWmnQklfH4MtJMRjZ2a8c80qXeMlQMv2uVp9ISJMTt562SbGd6n2oq0PaPgKm7Z6pL9E2UlLIhC+SHL3w==
 
-pngjs@^7.0.0:
-  version "7.0.0"
-  resolved "https://registry.yarnpkg.com/pngjs/-/pngjs-7.0.0.tgz#a8b7446020ebbc6ac739db6c5415a65d17090e26"
-  integrity sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==
-
 possible-typed-array-names@^1.0.0:
   version "1.1.0"
   resolved "https://registry.npmjs.org/possible-typed-array-names/-/possible-typed-array-names-1.1.0.tgz"
@@ -8988,20 +8992,19 @@ react-native-enriched-markdown@^0.5.0:
   resolved "https://registry.yarnpkg.com/react-native-enriched-markdown/-/react-native-enriched-markdown-0.5.0.tgz#0d2e9a965963ca253c592136741d8329734d434f"
   integrity sha512-CYihNlcg8IjsrVbmypDjFHsDF6Z6vYO0yraw6CkR30SDsg99J6fcBrOkyWOItO8PIDD21jw8yD1eYP/0LBOCdA==
 
-react-native-executorch-expo-resource-fetcher@^0.8.0:
-  version "0.8.0"
-  resolved "https://registry.yarnpkg.com/react-native-executorch-expo-resource-fetcher/-/react-native-executorch-expo-resource-fetcher-0.8.0.tgz#583c66e26c9729b36001658e5c701b44d20e2476"
-  integrity sha512-vdAne2FBL0nCQ2c2yHTSt8Uttm0Klmo/K7tirSVlKxgVtli4cmsfl+UpR5giaNtlRZ3ImMAMXNW34j0fItmRfQ==
+react-native-executorch-expo-resource-fetcher@^0.9.0:
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/react-native-executorch-expo-resource-fetcher/-/react-native-executorch-expo-resource-fetcher-0.9.0.tgz#68213f660433bdeb461420f13b6e03948a7d5b85"
+  integrity sha512-BcXny9AZLJGhxB7FF9SLzBOghUqUPTk1MeLmGOMVdGtsoWb0GhDQTzVXUbjm58/BzK8OO0w18FMnR7hJEFIpfg==
 
-react-native-executorch@^0.8.4:
-  version "0.8.4"
-  resolved "https://registry.yarnpkg.com/react-native-executorch/-/react-native-executorch-0.8.4.tgz#be496c718170cc14fe673954cb9fcc01704166b6"
-  integrity sha512-3g4TIKsMJCn8gkwx15yEtM9/glmRnSEzpz4J1jCiG5W0oe6E27bI46sU+x9uRo0xq9pXwoGygQw/cqv3Y+I+aw==
+react-native-executorch@^0.9.0:
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/react-native-executorch/-/react-native-executorch-0.9.0.tgz#99dc72827dcd483a47d17731c6f7b20c36b45b2d"
+  integrity sha512-pqHJzssr4WQg3xp9hxUGHDHMrtPWG8hSYP6Hw86IbDFexSvnMHYPaAZsYfiaNEBxF2VAepIGSfwh452z7F8Jiw==
   dependencies:
     "@huggingface/jinja" "^0.5.0"
     jsonrepair "^3.12.0"
     jsonschema "^1.5.0"
-    pngjs "^7.0.0"
     zod "^4.3.6"
 
 react-native-gesture-handler@~2.30.0:
@@ -10679,15 +10682,10 @@ url-parse@^1.5.3:
     querystringify "^2.1.1"
     requires-port "^1.0.0"
 
-use-latest-callback@^0.1.5:
+use-latest-callback@0.1.9, use-latest-callback@^0.1.5, use-latest-callback@^0.2.4:
   version "0.1.9"
   resolved "https://registry.yarnpkg.com/use-latest-callback/-/use-latest-callback-0.1.9.tgz#10191dc54257e65a8e52322127643a8940271e2a"
   integrity sha512-CL/29uS74AwreI/f2oz2hLTW7ZqVeV5+gxFeGudzQrgkCytrHw33G4KbnQOrRlAEzzAFXi7dDLMC9zhWcVpzmw==
-
-use-latest-callback@^0.2.4:
-  version "0.2.6"
-  resolved "https://registry.yarnpkg.com/use-latest-callback/-/use-latest-callback-0.2.6.tgz#e5ea752808c86219acc179ace0ae3c1203255e77"
-  integrity sha512-FvRG9i1HSo0wagmX63Vrm8SnlUU3LMM3WyZkQ76RnslpBrX694AdG4A0zQBx2B3ZifFA0yv/BaEHGBnEax5rZg==
 
 use-sync-external-store@^1.5.0:
   version "1.6.0"

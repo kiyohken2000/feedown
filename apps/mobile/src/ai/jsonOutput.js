@@ -1,3 +1,5 @@
+import { jsonrepair } from 'jsonrepair'
+
 // Reasoning models (Qwen3 family, some Llama 3 variants) emit
 // <think>...</think> blocks before the visible answer. They leak into:
 //   - chat replies (user sees the reasoning)
@@ -40,18 +42,71 @@ export function extractJson(rawText) {
   return rawText.trim()
 }
 
-const VALID_SIGNAL_TYPES = ['fact', 'claim', 'speculation', 'quote', 'promotion', 'unclear']
-const VALID_CONFIDENCES = ['high', 'medium', 'low']
+// Resilient JSON parser. Small LLMs frequently emit JSON with trailing
+// commas, unclosed brackets (truncation), smart quotes, single quotes, or
+// preamble text. We try escalating recovery before giving up so the user
+// doesn't hit a "Failed to generate" toast just because the closing `}`
+// got eaten by sampling noise.
+function tryParseStructured(stripped, extracted) {
+  // 1. Fast path: well-formed JSON.
+  try {
+    return JSON.parse(extracted)
+  } catch (_) {
+    // Fall through.
+  }
+  // 2. jsonrepair on the extracted substring — fixes trailing commas,
+  //    unclosed brackets, single/smart quotes, comments, etc.
+  try {
+    return JSON.parse(jsonrepair(extracted))
+  } catch (_) {
+    // Fall through.
+  }
+  // 3. jsonrepair on the full stripped text — useful when extractJson's
+  //    "first { ... last }" heuristic grabbed something wrong (e.g. a `{`
+  //    inside a string before the actual JSON object).
+  try {
+    return JSON.parse(jsonrepair(stripped))
+  } catch (_) {
+    return null
+  }
+}
+
+// Normalizes both the new flat shape `{facts, claims, quotes}` and any
+// legacy cached output in the old `{signals:[{type,text,confidence}], insufficient}`
+// shape. Returns the new shape or null if unrecognized.
+export function normalizeSignalsShape(parsed) {
+  if (!parsed || typeof parsed !== 'object') return null
+  const filterStr = (arr) =>
+    Array.isArray(arr) ? arr.filter((s) => typeof s === 'string' && s.trim()) : []
+  if ('facts' in parsed || 'claims' in parsed || 'quotes' in parsed) {
+    return {
+      facts: filterStr(parsed.facts),
+      claims: filterStr(parsed.claims),
+      quotes: filterStr(parsed.quotes),
+    }
+  }
+  if (Array.isArray(parsed.signals)) {
+    const buckets = { facts: [], claims: [], quotes: [] }
+    for (const s of parsed.signals) {
+      if (!s || typeof s.text !== 'string' || !s.text.trim()) continue
+      if (s.type === 'fact') buckets.facts.push(s.text.trim())
+      else if (s.type === 'claim') buckets.claims.push(s.text.trim())
+      else if (s.type === 'quote') buckets.quotes.push(s.text.trim())
+      // speculation / promotion / unclear are dropped — no mapping in new shape
+    }
+    return buckets
+  }
+  return null
+}
 
 export function parseSummaryOutput(rawText) {
-  const jsonStr = extractJson(stripThinkTags(rawText))
-  let parsed
-  try {
-    parsed = JSON.parse(jsonStr)
-  } catch (e) {
-    return { ok: false, error: `JSON parse error: ${e.message}`, raw: rawText }
+  const stripped = stripThinkTags(rawText)
+  const jsonStr = extractJson(stripped)
+  const parsed = tryParseStructured(stripped, jsonStr)
+  if (!parsed) {
+    return { ok: false, error: 'JSON parse error (even after repair)', raw: rawText }
   }
-  if (!parsed || !Array.isArray(parsed.summary) || parsed.summary.length === 0) {
+  if (!Array.isArray(parsed.summary) || parsed.summary.length === 0) {
     return { ok: false, error: 'Missing or empty summary array', raw: rawText }
   }
   const data = {
@@ -67,12 +122,21 @@ export function parseSummaryOutput(rawText) {
 }
 
 export function parseTranslationOutput(rawText) {
-  const jsonStr = extractJsonArray(stripThinkTags(rawText))
+  const stripped = stripThinkTags(rawText)
+  const jsonStr = extractJsonArray(stripped)
   let parsed
   try {
     parsed = JSON.parse(jsonStr)
-  } catch (e) {
-    return { ok: false, error: `JSON parse error: ${e.message}`, raw: rawText }
+  } catch (_) {
+    try {
+      parsed = JSON.parse(jsonrepair(jsonStr))
+    } catch (_) {
+      try {
+        parsed = JSON.parse(jsonrepair(stripped))
+      } catch (e) {
+        return { ok: false, error: `JSON parse error: ${e.message}`, raw: rawText }
+      }
+    }
   }
   if (!Array.isArray(parsed) || parsed.length === 0) {
     return { ok: false, error: 'Expected non-empty JSON array', raw: rawText }
@@ -97,29 +161,15 @@ export function buildTranslationRepairMessages(originalMessages, brokenRaw) {
 }
 
 export function parseSignalsOutput(rawText) {
-  const jsonStr = extractJson(stripThinkTags(rawText))
-  let parsed
-  try {
-    parsed = JSON.parse(jsonStr)
-  } catch (e) {
-    return { ok: false, error: `JSON parse error: ${e.message}`, raw: rawText }
+  const stripped = stripThinkTags(rawText)
+  const jsonStr = extractJson(stripped)
+  const parsed = tryParseStructured(stripped, jsonStr)
+  if (!parsed) {
+    return { ok: false, error: 'JSON parse error (even after repair)', raw: rawText }
   }
-  if (!parsed || !Array.isArray(parsed.signals)) {
-    return { ok: false, error: 'Missing signals array', raw: rawText }
+  const data = normalizeSignalsShape(parsed)
+  if (!data) {
+    return { ok: false, error: 'Unrecognized signals shape', raw: rawText }
   }
-  const signals = parsed.signals.filter(
-    (s) =>
-      s &&
-      VALID_SIGNAL_TYPES.includes(s.type) &&
-      typeof s.text === 'string' &&
-      s.text.trim() &&
-      VALID_CONFIDENCES.includes(s.confidence),
-  )
-  return {
-    ok: true,
-    data: {
-      signals,
-      insufficient: parsed.insufficient === true,
-    },
-  }
+  return { ok: true, data }
 }

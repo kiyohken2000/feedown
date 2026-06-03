@@ -99,31 +99,31 @@ export function buildSummaryMessages(articleCtx, perspective, outputLanguage = '
   return buildBriefSummaryMessages(articleCtx, outputLanguage)
 }
 
+// Flat 3-category schema. The previous design ({signals:[{type,text,confidence}],insufficient})
+// overwhelmed 1.2B-class models — schema complexity + 6 enums + confidence
+// judgment caused complete prompt non-adherence (model invented generic
+// content unrelated to the article). String arrays keyed by category
+// mirror the summary path's shape, which models handle reliably.
 export function buildSignalsMessages(articleCtx, outputLanguage = 'ja') {
   const langName = getLanguageName(outputLanguage)
   const ex = getLanguageExamples(outputLanguage)
-  const systemContent = `${BASE_SYSTEM}\n- Output language: ${langName} (every "text" field MUST be written in ${langName}; "type" and "confidence" stay in English as enum values)`
-  const userContent = `Analyze the following article and classify its content by signal type in ${langName}.
+  const systemContent = `${BASE_SYSTEM}\n- Output language: ${langName} (all values inside the JSON arrays MUST be written in ${langName})`
+  const userContent = `Analyze the following article and classify its content into three categories in ${langName}.
 
-Signal types to detect:
-- "fact": confirmed dates, numbers, releases, specifications, verified events
-- "claim": author's or company's interpretations, opinions, or assertions
-- "speculation": predictions, uncertain conclusions, unconfirmed outlooks
-- "quote": direct quotes or statements attributed to a specific person or source
-- "promotion": product pitches, sign-up prompts, calls-to-action, sponsor language
-- "unclear": statements with weak evidence, missing sources, or ambiguous meaning
+Categories:
+- "facts": confirmed dates, numbers, releases, specifications, verified events
+- "claims": opinions, interpretations, or assertions made by the author or a company
+- "quotes": direct quotes or statements attributed to a specific person or source
 
 Rules:
-- Extract up to 3 items per signal type that is present in the article
-- Omit signal types that are not present
+- Include up to 3 items per category that are present in the article
+- If a category is not present in the article, return an empty array for it
 - Keep each item concise (1–2 sentences)
-- Assign confidence: "high" (clearly identifiable), "medium" (likely), "low" (ambiguous)
-- If the article is too short to classify, set "insufficient": true and return an empty signals array
 
 ${buildArticleBlock(articleCtx)}
 
-Write all "text" values in ${langName}. Output JSON only, no code block:
-{"signals":[{"type":"fact","text":"${ex.signalFact} 1","confidence":"high"},{"type":"claim","text":"${ex.signalClaim} 1","confidence":"medium"}],"insufficient":false}`
+Write all values in ${langName}. Output JSON only, no code block:
+{"facts":["${ex.signalFact} 1"],"claims":["${ex.signalClaim} 1"],"quotes":[]}`
 
   return [
     { role: 'system', content: systemContent },
