@@ -48,6 +48,7 @@ export default function AiSettings() {
     updateSettings: updateAiSettings,
     getModelSize,
     deleteModel,
+    cancelDownload,
   } = useAi()
   // const { llm, tts, settings: aiSettings, updateSettings: updateAiSettings } = useAi()  // TTS: restore tts when re-enabling
   const [isLoading, setIsLoading] = useState(false)
@@ -58,6 +59,10 @@ export default function AiSettings() {
   const [hyMt2Downloading, setHyMt2Downloading] = useState(false)
   const ramBytes = getDeviceRamBytes()
   const ramGate = canRunOnDevice(HY_MT2_TRANSLATION_MODEL, ramBytes)
+  // useLLM は単一インスタンスで selectedModel のみ追跡するため、DL 中の
+  // モデル切替/AI 無効化は中途半端な partial file を残す。グローバル lock
+  // で他モデルの選択と AI Switch を一時的に封じる。
+  const isAnyDownloading = llm.downloadProgress > 0 && llm.downloadProgress < 1
 
   const downloadedKey = (aiSettings.downloadedModelIds ?? []).join(',')
   useEffect(() => {
@@ -212,6 +217,7 @@ export default function AiSettings() {
               <Switch
                 value={aiSettings.enabled}
                 onValueChange={(v) => updateAiSettings({ enabled: v })}
+                disabled={isAnyDownloading}
                 trackColor={{ false: '#767577', true: colors.primary }}
                 thumbColor={aiSettings.enabled ? colors.white : '#f4f3f4'}
               />
@@ -224,6 +230,7 @@ export default function AiSettings() {
                   Model
                 </Text>
                 {FEEDOWN_LLM_MODELS.map((model) => {
+                  const modelRamGate = canRunOnDevice(model, ramBytes)
                   const isSelected = aiSettings.selectedModelId === model.id
                   const isDownloadedLocally = (aiSettings.downloadedModelIds ?? []).includes(model.id)
                   const isActive = isSelected && llm.isReady
@@ -232,6 +239,10 @@ export default function AiSettings() {
                   const isPending = isSelected && aiSettings.downloadEnabled && !isActive && !isDownloading
                   const sizeLabel = formatBytes(modelSizes[model.id])
                   const canDelete = isDownloadedLocally && !isActive && !isDownloading && !isPending
+                  // DL 中は selected 以外の行をロック。RAM 不足の行も同じ
+                  // disabled 扱いだが理由が違うので warning 表記は別系統。
+                  const lockedByOtherDownload = isAnyDownloading && !isSelected
+                  const rowDisabled = !modelRamGate.ok || lockedByOtherDownload
 
                   return (
                     <TouchableOpacity
@@ -240,8 +251,10 @@ export default function AiSettings() {
                         styles.modelRow,
                         { borderColor: theme.border },
                         isSelected && styles.modelRowSelected,
+                        rowDisabled && styles.modelRowDisabled,
                       ]}
-                      onPress={() => updateAiSettings({ selectedModelId: model.id })}
+                      onPress={() => !rowDisabled && updateAiSettings({ selectedModelId: model.id })}
+                      disabled={rowDisabled}
                     >
                       <View style={styles.modelRowContent}>
                         <View style={styles.modelRowLeft}>
@@ -256,6 +269,11 @@ export default function AiSettings() {
                               {model.notes}
                               {sizeLabel ? `  •  ${sizeLabel}` : ''}
                             </Text>
+                            {!modelRamGate.ok && (
+                              <Text style={[styles.modelGateWarning, { color: colors.redSecondary }]}>
+                                ⚠ {modelRamGate.reason}
+                              </Text>
+                            )}
                           </View>
                         </View>
 
@@ -266,9 +284,17 @@ export default function AiSettings() {
                             </View>
                           )}
                           {isDownloading && (
-                            <Text style={[styles.modelStatusText, { color: theme.textMuted }]}>
-                              {Math.round(progress * 100)}%
-                            </Text>
+                            <View style={styles.downloadProgressRow}>
+                              <Text style={[styles.modelStatusText, { color: theme.textMuted }]}>
+                                {Math.round(progress * 100)}%
+                              </Text>
+                              <TouchableOpacity
+                                onPress={() => cancelDownload(model.id)}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <Text style={styles.cancelDownloadText}>Cancel</Text>
+                              </TouchableOpacity>
+                            </View>
                           )}
                           {isPending && (
                             <Text style={[styles.modelStatusText, { color: theme.textMuted }]}>
@@ -353,6 +379,23 @@ export default function AiSettings() {
               </>
             )}
           </View>
+        </View>
+
+        {/* Benchmark — compare models on a fixed prompt set */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Benchmark</Text>
+          <TouchableOpacity
+            style={[styles.card, styles.navRow, { backgroundColor: theme.card }]}
+            onPress={() => navigation.navigate('Benchmark')}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.toggleLabel, { color: theme.text }]}>Model Benchmark</Text>
+              <Text style={[styles.toggleDescription, { color: theme.textMuted }]}>
+                Compare cold load, TTFT, and decode speed across downloaded models
+              </Text>
+            </View>
+            <Text style={[styles.navChevron, { color: theme.textMuted }]}>›</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Translation Engine — Hy-MT2 (llama.rn, opt-in) */}
@@ -594,6 +637,22 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   modelRowSelected: { borderColor: colors.primary },
+  modelRowDisabled: { opacity: 0.5 },
+  downloadProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  cancelDownloadText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.redSecondary,
+  },
+  modelGateWarning: {
+    fontSize: fontSize.small,
+    fontWeight: '500',
+    marginTop: 4,
+  },
   modelRowContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -691,5 +750,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: colors.redSecondary,
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  navChevron: {
+    fontSize: fontSize.xLarge,
+    marginLeft: 8,
   },
 })

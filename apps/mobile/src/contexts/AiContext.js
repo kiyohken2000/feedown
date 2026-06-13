@@ -25,6 +25,7 @@ import {
   saveAiSettings,
 } from '../ai/aiStorage'
 import { modelPathFor, toNativePath } from '../ai/llama'
+import { canRunOnDevice } from '../ai/llama/models'
 
 function modelSources(model) {
   if (!model?.executorchModel) return []
@@ -63,10 +64,14 @@ export function AiProvider({ children }) {
     })
   }, [])
 
-  const selectedModel = useMemo(
-    () => getModelById(settings.selectedModelId) ?? getModelById(FEEDOWN_DEFAULT_LLM_ID),
-    [settings.selectedModelId],
-  )
+  const selectedModel = useMemo(() => {
+    // 保存された selectedModelId が現端末の RAM 要件を満たさない場合
+    // (e.g., Gemma 4 を選択済みの状態で 4GB 端末で起動) はデフォルトに
+    // フォールバック。useLLM がロード試行して jetsam OOM するのを防ぐ。
+    const m = getModelById(settings.selectedModelId)
+    if (m && canRunOnDevice(m).ok) return m
+    return getModelById(FEEDOWN_DEFAULT_LLM_ID)
+  }, [settings.selectedModelId])
 
   // preventLoad: AI 無効 / 初期化未完了 / ユーザーが Download を押していない
   // / llama.rn セッションが GPU を占有中
@@ -192,6 +197,30 @@ export function AiProvider({ children }) {
     }
   }, [])
 
+  // 進行中の DL を中断する。useLLM は単一インスタンスで selectedModel
+  // しか追跡しないため、別モデルへの切替や AI 無効化で DL が中途半端に
+  // 放棄されると partial file が残る。Cancel ではまず downloadEnabled を
+  // 落として useLLM のクリーンアップを誘発し、その後 deleteResources で
+  // 部分ファイルを掃除して次回 DL が clean に始まるようにする。
+  const cancelDownload = useCallback(async (modelId) => {
+    setSettings((prev) => {
+      const next = { ...prev, downloadEnabled: false }
+      saveAiSettings(next)
+      return next
+    })
+    // useLLM が preventLoad=true で unmount → 内部の fetch を abort する
+    // 猶予を少し置いてから partial ファイルを削除
+    await new Promise((r) => setTimeout(r, 300))
+    const model = getModelById(modelId)
+    const sources = modelSources(model)
+    if (sources.length === 0) return
+    try {
+      await ExpoResourceFetcher.deleteResources(...sources)
+    } catch (e) {
+      console.warn('[AiContext] cancel cleanup failed:', e?.message ?? e)
+    }
+  }, [])
+
   // Delete the on-disk files for the given model and update settings
   const deleteModel = useCallback(async (modelId) => {
     const model = getModelById(modelId)
@@ -223,6 +252,7 @@ export function AiProvider({ children }) {
         initialized,
         getModelSize,
         deleteModel,
+        cancelDownload,
         runWithLlamaRn,
         llamaActive,
       }}

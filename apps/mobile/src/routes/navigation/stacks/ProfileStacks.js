@@ -4,6 +4,7 @@ import { navigationProps } from './navigationProps/navigationProps'
 
 import Profile from '../../../scenes/profile/Profile'
 import AiSettings from '../../../scenes/profile/AiSettings'
+import Benchmark from '../../../scenes/profile/Benchmark'
 
 const Stack = createStackNavigator()
 
@@ -28,6 +29,13 @@ export const ProfileStacks = () => {
         component={AiSettings}
         options={{
           title: 'On-Device AI',
+        }}
+      />
+      <Stack.Screen
+        name="Benchmark"
+        component={Benchmark}
+        options={{
+          title: 'Model Benchmark',
         }}
       />
     </Stack.Navigator>

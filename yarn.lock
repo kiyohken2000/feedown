@@ -8992,15 +8992,15 @@ react-native-enriched-markdown@^0.5.0:
   resolved "https://registry.yarnpkg.com/react-native-enriched-markdown/-/react-native-enriched-markdown-0.5.0.tgz#0d2e9a965963ca253c592136741d8329734d434f"
   integrity sha512-CYihNlcg8IjsrVbmypDjFHsDF6Z6vYO0yraw6CkR30SDsg99J6fcBrOkyWOItO8PIDD21jw8yD1eYP/0LBOCdA==
 
-react-native-executorch-expo-resource-fetcher@^0.9.0:
-  version "0.9.0"
-  resolved "https://registry.yarnpkg.com/react-native-executorch-expo-resource-fetcher/-/react-native-executorch-expo-resource-fetcher-0.9.0.tgz#68213f660433bdeb461420f13b6e03948a7d5b85"
-  integrity sha512-BcXny9AZLJGhxB7FF9SLzBOghUqUPTk1MeLmGOMVdGtsoWb0GhDQTzVXUbjm58/BzK8OO0w18FMnR7hJEFIpfg==
+react-native-executorch-expo-resource-fetcher@^0.9.1:
+  version "0.9.1"
+  resolved "https://registry.yarnpkg.com/react-native-executorch-expo-resource-fetcher/-/react-native-executorch-expo-resource-fetcher-0.9.1.tgz#f6a9f25823442d66178fcf1a2f40efada603bcab"
+  integrity sha512-ypHCH0ushkeExdVSJAPMBJLDx7rWl7WAN1oInznfLUwlVsDNXWQB8nNhD3UGvrHk4ajcp1/OWcwO7GIhWOghsg==
 
-react-native-executorch@^0.9.0:
-  version "0.9.0"
-  resolved "https://registry.yarnpkg.com/react-native-executorch/-/react-native-executorch-0.9.0.tgz#99dc72827dcd483a47d17731c6f7b20c36b45b2d"
-  integrity sha512-pqHJzssr4WQg3xp9hxUGHDHMrtPWG8hSYP6Hw86IbDFexSvnMHYPaAZsYfiaNEBxF2VAepIGSfwh452z7F8Jiw==
+react-native-executorch@^0.9.1:
+  version "0.9.1"
+  resolved "https://registry.yarnpkg.com/react-native-executorch/-/react-native-executorch-0.9.1.tgz#84f812d266db37d2d3daa041dfbc2b720fa55370"
+  integrity sha512-fe4ePYIGWPaHup9bl8tCD+c9lOMER6AnyQctjrbLWF32x7pPLJynrERkOloK/gq3YyyCmVuTESlWdP/RNtKhCA==
   dependencies:
     "@huggingface/jinja" "^0.5.0"
     jsonrepair "^3.12.0"
@@ -10682,10 +10682,15 @@ url-parse@^1.5.3:
     querystringify "^2.1.1"
     requires-port "^1.0.0"
 
-use-latest-callback@0.1.9, use-latest-callback@^0.1.5, use-latest-callback@^0.2.4:
+use-latest-callback@^0.1.5:
   version "0.1.9"
   resolved "https://registry.yarnpkg.com/use-latest-callback/-/use-latest-callback-0.1.9.tgz#10191dc54257e65a8e52322127643a8940271e2a"
   integrity sha512-CL/29uS74AwreI/f2oz2hLTW7ZqVeV5+gxFeGudzQrgkCytrHw33G4KbnQOrRlAEzzAFXi7dDLMC9zhWcVpzmw==
+
+use-latest-callback@^0.2.4:
+  version "0.2.6"
+  resolved "https://registry.yarnpkg.com/use-latest-callback/-/use-latest-callback-0.2.6.tgz#e5ea752808c86219acc179ace0ae3c1203255e77"
+  integrity sha512-FvRG9i1HSo0wagmX63Vrm8SnlUU3LMM3WyZkQ76RnslpBrX694AdG4A0zQBx2B3ZifFA0yv/BaEHGBnEax5rZg==
 
 use-sync-external-store@^1.5.0:
   version "1.6.0"

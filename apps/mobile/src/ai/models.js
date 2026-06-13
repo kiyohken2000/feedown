@@ -1,4 +1,5 @@
 import {
+  GEMMA4_E2B,
   LFM2_5_1_2B_INSTRUCT_QUANTIZED,
   LFM2_5_350M_QUANTIZED,
   QWEN3_0_6B_QUANTIZED,
@@ -6,6 +7,7 @@ import {
   QWEN3_5_0_8B_QUANTIZED,
   QWEN3_5_2B_QUANTIZED,
 } from 'react-native-executorch'
+import { RAM_TIER } from './llama/models'
 
 export const FEEDOWN_DEFAULT_LLM_ID = 'lfm2_5_1_2b_instruct_quantized'
 export const MODEL_DEFINITION_VERSION = '1'
@@ -71,6 +73,26 @@ export const FEEDOWN_LLM_MODELS = [
     features: ['summary'],
     notes: 'For low-memory devices.',
     maxInputChars: 3000,
+  },
+  {
+    // executorch 0.9.1 で追加。iOS は MLX int4 (~2.89 GB), Android は
+    // Vulkan 8da4w (~2.57 GB) を自動選択。
+    //
+    // RAM gate: iPhone 13 mini (3.6 GB reported, 4 GB physical) で jetsam
+    // OOM が実機確認済み、iPhone Air (11.5 GB, A19 Pro) で動作確認済み。
+    // 6 GB / 8 GB 端末は未検証のため保守的に TIER_8GB を要求 (iPhone 15
+    // Pro / 16 / 16 Plus / iPad Air M1+ など)。Warm decode は ~30 tok/s で
+    // LFM 2.5 1.2B の半分程度、初回 cold load は Metal shader コンパイル
+    // で ~54s かかる点に注意。
+    id: 'gemma4_e2b',
+    executorchModel: GEMMA4_E2B,
+    displayName: 'Gemma 4 - E2B (experimental)',
+    recommendation: 'candidate',
+    features: ['summary'],
+    notes:
+      '~2.9 GB. First load takes ~1 min (Metal shader compile, cached after).',
+    maxInputChars: 5000,
+    minDeviceRamBytes: RAM_TIER.TIER_8GB,
   },
 ]
 

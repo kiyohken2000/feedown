@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as Haptics from 'expo-haptics'
 import { useAi } from '../contexts/AiContext'
-import { buildArticleContext } from './articleContext'
+import { buildArticleContext, truncateForRetry } from './articleContext'
 import { buildSummaryMessages, buildSignalsMessages, buildChatMessagesForGenerate, buildRepairPromptMessages } from './prompts'
 import { parseSummaryOutput, parseSignalsOutput, stripThinkTags } from './jsonOutput'
 import { getSummaryCache, saveSummaryCache, getSignalsCache, saveSignalsCache } from './aiCache'
@@ -121,6 +121,9 @@ export function useArticleAi(article, readerContent = null) {
   // Completion handler
   useEffect(() => {
     if (!llm.isGenerating && pendingRef.current) {
+      console.log(
+        `[ai] completion event: isGenerating=false feature=${pendingRef.current.feature} responseLen=${llm.response?.length ?? 0} retryingShort=${pendingRef.current.retryingShort ?? false}`,
+      )
       handleGenerationComplete(llm.response)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,9 +143,19 @@ export function useArticleAi(article, readerContent = null) {
   }
 
   function handleSummaryComplete(rawResponse, pending) {
+    // race ガード: 1st generate が失敗して空 response で完了した直後に
+    // .catch から短縮 retry がキックされる。useEffect on isGenerating は
+    // その失敗の transition も拾うので、ここで空 response + 短縮 retry
+    // in-flight なら処理を捨てて短縮 retry の完了を待つ。さもないと repair
+    // retry まで起動して executorch に 2 つの generate が同時に乗る。
+    if (pending.retryingShort && (!rawResponse || rawResponse.trim().length === 0)) {
+      console.log('[ai] handleSummaryComplete: skip (short retry in flight)')
+      return
+    }
     const parsed = parseSummaryOutput(rawResponse)
 
     if (parsed.ok) {
+      console.log(`[ai] handleSummaryComplete: parsed OK, response=${rawResponse?.length ?? 0} chars`)
       const modelId = selectedModel?.id ?? 'unknown'
       saveSummaryCache(
         pending.articleCtx.articleId,
@@ -157,6 +170,7 @@ export function useArticleAi(article, readerContent = null) {
       pendingRef.current = null
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     } else if (!pending.retrying) {
+      console.log(`[ai] handleSummaryComplete: parse failed → repair retry. response=${rawResponse?.length ?? 0} chars`)
       const repairMessages = buildRepairPromptMessages(pending.messages, rawResponse)
       pendingRef.current = { ...pending, retrying: true, messages: repairMessages }
       llm.generate(repairMessages).catch((err) => {
@@ -171,6 +185,7 @@ export function useArticleAi(article, readerContent = null) {
         pendingRef.current = null
       })
     } else {
+      console.log(`[ai] handleSummaryComplete: parse failed AGAIN, giving up. response=${rawResponse?.length ?? 0} chars`)
       setSummaryErrors((prev) => ({
         ...prev,
         [pending.perspective]: 'Failed to generate summary. Please try again.',
@@ -297,18 +312,80 @@ export function useArticleAi(article, readerContent = null) {
     }
 
     const messages = buildSummaryMessages(articleCtx, perspective, outputLanguage)
-    pendingRef.current = { feature: 'summary', articleCtx, messages, perspective, outputLanguage, retrying: false }
+    console.log(
+      `[ai] generateSummary model=${modelId} perspective=${perspective} text=${articleCtx.text.length} chars source=${articleCtx.contentSource}`,
+    )
+    pendingRef.current = {
+      feature: 'summary',
+      articleCtx,
+      messages,
+      perspective,
+      outputLanguage,
+      retrying: false,
+      retryingShort: false,
+    }
     llm.configure({ generationConfig: STRUCTURED_GENERATION_CONFIG })
     llm.generate(messages).catch((err) => {
-      console.warn('LLM summary generate failed:', err)
-      if (pendingRef.current?.feature !== 'summary') return
-      setSummaryErrors((prev) => ({
-        ...prev,
-        [pendingRef.current.perspective]: 'Model failed to generate. Try a shorter article or a smaller model.',
-      }))
-      setIsLoadingSummary(false)
-      pendingRef.current = null
+      handleSummaryGenerateError(err, perspective, outputLanguage)
     })
+  }
+
+  // executorch の `Failed to generate text` は context overflow / tokenizer
+  // 失敗 / prefill エラーすべて同じ文言で出てくる。一度長さを半減して再試行
+  // することで context overflow ならカバーできる。それでもダメなら諦める。
+  function handleSummaryGenerateError(err, perspective, outputLanguage) {
+    const pending = pendingRef.current
+    console.warn(
+      `[ai] generateSummary FAILED text=${pending?.articleCtx?.text?.length ?? '?'} chars retryingShort=${pending?.retryingShort ?? false} err=${err?.message ?? err}`,
+    )
+    if (pending?.feature !== 'summary') return
+
+    const SHORT_RETRY_THRESHOLD = 1500
+    if (!pending.retryingShort && pending.articleCtx.text.length > SHORT_RETRY_THRESHOLD) {
+      // 段落境界を尊重した truncate (冒頭 + 末尾段落)。raw slice より
+      // 結論を保てるが、段落構造が無い記事では fallback で raw slice 相当。
+      const shorterText = truncateForRetry(pending.articleCtx.text, SHORT_RETRY_THRESHOLD)
+      const shorterCtx = { ...pending.articleCtx, text: shorterText, truncated: true }
+      const shorterMessages = buildSummaryMessages(shorterCtx, perspective, outputLanguage)
+      // 構造可視化: [...] セパレータ有無で lead/tail 分解された段落構造か、
+      // raw slice fallback (段落少ない記事 or 巨大段落) かが判別できる
+      const sepIdx = shorterText.indexOf('\n\n[...]\n\n')
+      const hasSep = sepIdx >= 0
+      const leadLen = hasSep ? sepIdx : shorterText.length
+      const tailLen = hasSep ? shorterText.length - sepIdx - 9 : 0
+      console.log(
+        `[ai] generateSummary retry smart truncate: lead=${leadLen} sep=${hasSep ? 'yes' : 'no'} tail=${tailLen} total=${shorterText.length} (orig ${pending.articleCtx.text.length})`,
+      )
+      pendingRef.current = {
+        ...pending,
+        retryingShort: true,
+        articleCtx: shorterCtx,
+        messages: shorterMessages,
+      }
+      llm.configure({ generationConfig: STRUCTURED_GENERATION_CONFIG })
+      llm.generate(shorterMessages).catch((err2) => {
+        console.warn(
+          `[ai] generateSummary short-retry FAILED err=${err2?.message ?? err2}`,
+        )
+        if (pendingRef.current?.feature !== 'summary') return
+        setSummaryErrors((prev) => ({
+          ...prev,
+          [pendingRef.current.perspective]:
+            'Model failed to generate. Try a shorter article or a smaller model.',
+        }))
+        setIsLoadingSummary(false)
+        pendingRef.current = null
+      })
+      return
+    }
+
+    setSummaryErrors((prev) => ({
+      ...prev,
+      [pending.perspective]:
+        'Model failed to generate. Try a shorter article or a smaller model.',
+    }))
+    setIsLoadingSummary(false)
+    pendingRef.current = null
   }
 
   const generateSignals = async ({ force = false } = {}) => {
