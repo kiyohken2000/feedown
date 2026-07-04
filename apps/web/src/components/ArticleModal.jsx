@@ -65,6 +65,9 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
       color: isDarkMode ? '#e0e0e0' : '#333',
       marginBottom: '1rem',
       lineHeight: '1.3',
+      textDecoration: 'none',
+      display: 'inline-block',
+      cursor: 'pointer',
     },
     meta: {
       display: 'flex',
@@ -144,7 +147,16 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
           {article.imageUrl && (
             <img src={article.imageUrl} alt={article.title} style={styles.image} />
           )}
-          <h2 style={styles.title}>{article.title}</h2>
+          <h2 style={styles.title}>
+            <a
+              href={article.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'inherit', textDecoration: 'none' }}
+            >
+              {article.title}
+            </a>
+          </h2>
           <div style={styles.meta}>
             <span>{article.feedTitle || 'Unknown Feed'}</span>
             <span>•</span>
