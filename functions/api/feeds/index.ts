@@ -87,12 +87,28 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     // Parse request body
     const body = await request.json();
-    const { url, title, description } = body;
+    const { url: rawUrl, title, description } = body;
 
-    // Validate input
+    // Validate URL: presence, syntax, and protocol
+    const url = typeof rawUrl === 'string' ? rawUrl.trim() : '';
     if (!url) {
       return new Response(
         JSON.stringify({ error: 'Feed URL is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid URL' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return new Response(
+        JSON.stringify({ error: 'Only http:// or https:// URLs are supported' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -123,36 +139,49 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
-    // Try to fetch feed title from RSS
-    let feedTitle = title || '';
-    let feedDescription = description || '';
+    // Reachability + feed-shape check — always run so OPML imports with broken
+    // URLs are rejected too, not only the manual "type a URL" path.
+    let xmlText: string;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    if (!feedTitle) {
-      try {
-        // Fetch RSS XML directly (same as refresh.ts)
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const rssResponse = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'FeedOwn/1.0 (RSS Reader)',
+        },
+      });
 
-        const rssResponse = await fetch(url, {
-          method: 'GET',
-          signal: controller.signal,
-          headers: {
-            'User-Agent': 'FeedOwn/1.0 (RSS Reader)',
-          },
-        });
+      clearTimeout(timeoutId);
 
-        clearTimeout(timeoutId);
-
-        if (rssResponse.ok) {
-          const xmlText = await rssResponse.text();
-          const parsedFeed = await parseFeedBasicInfo(xmlText);
-          feedTitle = parsedFeed.title || '';
-          feedDescription = parsedFeed.description || '';
-        }
-      } catch (error) {
-        console.error('Failed to fetch feed title:', error);
+      if (!rssResponse.ok) {
+        return new Response(
+          JSON.stringify({ error: `Feed URL returned HTTP ${rssResponse.status}` }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
       }
+
+      xmlText = await rssResponse.text();
+    } catch (error) {
+      console.error('Failed to fetch feed:', error);
+      return new Response(
+        JSON.stringify({ error: 'Could not reach feed URL' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
     }
+
+    if (!looksLikeFeed(xmlText)) {
+      return new Response(
+        JSON.stringify({ error: 'URL does not appear to be an RSS or Atom feed' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const parsedFeed = await parseFeedBasicInfo(xmlText);
+    const feedTitle = title || parsedFeed.title || '';
+    const feedDescription = description || parsedFeed.description || '';
 
     // Extract favicon URL
     const faviconUrl = extractFaviconUrl(url);
@@ -253,6 +282,13 @@ async function parseFeedBasicInfo(xmlText: string): Promise<{ title: string; des
   }
 
   return result;
+}
+
+function looksLikeFeed(xmlText: string): boolean {
+  if (/<rss[\s>]/i.test(xmlText)) return true;
+  if (xmlText.includes('<feed') && xmlText.includes('http://www.w3.org/2005/Atom')) return true;
+  if (/<rdf:RDF[\s>]/i.test(xmlText)) return true;
+  return false;
 }
 
 function stripHtmlTags(html: string): string {
