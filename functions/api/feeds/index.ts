@@ -179,6 +179,13 @@ export async function onRequestPost(context: any): Promise<Response> {
       );
     }
 
+    if (!hasFeedItems(xmlText)) {
+      return new Response(
+        JSON.stringify({ error: 'Feed contains no articles' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const parsedFeed = await parseFeedBasicInfo(xmlText);
     const feedTitle = title || parsedFeed.title || '';
     const feedDescription = description || parsedFeed.description || '';
@@ -285,10 +292,16 @@ async function parseFeedBasicInfo(xmlText: string): Promise<{ title: string; des
 }
 
 function looksLikeFeed(xmlText: string): boolean {
-  if (/<rss[\s>]/i.test(xmlText)) return true;
-  if (xmlText.includes('<feed') && xmlText.includes('http://www.w3.org/2005/Atom')) return true;
-  if (/<rdf:RDF[\s>]/i.test(xmlText)) return true;
+  const head = xmlText.replace(/^\uFEFF/, '').trimStart().slice(0, 2000);
+  if (/^<!DOCTYPE\s+html/i.test(head) || /^<html[\s>]/i.test(head)) return false;
+  if (/<rss[\s>]/i.test(head)) return true;
+  if (/<feed[\s>]/i.test(head) && head.includes('http://www.w3.org/2005/Atom')) return true;
+  if (/<rdf:RDF[\s>]/i.test(head)) return true;
   return false;
+}
+
+function hasFeedItems(xmlText: string): boolean {
+  return /<item[\s>]/i.test(xmlText) || /<entry[\s>]/i.test(xmlText);
 }
 
 function stripHtmlTags(html: string): string {
