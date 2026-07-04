@@ -581,6 +581,7 @@ const DashboardPage = () => {
     },
     articlesList: {
       display: 'grid',
+      gridTemplateColumns: 'minmax(0, 1fr)',
       gap: '1rem',
     },
     articleCard: {
