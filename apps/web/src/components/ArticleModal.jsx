@@ -87,9 +87,9 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
     actions: {
       display: 'flex',
       gap: '1rem',
-      marginTop: '2rem',
-      paddingTop: '1.5rem',
-      borderTop: isDarkMode ? '1px solid #444' : '1px solid #eee',
+      marginBottom: '1.5rem',
+      paddingBottom: '1.5rem',
+      borderBottom: isDarkMode ? '1px solid #444' : '1px solid #eee',
       flexWrap: 'wrap',
     },
     button: {
@@ -147,30 +147,6 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
           {article.imageUrl && (
             <img src={article.imageUrl} alt={article.title} style={styles.image} />
           )}
-          <h2 style={styles.title}>
-            <a
-              href={article.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: 'inherit', textDecoration: 'none' }}
-            >
-              {article.title}
-            </a>
-          </h2>
-          <div style={styles.meta}>
-            <span>{article.feedTitle || 'Unknown Feed'}</span>
-            <span>•</span>
-            <span>{getRelativeTime(article.publishedAt)}</span>
-            {article.author && (
-              <>
-                <span>•</span>
-                <span>by {article.author}</span>
-              </>
-            )}
-          </div>
-          <div style={styles.description}>
-            {article.description || 'No content available'}
-          </div>
           <div style={styles.actions}>
             <button
               style={{ ...styles.button, ...styles.readButton }}
@@ -196,6 +172,30 @@ const ArticleModal = ({ article, onClose, onMarkAsRead, onToggleFavorite, isRead
               <FaExternalLinkAlt style={styles.buttonIcon} />
               Visit Original
             </a>
+          </div>
+          <h2 style={styles.title}>
+            <a
+              href={article.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'inherit', textDecoration: 'none' }}
+            >
+              {article.title}
+            </a>
+          </h2>
+          <div style={styles.meta}>
+            <span>{article.feedTitle || 'Unknown Feed'}</span>
+            <span>•</span>
+            <span>{getRelativeTime(article.publishedAt)}</span>
+            {article.author && (
+              <>
+                <span>•</span>
+                <span>by {article.author}</span>
+              </>
+            )}
+          </div>
+          <div style={styles.description}>
+            {article.description || 'No content available'}
           </div>
         </div>
       </div>
