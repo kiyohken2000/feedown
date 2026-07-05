@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
+import { getTokens } from '../styles/tokens';
 import appStoreBadge from '../assets/images/badges/appstore.png';
 import googlePlayBadge from '../assets/images/badges/googleplay.png';
 
@@ -9,11 +10,12 @@ export default function Footer() {
   const { isDarkMode } = useTheme();
   const { language } = useLanguage();
   const t = translations[language].footer;
+  const { color, radius } = getTokens(isDarkMode);
 
   const styles = {
     footer: {
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#f8f9fa',
-      borderTop: `1px solid ${isDarkMode ? '#333' : '#e0e0e0'}`,
+      backgroundColor: color.surface,
+      borderTop: `1px solid ${color.border}`,
       padding: '40px 0 20px',
       marginTop: 'auto',
     },
@@ -34,21 +36,21 @@ export default function Footer() {
       gap: '12px',
     },
     columnTitle: {
-      fontSize: '14px',
-      fontWeight: '600',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      fontSize: '13px',
+      fontWeight: 700,
+      color: color.text,
       marginBottom: '4px',
       textTransform: 'uppercase',
-      letterSpacing: '0.5px',
+      letterSpacing: '0.6px',
     },
     link: {
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      color: color.textMuted,
       textDecoration: 'none',
       fontSize: '14px',
       transition: 'color 0.2s',
     },
     divider: {
-      borderTop: `1px solid ${isDarkMode ? '#333' : '#e0e0e0'}`,
+      borderTop: `1px solid ${color.border}`,
       marginBottom: '20px',
     },
     bottom: {
@@ -60,10 +62,10 @@ export default function Footer() {
     },
     copyright: {
       fontSize: '13px',
-      color: isDarkMode ? '#888' : '#999',
+      color: color.textFaint,
     },
     heart: {
-      color: '#FF6B35',
+      color: color.accent,
     },
     badges: {
       display: 'flex',
@@ -74,11 +76,13 @@ export default function Footer() {
       display: 'inline-flex',
       alignItems: 'center',
       gap: '4px',
-      padding: '4px 8px',
-      borderRadius: '4px',
-      backgroundColor: isDarkMode ? '#2d2d2d' : '#e9ecef',
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      padding: '5px 10px',
+      borderRadius: radius.sm,
+      backgroundColor: color.surface2,
+      border: `1px solid ${color.border}`,
+      color: color.textMuted,
       fontSize: '12px',
+      fontWeight: 600,
       textDecoration: 'none',
     },
     storeBadgesContainer: {
@@ -94,7 +98,7 @@ export default function Footer() {
   };
 
   const handleLinkHover = (e, enter) => {
-    e.target.style.color = enter ? '#FF6B35' : (isDarkMode ? '#b0b0b0' : '#666');
+    e.currentTarget.style.color = enter ? color.accent : color.textMuted;
   };
 
   const scrollToTop = () => {
@@ -198,7 +202,7 @@ export default function Footer() {
               href="https://github.com/kiyohken2000"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: '#FF6B35', textDecoration: 'none' }}
+              style={{ color: color.accent, textDecoration: 'none' }}
             >
               kiyohken2000
             </a>

@@ -1,7 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
+import { LuSun, LuMoon } from 'react-icons/lu';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
+import { getTokens } from '../styles/tokens';
 import logoIcon from '../assets/images/icon.png';
 
 export default function PublicHeader() {
@@ -9,6 +11,7 @@ export default function PublicHeader() {
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { language, setLanguage } = useLanguage();
   const t = translations[language].header;
+  const { color, radius, shadow } = getTokens(isDarkMode);
 
   const isActive = (path) => location.pathname === path;
 
@@ -17,9 +20,10 @@ export default function PublicHeader() {
       position: 'sticky',
       top: 0,
       zIndex: 100,
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#ffffff',
-      borderBottom: `1px solid ${isDarkMode ? '#333' : '#e0e0e0'}`,
+      backgroundColor: color.surface,
+      borderBottom: `1px solid ${color.border}`,
       padding: '12px 0',
+      boxShadow: shadow.sm,
     },
     container: {
       maxWidth: '1200px',
@@ -36,72 +40,85 @@ export default function PublicHeader() {
       textDecoration: 'none',
     },
     logo: {
-      width: '32px',
-      height: '32px',
+      width: '30px',
+      height: '30px',
+      borderRadius: '8px',
     },
     logoText: {
       fontSize: '20px',
-      fontWeight: 'bold',
-      color: '#FF6B35',
+      fontWeight: 800,
+      letterSpacing: '-0.02em',
+      color: color.text,
       textDecoration: 'none',
     },
     nav: {
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
+      gap: '4px',
     },
     navLink: {
-      padding: '8px 16px',
-      borderRadius: '8px',
+      padding: '8px 14px',
+      borderRadius: radius.sm,
       textDecoration: 'none',
       fontSize: '14px',
-      fontWeight: '500',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      fontWeight: 600,
+      color: color.textMuted,
       transition: 'all 0.2s',
     },
     navLinkActive: {
-      backgroundColor: isDarkMode ? '#333' : '#f0f0f0',
-      color: '#FF6B35',
+      backgroundColor: color.accentSoft,
+      color: color.accent,
     },
     controls: {
       display: 'flex',
       alignItems: 'center',
       gap: '8px',
     },
+    langGroup: {
+      display: 'inline-flex',
+      padding: '2px',
+      gap: '2px',
+      backgroundColor: color.surface2,
+      borderRadius: radius.sm,
+      border: `1px solid ${color.border}`,
+    },
     langButton: {
-      padding: '6px 12px',
+      padding: '5px 10px',
       borderRadius: '6px',
-      border: `1px solid ${isDarkMode ? '#444' : '#ddd'}`,
+      border: 'none',
       backgroundColor: 'transparent',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      color: color.textMuted,
       fontSize: '13px',
+      fontWeight: 600,
       cursor: 'pointer',
       transition: 'all 0.2s',
     },
     langButtonActive: {
-      backgroundColor: '#FF6B35',
-      borderColor: '#FF6B35',
-      color: '#fff',
+      backgroundColor: color.accent,
+      color: color.onAccent,
     },
     themeButton: {
-      padding: '6px 10px',
-      borderRadius: '6px',
-      border: `1px solid ${isDarkMode ? '#444' : '#ddd'}`,
-      backgroundColor: 'transparent',
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      fontSize: '16px',
+      padding: '7px 9px',
+      borderRadius: radius.sm,
+      border: `1px solid ${color.border}`,
+      backgroundColor: color.surface,
+      color: color.text,
+      fontSize: '15px',
       cursor: 'pointer',
       transition: 'all 0.2s',
+      display: 'flex',
+      alignItems: 'center',
     },
     loginButton: {
-      padding: '8px 20px',
-      borderRadius: '8px',
-      backgroundColor: '#FF6B35',
-      color: '#fff',
+      padding: '8px 18px',
+      borderRadius: radius.sm,
+      backgroundColor: color.accent,
+      color: color.onAccent,
       textDecoration: 'none',
       fontSize: '14px',
-      fontWeight: '500',
+      fontWeight: 600,
       transition: 'all 0.2s',
+      boxShadow: shadow.sm,
     },
     mobileNav: {
       display: 'none',
@@ -147,30 +164,33 @@ export default function PublicHeader() {
         </nav>
 
         <div style={styles.controls}>
-          <button
-            style={{
-              ...styles.langButton,
-              ...(language === 'en' ? styles.langButtonActive : {}),
-            }}
-            onClick={() => setLanguage('en')}
-          >
-            EN
-          </button>
-          <button
-            style={{
-              ...styles.langButton,
-              ...(language === 'ja' ? styles.langButtonActive : {}),
-            }}
-            onClick={() => setLanguage('ja')}
-          >
-            JA
-          </button>
+          <div style={styles.langGroup}>
+            <button
+              style={{
+                ...styles.langButton,
+                ...(language === 'en' ? styles.langButtonActive : {}),
+              }}
+              onClick={() => setLanguage('en')}
+            >
+              EN
+            </button>
+            <button
+              style={{
+                ...styles.langButton,
+                ...(language === 'ja' ? styles.langButtonActive : {}),
+              }}
+              onClick={() => setLanguage('ja')}
+            >
+              JA
+            </button>
+          </div>
           <button
             style={styles.themeButton}
             onClick={toggleDarkMode}
             title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            aria-label={isDarkMode ? 'Light Mode' : 'Dark Mode'}
           >
-            {isDarkMode ? '☀️' : '🌙'}
+            {isDarkMode ? <LuSun /> : <LuMoon />}
           </button>
           <Link to="/login" style={styles.loginButton}>
             {t.login}

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaNewspaper, FaStar, FaMoon, FaLock, FaArrowRight, FaBook, FaServer, FaRocket, FaBrain, FaShieldAlt, FaComments, FaLanguage, FaListUl } from 'react-icons/fa';
+import { LuNewspaper, LuStar, LuMoon, LuLock, LuArrowRight, LuBookOpen, LuServer, LuRocket, LuBrain, LuShieldCheck, LuMessagesSquare, LuLanguages, LuList } from 'react-icons/lu';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
+import { getTokens } from '../styles/tokens';
 import PublicHeader from '../components/PublicHeader';
 import Footer from '../components/Footer';
 import screenshotImage from '../assets/images/screenshot_1.png';
@@ -33,22 +34,23 @@ export default function LandingPage() {
   const { language } = useLanguage();
   const t = translations[language].landing;
   const [selectedImage, setSelectedImage] = useState(null);
+  const { color, radius, shadow } = getTokens(isDarkMode);
 
   const styles = {
     page: {
       minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      backgroundColor: color.appBg,
+      color: color.text,
     },
     // Hero Section
     hero: {
-      padding: '80px 20px',
+      padding: '90px 20px',
       textAlign: 'center',
       background: isDarkMode
-        ? 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'
-        : 'linear-gradient(135deg, #fff5f2 0%, #ffffff 100%)',
+        ? `radial-gradient(900px 420px at 50% -10%, ${color.accentSoft} 0%, transparent 65%), ${color.appBg}`
+        : `radial-gradient(900px 420px at 50% -10%, ${color.accentSoft} 0%, transparent 65%), ${color.appBg}`,
     },
     heroContent: {
       maxWidth: '800px',
@@ -66,7 +68,7 @@ export default function LandingPage() {
     description: {
       fontSize: '18px',
       lineHeight: '1.6',
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      color: color.textMuted,
       marginBottom: '40px',
       maxWidth: '600px',
       margin: '0 auto 40px',
@@ -79,42 +81,43 @@ export default function LandingPage() {
     },
     primaryButton: {
       padding: '14px 32px',
-      borderRadius: '10px',
-      backgroundColor: '#FF6B35',
-      color: '#fff',
+      borderRadius: radius.md,
+      backgroundColor: color.accent,
+      color: color.onAccent,
       textDecoration: 'none',
       fontSize: '16px',
-      fontWeight: '600',
+      fontWeight: 600,
       transition: 'all 0.2s',
       boxShadow: '0 4px 14px rgba(255, 107, 53, 0.3)',
     },
     secondaryButton: {
       padding: '14px 32px',
-      borderRadius: '10px',
-      backgroundColor: 'transparent',
-      color: '#FF6B35',
+      borderRadius: radius.md,
+      backgroundColor: color.surface,
+      color: color.text,
       textDecoration: 'none',
       fontSize: '16px',
-      fontWeight: '600',
-      border: '2px solid #FF6B35',
+      fontWeight: 600,
+      border: `1px solid ${color.border}`,
       transition: 'all 0.2s',
     },
     // Features Section
     features: {
       padding: '80px 20px',
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#f8f9fa',
+      backgroundColor: color.surface2,
     },
     sectionTitle: {
       fontSize: '32px',
-      fontWeight: '700',
+      fontWeight: 800,
+      letterSpacing: '-0.02em',
       textAlign: 'center',
       marginBottom: '12px',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      color: color.text,
     },
     sectionSubtitle: {
       fontSize: '16px',
       textAlign: 'center',
-      color: isDarkMode ? '#888' : '#666',
+      color: color.textMuted,
       marginBottom: '60px',
     },
     featuresGrid: {
@@ -122,35 +125,34 @@ export default function LandingPage() {
       margin: '0 auto',
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-      gap: '30px',
+      gap: '24px',
     },
     featureCard: {
       padding: '30px',
-      borderRadius: '16px',
-      backgroundColor: isDarkMode ? '#2d2d2d' : '#ffffff',
-      boxShadow: isDarkMode
-        ? '0 4px 20px rgba(0, 0, 0, 0.3)'
-        : '0 4px 20px rgba(0, 0, 0, 0.05)',
-      transition: 'transform 0.2s',
+      borderRadius: radius.lg,
+      backgroundColor: color.surface,
+      border: `1px solid ${color.border}`,
+      boxShadow: shadow.sm,
+      transition: 'transform 0.2s, box-shadow 0.2s',
     },
     featureIcon: {
-      fontSize: '40px',
+      fontSize: '34px',
       marginBottom: '16px',
-      color: '#FF6B35',
+      color: color.accent,
     },
     buttonIcon: {
       marginRight: '8px',
     },
     featureTitle: {
       fontSize: '18px',
-      fontWeight: '600',
+      fontWeight: 700,
       marginBottom: '10px',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      color: color.text,
     },
     featureDesc: {
       fontSize: '14px',
       lineHeight: '1.6',
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      color: color.textMuted,
     },
     // Screenshot Section
     screenshot: {
@@ -178,7 +180,7 @@ export default function LandingPage() {
     // Mobile App Section
     mobileApp: {
       padding: '80px 20px',
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#f8f9fa',
+      backgroundColor: color.surface2,
     },
     mobileContent: {
       maxWidth: '1100px',
@@ -207,8 +209,8 @@ export default function LandingPage() {
     mobileLabel: {
       marginTop: '12px',
       fontSize: '14px',
-      fontWeight: '500',
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      fontWeight: 600,
+      color: color.textMuted,
     },
     mobileDesc: {
       maxWidth: '700px',
@@ -216,7 +218,7 @@ export default function LandingPage() {
       textAlign: 'center',
       fontSize: '16px',
       lineHeight: '1.7',
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      color: color.textMuted,
     },
     mobileButtons: {
       display: 'flex',
@@ -281,7 +283,7 @@ export default function LandingPage() {
     // On-Device AI Section
     aiSection: {
       padding: '80px 20px',
-      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
+      backgroundColor: color.appBg,
     },
     aiContent: {
       maxWidth: '1100px',
@@ -295,9 +297,11 @@ export default function LandingPage() {
     },
     aiFeatureCard: {
       padding: '28px',
-      borderRadius: '16px',
-      backgroundColor: isDarkMode ? '#1e1e2e' : '#f0f4ff',
+      borderRadius: radius.lg,
+      backgroundColor: color.surface,
+      border: `1px solid ${color.border}`,
       borderLeft: '4px solid #6C63FF',
+      boxShadow: shadow.sm,
     },
     aiFeatureIcon: {
       fontSize: '32px',
@@ -329,12 +333,12 @@ export default function LandingPage() {
       textAlign: 'center',
       fontSize: '14px',
       lineHeight: '1.7',
-      color: isDarkMode ? '#888' : '#888',
+      color: color.textFaint,
     },
     // Self-host Section
     selfHost: {
       padding: '80px 20px',
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#f8f9fa',
+      backgroundColor: color.surface2,
       textAlign: 'center',
     },
     selfHostContent: {
@@ -372,10 +376,10 @@ export default function LandingPage() {
   };
 
   const features = [
-    { icon: FaNewspaper, title: t.feature1Title, desc: t.feature1Desc },
-    { icon: FaStar, title: t.feature2Title, desc: t.feature2Desc },
-    { icon: FaMoon, title: t.feature3Title, desc: t.feature3Desc },
-    { icon: FaLock, title: t.feature4Title, desc: t.feature4Desc },
+    { icon: LuNewspaper, title: t.feature1Title, desc: t.feature1Desc },
+    { icon: LuStar, title: t.feature2Title, desc: t.feature2Desc },
+    { icon: LuMoon, title: t.feature3Title, desc: t.feature3Desc },
+    { icon: LuLock, title: t.feature4Title, desc: t.feature4Desc },
   ];
 
   return (
@@ -400,22 +404,22 @@ export default function LandingPage() {
                 e.target.style.boxShadow = '0 4px 14px rgba(255, 107, 53, 0.3)';
               }}
             >
-              <FaRocket style={styles.buttonIcon} />
+              <LuRocket style={styles.buttonIcon} />
               {t.getStarted}
             </Link>
             <Link
               to="/docs"
               style={{ ...styles.secondaryButton, display: 'inline-flex', alignItems: 'center' }}
               onMouseOver={(e) => {
-                e.target.style.backgroundColor = '#FF6B35';
-                e.target.style.color = '#fff';
+                e.currentTarget.style.backgroundColor = color.surfaceHover;
+                e.currentTarget.style.borderColor = color.accent;
               }}
               onMouseOut={(e) => {
-                e.target.style.backgroundColor = 'transparent';
-                e.target.style.color = '#FF6B35';
+                e.currentTarget.style.backgroundColor = color.surface;
+                e.currentTarget.style.borderColor = color.border;
               }}
             >
-              <FaBook style={styles.buttonIcon} />
+              <LuBookOpen style={styles.buttonIcon} />
               {t.viewDocs}
             </Link>
           </div>
@@ -598,7 +602,7 @@ export default function LandingPage() {
           {/* Privacy badge */}
           <div style={{ textAlign: 'center', marginBottom: '48px' }}>
             <span style={styles.aiPrivacyBadge}>
-              <FaShieldAlt />
+              <LuShieldCheck />
               {t.aiDesc}
             </span>
           </div>
@@ -606,10 +610,10 @@ export default function LandingPage() {
           {/* Feature cards */}
           <div style={styles.aiFeatureGrid}>
             {[
-              { Icon: FaListUl, title: t.aiFeature1Title, desc: t.aiFeature1Desc },
-              { Icon: FaBrain, title: t.aiFeature2Title, desc: t.aiFeature2Desc },
-              { Icon: FaComments, title: t.aiFeature3Title, desc: t.aiFeature3Desc },
-              { Icon: FaLanguage, title: t.aiFeature4Title, desc: t.aiFeature4Desc },
+              { Icon: LuList, title: t.aiFeature1Title, desc: t.aiFeature1Desc },
+              { Icon: LuBrain, title: t.aiFeature2Title, desc: t.aiFeature2Desc },
+              { Icon: LuMessagesSquare, title: t.aiFeature3Title, desc: t.aiFeature3Desc },
+              { Icon: LuLanguages, title: t.aiFeature4Title, desc: t.aiFeature4Desc },
             ].map(({ Icon, title, desc }, i) => (
               <div key={i} style={styles.aiFeatureCard}>
                 <Icon style={styles.aiFeatureIcon} />
@@ -659,15 +663,15 @@ export default function LandingPage() {
             to="/docs/setup"
             style={{ ...styles.secondaryButton, display: 'inline-flex', alignItems: 'center' }}
             onMouseOver={(e) => {
-              e.target.style.backgroundColor = '#FF6B35';
-              e.target.style.color = '#fff';
+              e.currentTarget.style.backgroundColor = color.surfaceHover;
+              e.currentTarget.style.borderColor = color.accent;
             }}
             onMouseOut={(e) => {
-              e.target.style.backgroundColor = 'transparent';
-              e.target.style.color = '#FF6B35';
+              e.currentTarget.style.backgroundColor = color.surface;
+              e.currentTarget.style.borderColor = color.border;
             }}
           >
-            <FaServer style={styles.buttonIcon} />
+            <LuServer style={styles.buttonIcon} />
             {t.selfHostButton}
           </Link>
         </div>
@@ -688,7 +692,7 @@ export default function LandingPage() {
           }}
         >
           {t.ctaButton}
-          <FaArrowRight style={{ marginLeft: '8px' }} />
+          <LuArrowRight style={{ marginLeft: '8px' }} />
         </Link>
       </section>
 

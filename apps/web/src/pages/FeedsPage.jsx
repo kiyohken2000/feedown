@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaPlus, FaTrash, FaUpload, FaDownload, FaCheck } from 'react-icons/fa';
+import { LuPlus, LuTrash2, LuUpload, LuDownload, LuCheck, LuGripVertical } from 'react-icons/lu';
 import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from '../components/ToastContainer';
+import { getTokens } from '../styles/tokens';
 
 // Helper function to escape XML special characters
 const escapeXml = (str) => {
@@ -314,6 +315,8 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
     }
   };
 
+  const { color, radius, shadow } = getTokens(isDarkMode);
+
   const styles = {
     container: {
       padding: '2rem',
@@ -321,93 +324,100 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
       margin: '2rem auto',
     },
     heading: {
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      color: color.text,
       marginBottom: '2rem',
       fontSize: '2rem',
-      fontWeight: 'bold',
+      fontWeight: 800,
+      letterSpacing: '-0.02em',
     },
     card: {
-      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
-      borderRadius: '8px',
+      backgroundColor: color.surface,
+      borderRadius: radius.lg,
       padding: '2rem',
-      boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.1)',
-      marginBottom: '2rem',
+      boxShadow: shadow.sm,
+      border: `1px solid ${color.border}`,
+      marginBottom: '1.5rem',
     },
     sectionHeading: {
-      color: isDarkMode ? '#b0b0b0' : '#555',
+      color: color.text,
       marginBottom: '1rem',
-      fontSize: '1.3rem',
-      fontWeight: '600',
+      fontSize: '1.2rem',
+      fontWeight: 700,
+      letterSpacing: '-0.01em',
     },
     form: {
       display: 'flex',
-      gap: '1rem',
+      gap: '0.75rem',
       marginBottom: '1rem',
     },
     input: {
       flex: 1,
-      padding: '0.75rem',
-      border: isDarkMode ? '2px solid #444' : '2px solid #e0e0e0',
-      borderRadius: '5px',
+      padding: '0.7rem 0.85rem',
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.sm,
       fontSize: '1rem',
-      transition: 'border-color 0.3s',
-      backgroundColor: isDarkMode ? '#1a1a1a' : 'white',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      transition: 'border-color 0.2s, box-shadow 0.2s',
+      backgroundColor: color.surface,
+      color: color.text,
     },
     button: {
-      padding: '0.75rem 1.5rem',
-      backgroundColor: '#FF6B35',
-      color: 'white',
+      padding: '0.7rem 1.35rem',
+      backgroundColor: color.accent,
+      color: color.onAccent,
       border: 'none',
-      borderRadius: '5px',
+      borderRadius: radius.sm,
       cursor: 'pointer',
       fontSize: '1rem',
-      fontWeight: '600',
-      transition: 'background-color 0.3s',
+      fontWeight: 600,
+      transition: 'background-color 0.2s',
       display: 'flex',
       alignItems: 'center',
       gap: '0.5rem',
+      boxShadow: shadow.sm,
     },
     buttonIcon: {
       fontSize: '0.9rem',
     },
     feedsList: {
       display: 'grid',
-      gap: '0.75rem',
+      gap: '0.6rem',
     },
     feedItem: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: '1rem',
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#f9f9f9',
-      borderRadius: '5px',
-      border: isDarkMode ? '1px solid #444' : '1px solid #e0e0e0',
+      padding: '0.85rem 1rem',
+      backgroundColor: color.surface2,
+      borderRadius: radius.sm,
+      border: `1px solid ${color.border}`,
       cursor: 'move',
-      transition: 'all 0.2s',
+      transition: 'opacity 0.2s, transform 0.2s',
     },
     feedItemDragging: {
       opacity: 0.5,
       transform: 'scale(0.98)',
     },
     dragHandle: {
-      fontSize: '1.2rem',
-      color: isDarkMode ? '#b0b0b0' : '#999',
+      fontSize: '1.1rem',
+      color: color.textFaint,
       cursor: 'grab',
-      marginRight: '0.75rem',
+      marginRight: '0.6rem',
       userSelect: 'none',
       flexShrink: 0,
+      display: 'flex',
+      alignItems: 'center',
     },
     feedInfo: {
       flex: 1,
       display: 'flex',
       alignItems: 'center',
       gap: '0.75rem',
+      minWidth: 0,
     },
     favicon: {
       width: '24px',
       height: '24px',
-      borderRadius: '3px',
+      borderRadius: '5px',
       flexShrink: 0,
     },
     feedContent: {
@@ -415,36 +425,40 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
       minWidth: 0,
     },
     feedTitle: {
-      fontWeight: '600',
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      marginBottom: '0.25rem',
+      fontWeight: 600,
+      color: color.text,
+      marginBottom: '0.2rem',
     },
     feedUrl: {
-      fontSize: '0.85rem',
-      color: isDarkMode ? '#b0b0b0' : '#999',
+      fontSize: '0.82rem',
+      color: color.textFaint,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
     },
     deleteButton: {
-      padding: '0.5rem 1rem',
-      backgroundColor: '#dc3545',
-      color: 'white',
-      border: 'none',
-      borderRadius: '5px',
+      padding: '0.45rem 0.9rem',
+      backgroundColor: 'transparent',
+      color: color.danger,
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.sm,
       cursor: 'pointer',
-      fontSize: '0.9rem',
-      fontWeight: '600',
-      transition: 'background-color 0.3s',
+      fontSize: '0.88rem',
+      fontWeight: 600,
+      transition: 'background-color 0.2s, border-color 0.2s, color 0.2s',
       display: 'flex',
       alignItems: 'center',
       gap: '0.4rem',
+      flexShrink: 0,
     },
     noFeeds: {
       textAlign: 'center',
       padding: '2rem',
-      color: isDarkMode ? '#b0b0b0' : '#999',
+      color: color.textMuted,
     },
     loadingSpinner: {
-      border: '4px solid #f3f3f3',
-      borderTop: '4px solid #FF6B35',
+      border: `4px solid ${color.surface2}`,
+      borderTop: `4px solid ${color.accent}`,
       borderRadius: '50%',
       width: '40px',
       height: '40px',
@@ -454,41 +468,44 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
     recommendedGrid: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-      gap: '1rem',
+      gap: '0.75rem',
     },
     recommendedItem: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: '1rem',
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#f9f9f9',
-      borderRadius: '5px',
-      border: isDarkMode ? '1px solid #444' : '1px solid #e0e0e0',
+      padding: '0.85rem 1rem',
+      backgroundColor: color.surface2,
+      borderRadius: radius.sm,
+      border: `1px solid ${color.border}`,
       gap: '0.75rem',
     },
     recommendedName: {
       flex: 1,
-      fontWeight: '600',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      fontWeight: 600,
+      color: color.text,
       fontSize: '0.95rem',
+      minWidth: 0,
     },
     addButton: {
-      padding: '0.5rem 1rem',
-      backgroundColor: '#28a745',
-      color: 'white',
+      padding: '0.45rem 0.95rem',
+      backgroundColor: color.accent,
+      color: color.onAccent,
       border: 'none',
-      borderRadius: '5px',
+      borderRadius: radius.sm,
       cursor: 'pointer',
-      fontSize: '0.9rem',
-      fontWeight: '600',
-      transition: 'background-color 0.3s',
+      fontSize: '0.88rem',
+      fontWeight: 600,
+      transition: 'background-color 0.2s',
       flexShrink: 0,
       display: 'flex',
       alignItems: 'center',
       gap: '0.4rem',
     },
     addButtonAdded: {
-      backgroundColor: '#6c757d',
+      backgroundColor: color.surface,
+      color: color.textMuted,
+      border: `1px solid ${color.border}`,
       cursor: 'not-allowed',
     },
     opmlButtonsContainer: {
@@ -497,15 +514,15 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
       marginLeft: 'auto',
     },
     opmlButton: {
-      padding: '0.5rem 1rem',
-      backgroundColor: isDarkMode ? '#444' : '#e0e0e0',
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      border: 'none',
-      borderRadius: '5px',
+      padding: '0.45rem 0.9rem',
+      backgroundColor: color.surface,
+      color: color.text,
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.sm,
       cursor: 'pointer',
       fontSize: '0.85rem',
-      fontWeight: '500',
-      transition: 'background-color 0.3s',
+      fontWeight: 600,
+      transition: 'background-color 0.2s',
       display: 'flex',
       alignItems: 'center',
       gap: '0.4rem',
@@ -551,9 +568,17 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
               style={styles.input}
               required
               disabled={addingFeed}
+              onFocus={(e) => { e.target.style.borderColor = color.accent; e.target.style.boxShadow = `0 0 0 3px ${color.accentSoft}`; }}
+              onBlur={(e) => { e.target.style.borderColor = color.border; e.target.style.boxShadow = 'none'; }}
             />
-            <button type="submit" style={styles.button} disabled={addingFeed}>
-              <FaPlus style={styles.buttonIcon} />
+            <button
+              type="submit"
+              style={styles.button}
+              disabled={addingFeed}
+              onMouseOver={(e) => { e.currentTarget.style.backgroundColor = color.accentHover; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = color.accent; }}
+            >
+              <LuPlus style={styles.buttonIcon} />
               {addingFeed ? 'Adding...' : 'Add Feed'}
             </button>
           </form>
@@ -579,17 +604,17 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
                   opacity: importing ? 0.7 : 1,
                 }}
               >
-                <FaUpload style={{ fontSize: '0.8rem' }} />
+                <LuUpload style={{ fontSize: '0.8rem' }} />
                 {importing ? 'Importing...' : 'Import'}
               </label>
               <button
                 onClick={handleExportOPML}
                 style={styles.opmlButton}
                 disabled={feeds.length === 0}
-                onMouseOver={(e) => (e.target.style.backgroundColor = isDarkMode ? '#555' : '#d0d0d0')}
-                onMouseOut={(e) => (e.target.style.backgroundColor = isDarkMode ? '#444' : '#e0e0e0')}
+                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = color.surfaceHover)}
+                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = color.surface)}
               >
-                <FaDownload style={{ fontSize: '0.8rem' }} />
+                <LuDownload style={{ fontSize: '0.8rem' }} />
                 Export
               </button>
             </div>
@@ -603,7 +628,7 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
           )}
 
           {feedsError && (
-            <p style={{ color: 'red', textAlign: 'center' }}>{feedsError}</p>
+            <p style={{ color: color.danger, textAlign: 'center' }}>{feedsError}</p>
           )}
 
           {!feedsLoading && !feedsError && (
@@ -622,7 +647,7 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
                       ...(draggedIndex === index ? styles.feedItemDragging : {}),
                     }}
                   >
-                    <div style={styles.dragHandle}>☰</div>
+                    <div style={styles.dragHandle}><LuGripVertical /></div>
                     <div style={styles.feedInfo}>
                       {feed.faviconUrl && (
                         <img
@@ -640,10 +665,10 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
                     <button
                       onClick={() => handleDeleteFeed(feed.id)}
                       style={styles.deleteButton}
-                      onMouseOver={(e) => (e.target.style.backgroundColor = '#c82333')}
-                      onMouseOut={(e) => (e.target.style.backgroundColor = '#dc3545')}
+                      onMouseOver={(e) => { e.currentTarget.style.backgroundColor = color.danger; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = color.danger; }}
+                      onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = color.danger; e.currentTarget.style.borderColor = color.border; }}
                     >
-                      <FaTrash style={{ fontSize: '0.8rem' }} />
+                      <LuTrash2 style={{ fontSize: '0.8rem' }} />
                       Delete
                     </button>
                   </div>
@@ -663,7 +688,7 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
             <h2 style={styles.sectionHeading}>Recommended Feeds</h2>
             {recommendedLoading ? (
               <div style={{ textAlign: 'center', padding: '1rem' }}>
-                <p style={{ color: isDarkMode ? '#b0b0b0' : '#999' }}>Loading recommended feeds...</p>
+                <p style={{ color: color.textMuted }}>Loading recommended feeds...</p>
               </div>
             ) : (
               <div style={styles.recommendedGrid}>
@@ -682,16 +707,16 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
                         disabled={isAdded || isAdding}
                         onMouseOver={(e) => {
                           if (!isAdded && !isAdding) {
-                            e.target.style.backgroundColor = '#218838';
+                            e.currentTarget.style.backgroundColor = color.accentHover;
                           }
                         }}
                         onMouseOut={(e) => {
                           if (!isAdded && !isAdding) {
-                            e.target.style.backgroundColor = '#28a745';
+                            e.currentTarget.style.backgroundColor = color.accent;
                           }
                         }}
                       >
-                        {isAdded ? <FaCheck style={{ fontSize: '0.8rem' }} /> : <FaPlus style={{ fontSize: '0.8rem' }} />}
+                        {isAdded ? <LuCheck style={{ fontSize: '0.8rem' }} /> : <LuPlus style={{ fontSize: '0.8rem' }} />}
                         {isAdding ? 'Adding...' : isAdded ? 'Added' : 'Add'}
                       </button>
                     </div>

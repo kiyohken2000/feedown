@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaSignOutAlt, FaMoon, FaSun, FaExclamationTriangle, FaTrash, FaMobileAlt } from 'react-icons/fa';
+import { LuLogOut, LuMoon, LuSun, LuTriangleAlert, LuTrash2, LuSmartphone } from 'react-icons/lu';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import { useTheme } from '../contexts/ThemeContext';
 import { useArticles } from '../contexts/ArticlesContext';
+import { getTokens } from '../styles/tokens';
 
 const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -120,57 +121,77 @@ const SettingsPage = () => {
     }
   };
 
+  const { color, radius, shadow } = getTokens(isDarkMode);
+  const WARNING = '#f59e0b';
+  const WARNING_HOVER = '#d98806';
+
   const styles = {
     container: {
       padding: '2rem',
       maxWidth: '800px',
-      margin: '2rem auto',
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f5f5',
+      margin: '0 auto',
       minHeight: '100vh',
     },
     card: {
-      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
-      borderRadius: '8px',
+      backgroundColor: color.surface,
+      borderRadius: radius.lg,
       padding: '2rem',
-      boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.1)',
-      marginBottom: '2rem',
+      boxShadow: shadow.sm,
+      border: `1px solid ${color.border}`,
+      marginBottom: '1.5rem',
     },
     heading: {
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      marginBottom: '1.5rem',
+      color: color.text,
+      margin: '1.5rem 0',
       fontSize: '1.8rem',
-      fontWeight: 'bold',
+      fontWeight: 800,
+      letterSpacing: '-0.02em',
     },
     sectionHeading: {
-      color: isDarkMode ? '#b0b0b0' : '#555',
+      color: color.text,
       marginBottom: '1rem',
-      fontSize: '1.3rem',
-      fontWeight: '600',
+      fontSize: '1.2rem',
+      fontWeight: 700,
+      letterSpacing: '-0.01em',
     },
     infoRow: {
       display: 'flex',
       justifyContent: 'space-between',
       padding: '0.75rem 0',
-      borderBottom: isDarkMode ? '1px solid #444' : '1px solid #eee',
+      borderBottom: `1px solid ${color.border}`,
       alignItems: 'center',
     },
     label: {
-      fontWeight: '600',
-      color: isDarkMode ? '#999' : '#666',
+      fontWeight: 600,
+      color: color.textMuted,
     },
     value: {
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      color: color.text,
     },
     button: {
-      padding: '0.75rem 2rem',
-      backgroundColor: '#FF6B35',
-      color: 'white',
+      padding: '0.7rem 1.75rem',
+      backgroundColor: color.accent,
+      color: color.onAccent,
       border: 'none',
-      borderRadius: '5px',
+      borderRadius: radius.sm,
       cursor: 'pointer',
       fontSize: '1rem',
-      fontWeight: '600',
-      transition: 'background-color 0.3s',
+      fontWeight: 600,
+      transition: 'background-color 0.2s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+    },
+    secondaryButton: {
+      padding: '0.7rem 1.75rem',
+      backgroundColor: color.surface,
+      color: color.text,
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.sm,
+      cursor: 'pointer',
+      fontSize: '1rem',
+      fontWeight: 600,
+      transition: 'background-color 0.2s',
       display: 'flex',
       alignItems: 'center',
       gap: '0.5rem',
@@ -181,14 +202,11 @@ const SettingsPage = () => {
     themeIcon: {
       fontSize: '1.2rem',
       marginRight: '0.75rem',
-      color: isDarkMode ? '#ffc107' : '#FF6B35',
-    },
-    dangerButton: {
-      backgroundColor: '#dc3545',
+      color: color.accent,
     },
     loadingSpinner: {
-      border: '4px solid #f3f3f3',
-      borderTop: '4px solid #FF6B35',
+      border: `4px solid ${color.surface2}`,
+      borderTop: `4px solid ${color.accent}`,
       borderRadius: '50%',
       width: '40px',
       height: '40px',
@@ -197,17 +215,17 @@ const SettingsPage = () => {
     },
     toggleSwitch: {
       position: 'relative',
-      width: '60px',
+      width: '56px',
       height: '30px',
-      backgroundColor: isDarkMode ? '#FF6B35' : '#ccc',
-      borderRadius: '15px',
+      backgroundColor: isDarkMode ? color.accent : color.borderStrong,
+      borderRadius: radius.pill,
       cursor: 'pointer',
       transition: 'background-color 0.3s',
     },
     toggleSlider: {
       position: 'absolute',
       top: '3px',
-      left: isDarkMode ? '33px' : '3px',
+      left: isDarkMode ? '29px' : '3px',
       width: '24px',
       height: '24px',
       backgroundColor: 'white',
@@ -216,47 +234,47 @@ const SettingsPage = () => {
       boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
     },
     warningText: {
-      color: isDarkMode ? '#ff9800' : '#ff6f00',
+      color: WARNING,
       fontSize: '0.9rem',
       marginBottom: '1.5rem',
-      fontWeight: '500',
+      fontWeight: 600,
     },
     dangerSection: {
       display: 'flex',
       flexDirection: 'column',
-      gap: '1.5rem',
+      gap: '1rem',
     },
     dangerItem: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: '1rem',
-      borderRadius: '5px',
-      border: isDarkMode ? '1px solid #444' : '1px solid #e0e0e0',
+      padding: '1.25rem',
+      borderRadius: radius.md,
+      border: `1px solid ${color.border}`,
       gap: '1rem',
     },
     dangerTitle: {
-      fontSize: '1.1rem',
-      fontWeight: '600',
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      marginBottom: '0.5rem',
+      fontSize: '1.05rem',
+      fontWeight: 700,
+      color: color.text,
+      marginBottom: '0.4rem',
     },
     dangerDescription: {
       fontSize: '0.9rem',
-      color: isDarkMode ? '#b0b0b0' : '#666',
-      lineHeight: '1.4',
+      color: color.textMuted,
+      lineHeight: '1.5',
     },
     warningButton: {
-      backgroundColor: '#ff9800',
+      backgroundColor: WARNING,
       flexShrink: 0,
     },
     criticalButton: {
-      backgroundColor: '#c82333',
+      backgroundColor: color.danger,
       flexShrink: 0,
     },
     passwordHint: {
       fontSize: '0.85rem',
-      color: isDarkMode ? '#888' : '#888',
+      color: color.textFaint,
       marginTop: '1rem',
       fontStyle: 'italic',
     },
@@ -284,7 +302,7 @@ const SettingsPage = () => {
           <h2 style={styles.sectionHeading}>Appearance</h2>
           <div style={styles.infoRow}>
             <span style={{ ...styles.label, display: 'flex', alignItems: 'center' }}>
-              {isDarkMode ? <FaMoon style={styles.themeIcon} /> : <FaSun style={styles.themeIcon} />}
+              {isDarkMode ? <LuMoon style={styles.themeIcon} /> : <LuSun style={styles.themeIcon} />}
               Dark Mode
             </span>
             <div
@@ -315,10 +333,10 @@ const SettingsPage = () => {
 
         <div style={styles.card}>
           <h2 style={styles.sectionHeading}>
-            <FaMobileAlt style={{ marginRight: 8, verticalAlign: 'middle' }} />
+            <LuSmartphone style={{ marginRight: 8, verticalAlign: 'middle' }} />
             Mobile Login
           </h2>
-          <p style={{ color: isDarkMode ? '#b0b0b0' : '#666', marginBottom: '1rem', lineHeight: '1.5' }}>
+          <p style={{ color: color.textMuted, marginBottom: '1rem', lineHeight: '1.5' }}>
             Scan this QR code with the FeedOwn mobile app to auto-fill your server URL and email.
           </p>
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
@@ -340,7 +358,7 @@ const SettingsPage = () => {
               />
             </div>
           </div>
-          <p style={{ color: isDarkMode ? '#888' : '#888', fontSize: '0.9rem', textAlign: 'center', fontStyle: 'italic' }}>
+          <p style={{ color: color.textFaint, fontSize: '0.9rem', textAlign: 'center', fontStyle: 'italic' }}>
             After scanning, enter your password to complete login.
           </p>
         </div>
@@ -350,11 +368,11 @@ const SettingsPage = () => {
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <button
               onClick={handleLogout}
-              style={{ ...styles.button, ...styles.dangerButton }}
-              onMouseOver={(e) => (e.target.style.backgroundColor = '#c82333')}
-              onMouseOut={(e) => (e.target.style.backgroundColor = '#dc3545')}
+              style={styles.secondaryButton}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = color.surfaceHover)}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = color.surface)}
             >
-              <FaSignOutAlt style={styles.buttonIcon} />
+              <LuLogOut style={styles.buttonIcon} />
               Logout
             </button>
           </div>
@@ -375,10 +393,10 @@ const SettingsPage = () => {
               <button
                 onClick={handleClearAllData}
                 style={{ ...styles.button, ...styles.warningButton }}
-                onMouseOver={(e) => (e.target.style.backgroundColor = '#e68900')}
-                onMouseOut={(e) => (e.target.style.backgroundColor = '#ff9800')}
+                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = WARNING_HOVER)}
+                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = WARNING)}
               >
-                <FaExclamationTriangle style={styles.buttonIcon} />
+                <LuTriangleAlert style={styles.buttonIcon} />
                 Clear Data
               </button>
             </div>
@@ -393,10 +411,10 @@ const SettingsPage = () => {
               <button
                 onClick={handleDeleteAccount}
                 style={{ ...styles.button, ...styles.criticalButton }}
-                onMouseOver={(e) => (e.target.style.backgroundColor = '#a00000')}
-                onMouseOut={(e) => (e.target.style.backgroundColor = '#c82333')}
+                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#b02a37')}
+                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = color.danger)}
               >
-                <FaTrash style={styles.buttonIcon} />
+                <LuTrash2 style={styles.buttonIcon} />
                 Delete Account
               </button>
             </div>

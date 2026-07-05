@@ -1,23 +1,28 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FaNewspaper, FaStar, FaRss, FaCog } from 'react-icons/fa';
+import { LuNewspaper, LuStar, LuRss, LuSettings } from 'react-icons/lu';
 import logoIcon from '../assets/images/icon.png';
+import { useTheme } from '../contexts/ThemeContext';
+import { getTokens } from '../styles/tokens';
 
 const Navigation = ({ unreadCount = 0 }) => {
   const location = useLocation();
+  const { isDarkMode } = useTheme();
+  const { color, radius, shadow } = getTokens(isDarkMode);
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: FaNewspaper },
-    { path: '/favorites', label: 'Favorites', icon: FaStar },
-    { path: '/feeds', label: 'Feeds', icon: FaRss },
-    { path: '/settings', label: 'Settings', icon: FaCog },
+    { path: '/dashboard', label: 'Dashboard', icon: LuNewspaper },
+    { path: '/favorites', label: 'Favorites', icon: LuStar },
+    { path: '/feeds', label: 'Feeds', icon: LuRss },
+    { path: '/settings', label: 'Settings', icon: LuSettings },
   ];
 
   const styles = {
     nav: {
-      backgroundColor: '#FF6B35',
-      padding: '1rem 2rem',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      backgroundColor: color.surface,
+      borderBottom: `1px solid ${color.border}`,
+      padding: '0.75rem 2rem',
+      boxShadow: shadow.sm,
       position: 'sticky',
       top: 0,
       zIndex: 100,
@@ -30,54 +35,62 @@ const Navigation = ({ unreadCount = 0 }) => {
       alignItems: 'center',
     },
     brand: {
-      color: 'white',
-      fontSize: '1.5rem',
-      fontWeight: 'bold',
+      color: color.text,
+      fontSize: '1.35rem',
+      fontWeight: 700,
+      letterSpacing: '-0.02em',
       textDecoration: 'none',
       display: 'flex',
       alignItems: 'center',
-      gap: '0.75rem',
+      gap: '0.6rem',
     },
     brandLogo: {
-      width: '32px',
-      height: '32px',
-      borderRadius: '6px',
+      width: '30px',
+      height: '30px',
+      borderRadius: '8px',
     },
     navList: {
       display: 'flex',
       listStyle: 'none',
       margin: 0,
       padding: 0,
-      gap: '2rem',
+      gap: '0.35rem',
+      alignItems: 'center',
     },
     navItem: {
       margin: 0,
     },
     navLink: {
-      color: 'white',
+      color: color.textMuted,
       textDecoration: 'none',
-      padding: '0.5rem 1rem',
-      borderRadius: '4px',
-      transition: 'background-color 0.3s',
+      padding: '0.5rem 0.85rem',
+      borderRadius: radius.sm,
+      fontSize: '0.95rem',
+      fontWeight: 600,
+      transition: 'background-color 0.2s, color 0.2s',
       display: 'flex',
       alignItems: 'center',
       gap: '0.5rem',
     },
     navIcon: {
-      fontSize: '1rem',
+      fontSize: '0.95rem',
     },
     activeNavLink: {
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      backgroundColor: color.accentSoft,
+      color: color.accent,
     },
     unreadBadge: {
-      backgroundColor: 'white',
-      color: '#FF6B35',
-      padding: '0.15rem 0.5rem',
-      borderRadius: '12px',
-      fontSize: '0.85rem',
-      fontWeight: '700',
-      marginLeft: '0.5rem',
+      backgroundColor: color.accent,
+      color: color.onAccent,
+      padding: '0.1rem 0.45rem',
+      borderRadius: radius.pill,
+      fontSize: '0.75rem',
+      fontWeight: 700,
+      marginLeft: '0.35rem',
       display: 'inline-block',
+      minWidth: '1.1rem',
+      textAlign: 'center',
+      lineHeight: 1.5,
     },
   };
 
@@ -91,13 +104,26 @@ const Navigation = ({ unreadCount = 0 }) => {
         <ul style={styles.navList}>
           {navItems.map((item) => {
             const IconComponent = item.icon;
+            const isActive = location.pathname === item.path;
             return (
               <li key={item.path} style={styles.navItem}>
                 <Link
                   to={item.path}
                   style={{
                     ...styles.navLink,
-                    ...(location.pathname === item.path ? styles.activeNavLink : {}),
+                    ...(isActive ? styles.activeNavLink : {}),
+                  }}
+                  onMouseOver={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = color.surface2;
+                      e.currentTarget.style.color = color.text;
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = color.textMuted;
+                    }
                   }}
                 >
                   <IconComponent style={styles.navIcon} />

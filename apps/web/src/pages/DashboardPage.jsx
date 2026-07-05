@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FaCheck, FaSync, FaArrowUp, FaKeyboard } from 'react-icons/fa';
+import { LuCheck, LuRefreshCw, LuArrowUp, LuKeyboard, LuLayoutGrid, LuRows3, LuStar } from 'react-icons/lu';
+import ReadingDrawer from '../components/ReadingDrawer';
 import { getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import ArticleModal from '../components/ArticleModal';
 import { useTheme } from '../contexts/ThemeContext';
 import { useArticles } from '../contexts/ArticlesContext';
+import { getTokens } from '../styles/tokens';
 
 const DashboardPage = () => {
   const [filteredArticles, setFilteredArticles] = useState([]);
@@ -18,6 +20,10 @@ const DashboardPage = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1); // keyboard-focused article row
   const [shortcutsOpen, setShortcutsOpen] = useState(false); // '?' help overlay
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('dashboardViewMode') || 'cards'); // 'cards' | 'compact'
+  const [isWide, setIsWide] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true
+  ); // wide screens get the two-pane reading view
 
   const location = useLocation();
   const { isDarkMode } = useTheme();
@@ -141,7 +147,6 @@ const DashboardPage = () => {
       let offset = 0;
       let totalNewArticles = 0;
       let totalSuccessful = 0;
-      let totalFailed = 0;
       let totalFeeds = 0;
       let latestFeeds = null;
 
@@ -155,7 +160,6 @@ const DashboardPage = () => {
         const { stats, remaining, nextOffset } = refreshResponse.data;
         totalFeeds = stats.totalFeeds;
         totalSuccessful += stats.successfulFeeds;
-        totalFailed += stats.failedFeeds;
         totalNewArticles += stats.newArticles;
 
         if (refreshResponse.data.feeds) {
@@ -538,6 +542,19 @@ const DashboardPage = () => {
     return () => document.removeEventListener('click', handleClick);
   }, []);
 
+  // Persist the chosen list density
+  useEffect(() => {
+    localStorage.setItem('dashboardViewMode', viewMode);
+  }, [viewMode]);
+
+  // Track viewport width to switch between two-pane (wide) and modal (narrow)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = (e) => setIsWide(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   const getRelativeTime = (dateString) => {
     if (!dateString) return 'Unknown date';
 
@@ -566,29 +583,48 @@ const DashboardPage = () => {
     return feed?.faviconUrl || null;
   };
 
+  const { color, radius, shadow } = getTokens(isDarkMode);
+
+  const secondaryButton = {
+    padding: '0.5rem 1rem',
+    backgroundColor: color.surface,
+    color: color.text,
+    border: `1px solid ${color.border}`,
+    borderRadius: radius.sm,
+    cursor: 'pointer',
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    transition: 'background-color 0.2s, border-color 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.45rem',
+  };
+
   const styles = {
     container: {
       paddingLeft: '2rem',
       paddingRight: '2rem',
       paddingBottom: '2rem',
+      paddingTop: '1.25rem',
       maxWidth: '1200px',
       margin: '0 auto',
     },
     controlsWrapper: {
       position: 'sticky',
-      top: '73px',
-      backgroundColor: isDarkMode ? 'rgba(26, 26, 26, 0.85)' : 'rgba(240, 240, 240, 0.85)',
-      backdropFilter: 'blur(10px)',
+      top: '55px',
+      backgroundColor: color.controlsBg,
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
       zIndex: 50,
-      borderBottom: isDarkMode ? '1px solid #444' : '1px solid #ddd',
+      borderBottom: `1px solid ${color.border}`,
       width: '100%',
     },
     controls: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingTop: '1rem',
-      paddingBottom: '1rem',
+      paddingTop: '0.85rem',
+      paddingBottom: '0.85rem',
       paddingLeft: '2rem',
       paddingRight: '2rem',
       flexWrap: 'wrap',
@@ -600,98 +636,74 @@ const DashboardPage = () => {
       display: 'flex',
       gap: '0.5rem',
       flexWrap: 'wrap',
+      alignItems: 'center',
     },
     filterGroup: {
-      display: 'flex',
-      gap: '0.5rem',
+      display: 'inline-flex',
+      gap: '0.2rem',
+      padding: '0.2rem',
+      backgroundColor: color.surface2,
+      borderRadius: radius.md,
+      border: `1px solid ${color.border}`,
     },
     leftControls: {
       display: 'flex',
-      gap: '1rem',
+      gap: '0.75rem',
       alignItems: 'center',
       flexWrap: 'wrap',
     },
     feedSelector: {
-      padding: '0.5rem 1rem',
-      border: '2px solid #FF6B35',
-      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      borderRadius: '5px',
+      padding: '0.5rem 0.85rem',
+      border: `1px solid ${color.border}`,
+      backgroundColor: color.surface,
+      color: color.text,
+      borderRadius: radius.sm,
       cursor: 'pointer',
       fontSize: '0.9rem',
-      fontWeight: '600',
+      fontWeight: 600,
       minWidth: '150px',
       maxWidth: '250px',
     },
     filterButton: {
-      padding: '0.5rem 1rem',
-      border: '2px solid #FF6B35',
-      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
-      color: '#FF6B35',
-      borderRadius: '5px',
+      padding: '0.4rem 0.9rem',
+      border: 'none',
+      backgroundColor: 'transparent',
+      color: color.textMuted,
+      borderRadius: radius.sm,
       cursor: 'pointer',
       fontSize: '0.9rem',
-      fontWeight: '600',
-      transition: 'all 0.3s',
+      fontWeight: 600,
+      transition: 'background-color 0.2s, color 0.2s',
     },
     activeFilter: {
-      backgroundColor: '#FF6B35',
-      color: 'white',
+      backgroundColor: color.accent,
+      color: color.onAccent,
+      boxShadow: shadow.sm,
     },
     refreshButton: {
-      padding: '0.5rem 1.5rem',
-      backgroundColor: '#FF6B35',
-      color: 'white',
+      padding: '0.5rem 1.25rem',
+      backgroundColor: color.accent,
+      color: color.onAccent,
       border: 'none',
-      borderRadius: '5px',
+      borderRadius: radius.sm,
       cursor: 'pointer',
       fontSize: '0.9rem',
-      fontWeight: '600',
-      transition: 'background-color 0.3s',
+      fontWeight: 600,
+      transition: 'background-color 0.2s',
       display: 'flex',
       alignItems: 'center',
-      gap: '0.4rem',
+      gap: '0.45rem',
+      boxShadow: shadow.sm,
     },
     markAllReadButton: {
-      padding: '0.5rem 1.5rem',
-      backgroundColor: '#28a745',
-      color: 'white',
-      border: 'none',
-      borderRadius: '5px',
-      cursor: 'pointer',
-      fontSize: '0.9rem',
-      fontWeight: '600',
-      transition: 'background-color 0.3s',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.4rem',
+      ...secondaryButton,
     },
     scrollTopButton: {
-      padding: '0.5rem 1.5rem',
-      backgroundColor: '#6c757d',
-      color: 'white',
-      border: 'none',
-      borderRadius: '5px',
-      cursor: 'pointer',
-      fontSize: '0.9rem',
-      fontWeight: '600',
-      transition: 'background-color 0.3s',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.4rem',
+      ...secondaryButton,
     },
     shortcutsButton: {
-      padding: '0.5rem 0.85rem',
-      backgroundColor: '#6c757d',
-      color: 'white',
-      border: 'none',
-      borderRadius: '5px',
-      cursor: 'pointer',
-      fontSize: '0.9rem',
-      fontWeight: '600',
-      transition: 'background-color 0.3s',
-      display: 'flex',
-      alignItems: 'center',
+      ...secondaryButton,
+      padding: '0.5rem 0.7rem',
     },
     buttonIcon: {
       fontSize: '0.85rem',
@@ -699,25 +711,79 @@ const DashboardPage = () => {
     articlesList: {
       display: 'grid',
       gridTemplateColumns: 'minmax(0, 1fr)',
-      gap: '1rem',
+      gap: '0.85rem',
     },
     articleCard: {
-      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
-      borderRadius: '8px',
+      backgroundColor: color.surface,
+      borderRadius: radius.md,
       padding: '1rem',
-      boxShadow: isDarkMode ? '0 2px 4px rgba(0,0,0,0.4)' : '0 2px 4px rgba(0,0,0,0.1)',
+      boxShadow: shadow.sm,
       cursor: 'pointer',
-      transition: 'all 0.3s',
-      border: isDarkMode ? '1px solid #444' : '1px solid #eee',
+      transition: 'transform 0.2s, box-shadow 0.2s, border-color 0.2s',
+      borderStyle: 'solid',
+      borderWidth: '1px',
+      borderLeftWidth: '3px',
       display: 'flex',
       gap: '1rem',
     },
     articleCardRead: {
-      opacity: 0.6,
+      opacity: 0.55,
     },
-    articleCardFocused: {
-      border: '2px solid #FF6B35',
-      boxShadow: '0 0 0 3px rgba(255, 107, 53, 0.25)',
+    compactRow: {
+      backgroundColor: color.surface,
+      borderRadius: radius.sm,
+      borderStyle: 'solid',
+      borderWidth: '1px',
+      borderLeftWidth: '3px',
+      padding: '0.6rem 0.85rem',
+      cursor: 'pointer',
+      transition: 'background-color 0.2s, border-color 0.2s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.7rem',
+    },
+    compactTitle: {
+      flex: 1,
+      minWidth: 0,
+      color: color.text,
+      fontSize: '0.98rem',
+      fontWeight: 600,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    },
+    compactSource: {
+      color: color.accent,
+      fontSize: '0.82rem',
+      fontWeight: 600,
+      flexShrink: 0,
+      maxWidth: '160px',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    },
+    compactTime: {
+      color: color.textFaint,
+      fontSize: '0.8rem',
+      flexShrink: 0,
+    },
+    starButton: {
+      background: 'transparent',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '0.25rem',
+      color: color.textFaint,
+      display: 'inline-flex',
+      alignItems: 'center',
+      flexShrink: 0,
+      lineHeight: 1,
+    },
+    starButtonActive: {
+      color: color.accent,
+    },
+    viewToggleButton: {
+      ...secondaryButton,
+      padding: '0.5rem 0.7rem',
     },
     shortcutsOverlay: {
       position: 'fixed',
@@ -725,7 +791,9 @@ const DashboardPage = () => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      backgroundColor: color.overlay,
+      backdropFilter: 'blur(2px)',
+      WebkitBackdropFilter: 'blur(2px)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
@@ -733,18 +801,20 @@ const DashboardPage = () => {
       padding: '1rem',
     },
     shortcutsPanel: {
-      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      borderRadius: '12px',
+      backgroundColor: color.surface,
+      color: color.text,
+      borderRadius: radius.lg,
       padding: '1.5rem 2rem',
       minWidth: '320px',
       maxWidth: '90vw',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+      border: `1px solid ${color.border}`,
+      boxShadow: shadow.lg,
     },
     shortcutsTitle: {
       margin: '0 0 1rem',
-      fontSize: '1.3rem',
-      fontWeight: 'bold',
+      fontSize: '1.25rem',
+      fontWeight: 700,
+      letterSpacing: '-0.01em',
     },
     shortcutRow: {
       display: 'flex',
@@ -757,30 +827,31 @@ const DashboardPage = () => {
       minWidth: '5.5rem',
       textAlign: 'center',
       padding: '0.2rem 0.5rem',
-      borderRadius: '5px',
-      border: isDarkMode ? '1px solid #555' : '1px solid #ccc',
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f5f5',
-      fontFamily: 'monospace',
+      borderRadius: radius.sm,
+      border: `1px solid ${color.borderStrong}`,
+      backgroundColor: color.surface2,
+      color: color.text,
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
       fontSize: '0.85rem',
     },
     thumbnail: {
       width: '200px',
       height: '120px',
       objectFit: 'cover',
-      borderRadius: '6px',
+      borderRadius: radius.sm,
       flexShrink: 0,
-      backgroundColor: '#f0f0f0',
+      backgroundColor: color.surface2,
     },
     noThumbnail: {
       width: '200px',
       height: '120px',
-      borderRadius: '6px',
+      borderRadius: radius.sm,
       flexShrink: 0,
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#f0f0f0',
+      backgroundColor: color.surface2,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      color: '#999',
+      color: color.textFaint,
       fontSize: '0.8rem',
     },
     articleContent: {
@@ -791,33 +862,48 @@ const DashboardPage = () => {
       display: 'flex',
       gap: '0.5rem',
       alignItems: 'center',
-      fontSize: '0.85rem',
-      color: isDarkMode ? '#b0b0b0' : '#999',
-      marginBottom: '0.5rem',
+      fontSize: '0.82rem',
+      color: color.textFaint,
+      marginBottom: '0.4rem',
       flexWrap: 'wrap',
     },
     feedTitle: {
-      color: '#FF6B35',
-      fontWeight: '600',
+      color: color.accent,
+      fontWeight: 600,
       display: 'flex',
       alignItems: 'center',
-      gap: '0.5rem',
+      gap: '0.4rem',
     },
     favicon: {
       width: '16px',
       height: '16px',
-      borderRadius: '2px',
+      borderRadius: '3px',
       flexShrink: 0,
     },
+    unreadDot: {
+      width: '8px',
+      height: '8px',
+      borderRadius: '50%',
+      backgroundColor: color.accent,
+      flexShrink: 0,
+    },
+    readTag: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.25rem',
+      color: color.success,
+      fontWeight: 600,
+    },
     articleTitle: {
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      marginBottom: '0.5rem',
-      fontSize: '1.2rem',
-      fontWeight: '600',
-      lineHeight: '1.4',
+      color: color.text,
+      marginBottom: '0.4rem',
+      fontSize: '1.15rem',
+      fontWeight: 700,
+      lineHeight: '1.35',
+      letterSpacing: '-0.01em',
     },
     articleDescription: {
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      color: color.textMuted,
       lineHeight: '1.5',
       fontSize: '0.95rem',
       marginBottom: '0.5rem',
@@ -829,11 +915,11 @@ const DashboardPage = () => {
     noArticles: {
       textAlign: 'center',
       padding: '3rem',
-      color: isDarkMode ? '#b0b0b0' : '#999',
+      color: color.textMuted,
     },
     loadingSpinner: {
-      border: '4px solid #f3f3f3',
-      borderTop: '4px solid #FF6B35',
+      border: `4px solid ${color.surface2}`,
+      borderTop: `4px solid ${color.accent}`,
       borderRadius: '50%',
       width: '40px',
       height: '40px',
@@ -841,8 +927,8 @@ const DashboardPage = () => {
       margin: '2rem auto',
     },
     inlineSpinner: {
-      border: '3px solid #f3f3f3',
-      borderTop: '3px solid #FF6B35',
+      border: `3px solid ${color.surface2}`,
+      borderTop: `3px solid ${color.accent}`,
       borderRadius: '50%',
       width: '20px',
       height: '20px',
@@ -867,10 +953,129 @@ const DashboardPage = () => {
     endOfArticles: {
       textAlign: 'center',
       padding: '2rem',
-      color: isDarkMode ? '#b0b0b0' : '#999',
+      color: color.textFaint,
       fontSize: '0.9rem',
     },
   };
+
+  const showSkeletons = articlesLoading && filteredArticles.length === 0;
+  const skVars = { '--sk-base': color.surface2, '--sk-hl': color.surfaceHover };
+
+  const renderStar = (article, isFav) => (
+    <button
+      style={{ ...styles.starButton, ...(isFav ? styles.starButtonActive : {}) }}
+      onClick={(e) => { e.stopPropagation(); toggleFavoriteForArticle(article); }}
+      title={isFav ? 'Unfavorite' : 'Add to favorites'}
+      aria-label={isFav ? 'Unfavorite' : 'Add to favorites'}
+    >
+      <LuStar size={16} fill={isFav ? 'currentColor' : 'none'} />
+    </button>
+  );
+
+  const renderArticle = (article, index) => {
+    const isRead = readArticles.has(article.id);
+    const isFocused = index === focusedIndex;
+    const isFav = favoritedArticles.has(article.id);
+    // Border colors are always set explicitly (never removed between renders) to
+    // avoid the React shorthand/longhand stale-inline-style bug that left a faint
+    // ring on cards after focus moved away.
+    const stateStyle = {
+      ...(isRead ? styles.articleCardRead : {}),
+      borderColor: isFocused ? color.accent : color.border,
+      borderLeftColor: (isFocused || !isRead) ? color.accent : color.border,
+    };
+
+    if (viewMode === 'compact') {
+      return (
+        <div
+          key={article.id}
+          ref={(el) => (articleRefs.current[article.id] = el)}
+          data-article-id={article.id}
+          style={{ ...styles.compactRow, ...stateStyle }}
+          onClick={() => handleArticleClick(article)}
+          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = color.surfaceHover; }}
+          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = color.surface; }}
+        >
+          {getFeedFavicon(article.feedId) && (
+            <img
+              src={getFeedFavicon(article.feedId)}
+              alt=""
+              style={styles.favicon}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          )}
+          <span style={styles.compactTitle}>{article.title}</span>
+          <span style={styles.compactSource}>{article.feedTitle || 'Unknown Feed'}</span>
+          <span style={styles.compactTime}>{getRelativeTime(article.publishedAt)}</span>
+          {isRead && <LuCheck style={{ color: color.success, fontSize: '0.8rem', flexShrink: 0 }} />}
+          {renderStar(article, isFav)}
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={article.id}
+        ref={(el) => (articleRefs.current[article.id] = el)}
+        data-article-id={article.id}
+        style={{ ...styles.articleCard, ...stateStyle }}
+        onClick={() => handleArticleClick(article)}
+        onMouseOver={(e) => {
+          e.currentTarget.style.boxShadow = shadow.md;
+          e.currentTarget.style.transform = 'translateY(-2px)';
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.boxShadow = shadow.sm;
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}
+      >
+        {article.imageUrl ? (
+          <img src={article.imageUrl} alt={article.title} style={styles.thumbnail} />
+        ) : (
+          <div style={styles.noThumbnail}>No image</div>
+        )}
+        <div style={styles.articleContent}>
+          <div style={styles.articleMeta}>
+            <span style={styles.feedTitle}>
+              {getFeedFavicon(article.feedId) && (
+                <img
+                  src={getFeedFavicon(article.feedId)}
+                  alt=""
+                  style={styles.favicon}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              )}
+              {article.feedTitle || 'Unknown Feed'}
+            </span>
+            <span>•</span>
+            <span>{getRelativeTime(article.publishedAt)}</span>
+            {isRead && (
+              <span style={styles.readTag}>
+                <LuCheck style={{ fontSize: '0.72rem' }} /> Read
+              </span>
+            )}
+            <span style={{ marginLeft: 'auto' }}>{renderStar(article, isFav)}</span>
+          </div>
+          <h3 style={styles.articleTitle}>{article.title}</h3>
+          <p style={styles.articleDescription}>
+            {article.description || 'No description available'}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSkeleton = (i) => (
+    <div key={`sk-${i}`} style={{ ...styles.articleCard, cursor: 'default' }}>
+      <div className="fo-skeleton" style={{ width: '200px', height: '120px', flexShrink: 0, ...skVars }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="fo-skeleton" style={{ width: '40%', height: '0.75rem', marginBottom: '0.75rem', ...skVars }} />
+        <div className="fo-skeleton" style={{ width: '92%', height: '1.15rem', marginBottom: '0.6rem', ...skVars }} />
+        <div className="fo-skeleton" style={{ width: '100%', height: '0.8rem', marginBottom: '0.45rem', ...skVars }} />
+        <div className="fo-skeleton" style={{ width: '70%', height: '0.8rem', ...skVars }} />
+      </div>
+    </div>
+  );
 
   return (
     <div>
@@ -892,64 +1097,77 @@ const DashboardPage = () => {
             </select>
 
             <div style={styles.filterGroup}>
-              <button
-                onClick={() => setFilter('all')}
-                style={{
-                  ...styles.filterButton,
-                  ...(filter === 'all' ? styles.activeFilter : {}),
-                }}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setFilter('unread')}
-                style={{
-                  ...styles.filterButton,
-                  ...(filter === 'unread' ? styles.activeFilter : {}),
-                }}
-              >
-                Unread
-              </button>
-              <button
-                onClick={() => setFilter('read')}
-                style={{
-                  ...styles.filterButton,
-                  ...(filter === 'read' ? styles.activeFilter : {}),
-                }}
-              >
-                Read
-              </button>
+              {['all', 'unread', 'read'].map((key) => {
+                const isActive = filter === key;
+                const label = key.charAt(0).toUpperCase() + key.slice(1);
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    style={{
+                      ...styles.filterButton,
+                      ...(isActive ? styles.activeFilter : {}),
+                    }}
+                    onMouseOver={(e) => {
+                      if (!isActive) e.currentTarget.style.color = color.text;
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isActive) e.currentTarget.style.color = color.textMuted;
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           <div style={styles.buttonGroup}>
             <button
+              onClick={() => setViewMode((m) => (m === 'cards' ? 'compact' : 'cards'))}
+              style={styles.viewToggleButton}
+              title={viewMode === 'cards' ? 'Switch to compact list' : 'Switch to card view'}
+              aria-label="Toggle list density"
+              onMouseOver={(e) => { e.currentTarget.style.backgroundColor = color.surfaceHover; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = color.surface; }}
+            >
+              {viewMode === 'cards' ? <LuRows3 style={styles.buttonIcon} /> : <LuLayoutGrid style={styles.buttonIcon} />}
+            </button>
+            <button
               onClick={handleMarkAllAsRead}
               style={styles.markAllReadButton}
               disabled={articlesLoading || unreadCount === 0}
+              onMouseOver={(e) => { e.currentTarget.style.backgroundColor = color.surfaceHover; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = color.surface; }}
             >
-              <FaCheck style={styles.buttonIcon} /> Mark All Read
+              <LuCheck style={styles.buttonIcon} /> Mark All Read
             </button>
             <button
               onClick={handleRefresh}
               style={styles.refreshButton}
               disabled={articlesLoading}
+              onMouseOver={(e) => { e.currentTarget.style.backgroundColor = color.accentHover; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = color.accent; }}
             >
-              <FaSync style={styles.buttonIcon} /> Refresh
+              <LuRefreshCw style={styles.buttonIcon} /> Refresh
             </button>
             <button
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               style={styles.scrollTopButton}
+              onMouseOver={(e) => { e.currentTarget.style.backgroundColor = color.surfaceHover; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = color.surface; }}
             >
-              <FaArrowUp style={styles.buttonIcon} /> Top
+              <LuArrowUp style={styles.buttonIcon} /> Top
             </button>
             <button
               onClick={() => setShortcutsOpen(true)}
               style={styles.shortcutsButton}
               title="Keyboard shortcuts (press ?)"
               aria-label="Keyboard shortcuts"
+              onMouseOver={(e) => { e.currentTarget.style.backgroundColor = color.surfaceHover; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = color.surface; }}
             >
-              <FaKeyboard style={styles.buttonIcon} />
+              <LuKeyboard style={styles.buttonIcon} />
             </button>
             {articlesLoading && (
               <div style={styles.inlineSpinner}></div>
@@ -960,95 +1178,62 @@ const DashboardPage = () => {
 
       <div style={styles.container}>
         {articlesError && (
-          <p style={{ color: 'red', textAlign: 'center' }}>{articlesError}</p>
+          <p style={{ color: color.danger, textAlign: 'center' }}>{articlesError}</p>
         )}
 
         {!articlesError && (
-          <div style={styles.articlesList}>
-            {filteredArticles.length > 0 ? (
-              filteredArticles.map((article, index) => {
-                const isRead = readArticles.has(article.id);
-                const isFocused = index === focusedIndex;
-                return (
-                  <div
-                    key={article.id}
-                    ref={(el) => (articleRefs.current[article.id] = el)}
-                    data-article-id={article.id}
-                    style={{
-                      ...styles.articleCard,
-                      ...(isRead ? styles.articleCardRead : {}),
-                      ...(isFocused ? styles.articleCardFocused : {}),
-                    }}
-                    onClick={() => handleArticleClick(article)}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    {article.imageUrl ? (
-                      <img src={article.imageUrl} alt={article.title} style={styles.thumbnail} />
-                    ) : (
-                      <div style={styles.noThumbnail}>No image</div>
-                    )}
-                    <div style={styles.articleContent}>
-                      <div style={styles.articleMeta}>
-                        <span style={styles.feedTitle}>
-                          {getFeedFavicon(article.feedId) && (
-                            <img
-                              src={getFeedFavicon(article.feedId)}
-                              alt=""
-                              style={styles.favicon}
-                              onError={(e) => { e.target.style.display = 'none'; }}
-                            />
-                          )}
-                          {article.feedTitle || 'Unknown Feed'}
-                        </span>
-                        <span>•</span>
-                        <span>{getRelativeTime(article.publishedAt)}</span>
-                        {isRead && <span style={{ color: '#28a745' }}>✓ Read</span>}
-                      </div>
-                      <h3 style={styles.articleTitle}>{article.title}</h3>
-                      <p style={styles.articleDescription}>
-                        {article.description || 'No description available'}
-                      </p>
+          showSkeletons ? (
+            <div style={styles.articlesList}>
+              {Array.from({ length: 6 }).map((_, i) => renderSkeleton(i))}
+            </div>
+          ) : (
+            <div style={styles.articlesList}>
+              {filteredArticles.length > 0 ? (
+                filteredArticles.map((article, index) => renderArticle(article, index))
+              ) : (
+                <div style={styles.noArticles}>
+                  <p>No articles found.</p>
+                  <p>Try adding some feeds or changing the filter.</p>
+                </div>
+              )}
+
+              {/* Load more trigger for infinite scroll */}
+              {filteredArticles.length > 0 && hasMore && (
+                <div ref={loadMoreRef} style={styles.loadMoreTrigger}>
+                  {loadingMore && (
+                    <div style={styles.loadingMore}>
+                      <div style={styles.loadingSpinner}></div>
+                      <p>Loading more articles...</p>
                     </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div style={styles.noArticles}>
-                <p>No articles found.</p>
-                <p>Try adding some feeds or changing the filter.</p>
-              </div>
-            )}
+                  )}
+                </div>
+              )}
 
-            {/* Load more trigger for infinite scroll */}
-            {filteredArticles.length > 0 && hasMore && (
-              <div ref={loadMoreRef} style={styles.loadMoreTrigger}>
-                {loadingMore && (
-                  <div style={styles.loadingMore}>
-                    <div style={styles.loadingSpinner}></div>
-                    <p>Loading more articles...</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* End of articles indicator */}
-            {filteredArticles.length > 0 && !hasMore && (
-              <div style={styles.endOfArticles}>
-                <p>No more articles to load</p>
-              </div>
-            )}
-          </div>
+              {/* End of articles indicator */}
+              {filteredArticles.length > 0 && !hasMore && (
+                <div style={styles.endOfArticles}>
+                  <p>No more articles to load</p>
+                </div>
+              )}
+            </div>
+          )
         )}
       </div>
 
-      {selectedArticle && (
+      {/* Wide screens: Feedly-style slide-over drawer covering most of the screen */}
+      {selectedArticle && isWide && (
+        <ReadingDrawer
+          article={selectedArticle}
+          onClose={handleCloseModal}
+          onMarkAsRead={handleMarkAsRead}
+          onToggleFavorite={handleToggleFavorite}
+          isRead={readArticles.has(selectedArticle.id)}
+          isFavorited={favoritedArticles.has(selectedArticle.id)}
+        />
+      )}
+
+      {/* Narrow screens: centered modal */}
+      {selectedArticle && !isWide && (
         <ArticleModal
           article={selectedArticle}
           onClose={handleCloseModal}

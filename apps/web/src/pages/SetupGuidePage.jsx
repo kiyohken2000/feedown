@@ -6,6 +6,7 @@ import { translations } from '../i18n/translations';
 import PublicHeader from '../components/PublicHeader';
 import Footer from '../components/Footer';
 import ImageZoom from '../components/ImageZoom';
+import { getTokens } from '../styles/tokens';
 
 // Web screenshots
 import supabaseDashboard1 from '../assets/images/web_screenshots/supabase_dashboard_1.png';
@@ -31,14 +32,15 @@ export default function SetupGuidePage() {
   const { language } = useLanguage();
   const t = translations[language].setup;
   const [activeSection, setActiveSection] = useState('prerequisites');
+  const { color, radius, shadow } = getTokens(isDarkMode);
 
   const styles = {
     page: {
       minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      backgroundColor: color.appBg,
+      color: color.text,
     },
     container: {
       flex: 1,
@@ -59,26 +61,28 @@ export default function SetupGuidePage() {
     },
     sidebarTitle: {
       fontSize: '12px',
-      fontWeight: '600',
+      fontWeight: 700,
       textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      color: isDarkMode ? '#888' : '#999',
+      letterSpacing: '0.6px',
+      color: color.textFaint,
       marginBottom: '12px',
     },
     sidebarLink: {
       display: 'block',
       padding: '8px 12px',
-      borderRadius: '6px',
+      borderRadius: radius.sm,
       fontSize: '14px',
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      fontWeight: 500,
+      color: color.textMuted,
       textDecoration: 'none',
       cursor: 'pointer',
       transition: 'all 0.2s',
       marginBottom: '4px',
     },
     sidebarLinkActive: {
-      backgroundColor: isDarkMode ? '#2d2d2d' : '#f0f0f0',
-      color: '#FF6B35',
+      backgroundColor: color.accentSoft,
+      color: color.accent,
+      fontWeight: 600,
     },
     content: {
       maxWidth: '800px',
@@ -86,12 +90,13 @@ export default function SetupGuidePage() {
     },
     title: {
       fontSize: '36px',
-      fontWeight: '700',
+      fontWeight: 800,
+      letterSpacing: '-0.02em',
       marginBottom: '8px',
     },
     subtitle: {
       fontSize: '18px',
-      color: isDarkMode ? '#888' : '#666',
+      color: color.textMuted,
       marginBottom: '40px',
     },
     section: {
@@ -99,16 +104,17 @@ export default function SetupGuidePage() {
     },
     sectionTitle: {
       fontSize: '24px',
-      fontWeight: '600',
+      fontWeight: 700,
+      letterSpacing: '-0.01em',
       marginBottom: '16px',
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      borderBottom: `2px solid ${isDarkMode ? '#333' : '#e0e0e0'}`,
+      color: color.text,
+      borderBottom: `1px solid ${color.border}`,
       paddingBottom: '8px',
     },
     paragraph: {
       fontSize: '16px',
       lineHeight: '1.8',
-      color: isDarkMode ? '#b0b0b0' : '#555',
+      color: color.textMuted,
       marginBottom: '16px',
     },
     list: {
@@ -119,34 +125,34 @@ export default function SetupGuidePage() {
     listItem: {
       fontSize: '16px',
       lineHeight: '1.8',
-      color: isDarkMode ? '#b0b0b0' : '#555',
+      color: color.textMuted,
       marginBottom: '8px',
       textAlign: 'left',
     },
     screenshot: {
       width: '100%',
       maxWidth: '100%',
-      borderRadius: '8px',
-      border: `1px solid ${isDarkMode ? '#333' : '#e1e4e8'}`,
+      borderRadius: radius.md,
+      border: `1px solid ${color.border}`,
       marginBottom: '16px',
-      boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.1)',
+      boxShadow: shadow.md,
     },
     screenshotCaption: {
       fontSize: '14px',
-      color: isDarkMode ? '#888' : '#666',
+      color: color.textFaint,
       textAlign: 'center',
       marginTop: '-8px',
       marginBottom: '24px',
       fontStyle: 'italic',
     },
     codeBlock: {
-      backgroundColor: isDarkMode ? '#1e1e1e' : '#f6f8fa',
-      border: `1px solid ${isDarkMode ? '#333' : '#e1e4e8'}`,
-      borderRadius: '8px',
+      backgroundColor: color.surface2,
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.md,
       padding: '16px',
       overflowX: 'auto',
       marginBottom: '16px',
-      fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
       fontSize: '14px',
       lineHeight: '1.6',
       whiteSpace: 'pre-wrap',
@@ -154,15 +160,16 @@ export default function SetupGuidePage() {
       textAlign: 'left',
     },
     code: {
-      color: isDarkMode ? '#e6e6e6' : '#24292e',
+      color: color.text,
     },
     inlineCode: {
-      backgroundColor: isDarkMode ? '#2d2d2d' : '#f0f0f0',
+      backgroundColor: color.surface2,
+      border: `1px solid ${color.border}`,
       padding: '2px 6px',
-      borderRadius: '4px',
-      fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+      borderRadius: '5px',
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
       fontSize: '14px',
-      color: isDarkMode ? '#ff7b72' : '#d73a49',
+      color: color.accent,
     },
     table: {
       width: '100%',
@@ -171,16 +178,17 @@ export default function SetupGuidePage() {
       fontSize: '14px',
     },
     th: {
-      backgroundColor: isDarkMode ? '#2d2d2d' : '#f6f8fa',
+      backgroundColor: color.surface2,
       padding: '12px',
       textAlign: 'left',
-      borderBottom: `2px solid ${isDarkMode ? '#444' : '#e1e4e8'}`,
-      fontWeight: '600',
+      borderBottom: `1px solid ${color.borderStrong}`,
+      color: color.text,
+      fontWeight: 700,
     },
     td: {
       padding: '12px',
-      borderBottom: `1px solid ${isDarkMode ? '#333' : '#e1e4e8'}`,
-      color: isDarkMode ? '#b0b0b0' : '#555',
+      borderBottom: `1px solid ${color.border}`,
+      color: color.textMuted,
     },
     stepNumber: {
       display: 'inline-flex',
@@ -189,40 +197,42 @@ export default function SetupGuidePage() {
       width: '28px',
       height: '28px',
       borderRadius: '50%',
-      backgroundColor: '#FF6B35',
-      color: '#fff',
+      backgroundColor: color.accent,
+      color: color.onAccent,
       fontSize: '14px',
-      fontWeight: '600',
+      fontWeight: 700,
       marginRight: '12px',
+      flexShrink: 0,
     },
     stepTitle: {
       display: 'flex',
       alignItems: 'center',
       fontSize: '20px',
-      fontWeight: '600',
+      fontWeight: 700,
       marginBottom: '12px',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      color: color.text,
     },
     note: {
-      backgroundColor: isDarkMode ? '#2d2d1a' : '#fff8e6',
-      border: `1px solid ${isDarkMode ? '#665500' : '#ffd700'}`,
-      borderRadius: '8px',
+      backgroundColor: color.accentSoft,
+      border: `1px solid ${color.accentBorder}`,
+      borderRadius: radius.md,
       padding: '16px',
       marginBottom: '16px',
     },
     noteTitle: {
-      fontWeight: '600',
+      fontWeight: 700,
       marginBottom: '8px',
-      color: isDarkMode ? '#ffd700' : '#996600',
+      color: color.accent,
     },
     backLink: {
       display: 'inline-flex',
       alignItems: 'center',
       gap: '8px',
       marginTop: '20px',
-      color: '#FF6B35',
+      color: color.accent,
       textDecoration: 'none',
       fontSize: '14px',
+      fontWeight: 600,
     },
   };
 
@@ -773,8 +783,8 @@ npx expo start --clear`}
               {language === 'en' ? 'Troubleshooting' : 'トラブルシューティング'}
             </h2>
 
-            <div style={{ ...styles.note, backgroundColor: isDarkMode ? '#2d1a1a' : '#fff0f0', borderColor: isDarkMode ? '#660000' : '#ff6b6b' }}>
-              <div style={{ ...styles.noteTitle, color: isDarkMode ? '#ff6b6b' : '#cc0000' }}>
+            <div style={{ ...styles.note, backgroundColor: color.surface, borderColor: color.danger }}>
+              <div style={{ ...styles.noteTitle, color: color.danger }}>
                 API 405 Error
               </div>
               <p style={{ ...styles.paragraph, marginBottom: 0 }}>
@@ -785,8 +795,8 @@ npx expo start --clear`}
               </p>
             </div>
 
-            <div style={{ ...styles.note, backgroundColor: isDarkMode ? '#2d1a1a' : '#fff0f0', borderColor: isDarkMode ? '#660000' : '#ff6b6b' }}>
-              <div style={{ ...styles.noteTitle, color: isDarkMode ? '#ff6b6b' : '#cc0000' }}>
+            <div style={{ ...styles.note, backgroundColor: color.surface, borderColor: color.danger }}>
+              <div style={{ ...styles.noteTitle, color: color.danger }}>
                 RLS Error
               </div>
               <p style={{ ...styles.paragraph, marginBottom: 0 }}>
@@ -797,8 +807,8 @@ npx expo start --clear`}
               </p>
             </div>
 
-            <div style={{ ...styles.note, backgroundColor: isDarkMode ? '#2d1a1a' : '#fff0f0', borderColor: isDarkMode ? '#660000' : '#ff6b6b' }}>
-              <div style={{ ...styles.noteTitle, color: isDarkMode ? '#ff6b6b' : '#cc0000' }}>
+            <div style={{ ...styles.note, backgroundColor: color.surface, borderColor: color.danger }}>
+              <div style={{ ...styles.noteTitle, color: color.danger }}>
                 {language === 'en' ? 'Articles Not Showing' : '記事が表示されない'}
               </div>
               <p style={{ ...styles.paragraph, marginBottom: 0 }}>
@@ -842,8 +852,8 @@ npx expo start --clear`}
           </section>
 
           {/* GitHub Link */}
-          <section style={{ ...styles.section, textAlign: 'center', padding: '40px', backgroundColor: isDarkMode ? '#1a1a1a' : '#f8f9fa', borderRadius: '16px' }}>
-            <h3 style={{ fontSize: '20px', marginBottom: '12px' }}>
+          <section style={{ ...styles.section, textAlign: 'center', padding: '40px', backgroundColor: color.surface2, border: `1px solid ${color.border}`, borderRadius: radius.lg }}>
+            <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '12px' }}>
               {t.viewFullGuide}
             </h3>
             <p style={{ ...styles.paragraph, marginBottom: '20px' }}>
@@ -856,12 +866,13 @@ npx expo start --clear`}
               style={{
                 display: 'inline-block',
                 padding: '12px 24px',
-                borderRadius: '8px',
-                backgroundColor: '#FF6B35',
-                color: '#fff',
+                borderRadius: radius.sm,
+                backgroundColor: color.accent,
+                color: color.onAccent,
                 textDecoration: 'none',
                 fontSize: '14px',
-                fontWeight: '500',
+                fontWeight: 600,
+                boxShadow: shadow.sm,
               }}
             >
               {language === 'en' ? 'View on GitHub' : 'GitHubで見る'} →

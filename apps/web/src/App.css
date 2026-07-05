@@ -1,7 +1,7 @@
 /* Dark mode global styles */
 :root {
   --bg-primary: #ffffff;
-  --bg-secondary: #f5f5f5;
+  --bg-secondary: #f6f7f9;
   --text-primary: #333333;
   --text-secondary: #666666;
   --border-color: #e0e0e0;
@@ -9,7 +9,7 @@
 
 .dark-mode {
   --bg-primary: #1a1a1a;
-  --bg-secondary: #2d2d2d;
+  --bg-secondary: #111214;
   --text-primary: #e0e0e0;
   --text-secondary: #b0b0b0;
   --border-color: #444444;

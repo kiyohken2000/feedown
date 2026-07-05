@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaTimes } from 'react-icons/fa';
+import { LuX, LuStar } from 'react-icons/lu';
 import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
 import ArticleModal from '../components/ArticleModal';
+import ReadingDrawer from '../components/ReadingDrawer';
 import { useTheme } from '../contexts/ThemeContext';
+import { getTokens } from '../styles/tokens';
 
 const FavoritesPage = () => {
   const [loading, setLoading] = useState(true);
@@ -15,6 +17,9 @@ const FavoritesPage = () => {
   const [favoritesError, setFavoritesError] = useState(null);
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [feeds, setFeeds] = useState([]);
+  const [isWide, setIsWide] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true
+  );
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
 
@@ -79,6 +84,14 @@ const FavoritesPage = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  // Track viewport width to switch between drawer (wide) and modal (narrow)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = (e) => setIsWide(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   const handleArticleClick = (favorite) => {
     // Convert favorite format to article format for modal
@@ -149,6 +162,8 @@ const FavoritesPage = () => {
     return feed?.faviconUrl || null;
   };
 
+  const { color, radius, shadow } = getTokens(isDarkMode);
+
   const styles = {
     container: {
       paddingLeft: '2rem',
@@ -162,48 +177,49 @@ const FavoritesPage = () => {
       paddingBottom: '1.5rem',
     },
     heading: {
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      marginBottom: '0.5rem',
-      fontSize: '1.5rem',
-      fontWeight: 'bold',
+      color: color.text,
+      marginBottom: '0.4rem',
+      fontSize: '1.6rem',
+      fontWeight: 800,
+      letterSpacing: '-0.02em',
       display: 'flex',
       alignItems: 'center',
-      gap: '0.5rem',
+      gap: '0.6rem',
     },
     favoriteIcon: {
-      color: '#FFD700',
-      fontSize: '1.8rem',
+      color: color.accent,
+      fontSize: '1.5rem',
     },
     subtitle: {
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      color: color.textMuted,
       fontSize: '1rem',
     },
     articlesList: {
       display: 'grid',
-      gap: '1rem',
+      gap: '0.85rem',
     },
     articleCard: {
-      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
-      borderRadius: '8px',
-      padding: '1.5rem',
-      boxShadow: isDarkMode ? '0 2px 4px rgba(0,0,0,0.4)' : '0 2px 4px rgba(0,0,0,0.1)',
-      border: isDarkMode ? '1px solid #444' : '1px solid #eee',
-      transition: 'all 0.3s',
+      backgroundColor: color.surface,
+      borderRadius: radius.md,
+      padding: '1.25rem',
+      boxShadow: shadow.sm,
+      border: `1px solid ${color.border}`,
+      transition: 'transform 0.2s, box-shadow 0.2s',
       cursor: 'pointer',
       display: 'flex',
-      gap: '1.5rem',
+      gap: '1.25rem',
       position: 'relative',
     },
     removeButton: {
       position: 'absolute',
       top: '0.75rem',
       right: '0.75rem',
-      backgroundColor: isDarkMode ? '#444' : '#e0e0e0',
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      backgroundColor: color.surface2,
+      color: color.textMuted,
       border: 'none',
       borderRadius: '50%',
-      width: '28px',
-      height: '28px',
+      width: '30px',
+      height: '30px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -215,19 +231,19 @@ const FavoritesPage = () => {
       width: '200px',
       height: '120px',
       objectFit: 'cover',
-      borderRadius: '6px',
-      backgroundColor: '#f5f5f5',
+      borderRadius: radius.sm,
+      backgroundColor: color.surface2,
       flexShrink: 0,
     },
     noImage: {
       width: '200px',
       height: '120px',
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f5f5',
-      borderRadius: '6px',
+      backgroundColor: color.surface2,
+      borderRadius: radius.sm,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      color: isDarkMode ? '#b0b0b0' : '#999',
+      color: color.textFaint,
       fontSize: '0.9rem',
       flexShrink: 0,
     },
@@ -235,36 +251,38 @@ const FavoritesPage = () => {
       flex: 1,
       display: 'flex',
       flexDirection: 'column',
-      gap: '0.5rem',
+      gap: '0.4rem',
     },
     articleMeta: {
       display: 'flex',
       gap: '0.5rem',
-      fontSize: '0.85rem',
-      color: isDarkMode ? '#b0b0b0' : '#999',
+      fontSize: '0.82rem',
+      color: color.textFaint,
       flexWrap: 'wrap',
+      alignItems: 'center',
     },
     feedTitle: {
-      color: '#FF6B35',
-      fontWeight: '600',
+      color: color.accent,
+      fontWeight: 600,
       display: 'flex',
       alignItems: 'center',
-      gap: '0.5rem',
+      gap: '0.4rem',
     },
     favicon: {
       width: '16px',
       height: '16px',
-      borderRadius: '2px',
+      borderRadius: '3px',
       flexShrink: 0,
     },
     articleTitle: {
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      fontSize: '1.2rem',
-      fontWeight: '600',
-      lineHeight: '1.4',
+      color: color.text,
+      fontSize: '1.15rem',
+      fontWeight: 700,
+      lineHeight: '1.35',
+      letterSpacing: '-0.01em',
     },
     articleDescription: {
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      color: color.textMuted,
       fontSize: '0.95rem',
       lineHeight: '1.6',
       display: '-webkit-box',
@@ -275,11 +293,11 @@ const FavoritesPage = () => {
     noFavorites: {
       textAlign: 'center',
       padding: '3rem',
-      color: isDarkMode ? '#b0b0b0' : '#999',
+      color: color.textMuted,
     },
     loadingSpinner: {
-      border: '4px solid #f3f3f3',
-      borderTop: '4px solid #FF6B35',
+      border: `4px solid ${color.surface2}`,
+      borderTop: `4px solid ${color.accent}`,
       borderRadius: '50%',
       width: '40px',
       height: '40px',
@@ -306,7 +324,7 @@ const FavoritesPage = () => {
       <div style={styles.container}>
         <div style={styles.header}>
           <h1 style={styles.heading}>
-            <span style={styles.favoriteIcon}>★</span>
+            <LuStar style={styles.favoriteIcon} fill="currentColor" />
             Favorites
           </h1>
           <p style={styles.subtitle}>Your saved articles ({favorites.length})</p>
@@ -320,7 +338,7 @@ const FavoritesPage = () => {
         )}
 
         {favoritesError && (
-          <p style={{ color: 'red', textAlign: 'center' }}>{favoritesError}</p>
+          <p style={{ color: color.danger, textAlign: 'center' }}>{favoritesError}</p>
         )}
 
         {!favoritesLoading && !favoritesError && (
@@ -332,11 +350,11 @@ const FavoritesPage = () => {
                   style={styles.articleCard}
                   onClick={() => handleArticleClick(favorite)}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                    e.currentTarget.style.boxShadow = shadow.md;
                     e.currentTarget.style.transform = 'translateY(-2px)';
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                    e.currentTarget.style.boxShadow = shadow.sm;
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
@@ -344,16 +362,16 @@ const FavoritesPage = () => {
                     style={styles.removeButton}
                     onClick={(e) => handleRemoveFavoriteFromList(e, favorite.articleId)}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = '#dc3545';
-                      e.currentTarget.style.color = 'white';
+                      e.currentTarget.style.backgroundColor = color.danger;
+                      e.currentTarget.style.color = '#fff';
                     }}
                     onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = isDarkMode ? '#444' : '#e0e0e0';
-                      e.currentTarget.style.color = isDarkMode ? '#b0b0b0' : '#666';
+                      e.currentTarget.style.backgroundColor = color.surface2;
+                      e.currentTarget.style.color = color.textMuted;
                     }}
                     title="Remove from favorites"
                   >
-                    <FaTimes />
+                    <LuX />
                   </button>
                   {favorite.imageUrl ? (
                     <img
@@ -397,7 +415,18 @@ const FavoritesPage = () => {
         )}
       </div>
 
-      {selectedArticle && (
+      {selectedArticle && isWide && (
+        <ReadingDrawer
+          article={selectedArticle}
+          onClose={handleCloseModal}
+          onMarkAsRead={() => {}} // Favorites don't need mark as read
+          onToggleFavorite={handleRemoveFromFavorites}
+          isRead={false}
+          isFavorited={true}
+        />
+      )}
+
+      {selectedArticle && !isWide && (
         <ArticleModal
           article={selectedArticle}
           onClose={handleCloseModal}

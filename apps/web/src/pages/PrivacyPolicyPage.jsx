@@ -3,18 +3,20 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import PublicHeader from '../components/PublicHeader';
 import Footer from '../components/Footer';
+import { getTokens } from '../styles/tokens';
 
 export default function PrivacyPolicyPage() {
   const { isDarkMode } = useTheme();
   const { language } = useLanguage();
+  const { color, radius } = getTokens(isDarkMode);
 
   const styles = {
     page: {
       minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      backgroundColor: color.appBg,
+      color: color.text,
     },
     container: {
       flex: 1,
@@ -24,12 +26,13 @@ export default function PrivacyPolicyPage() {
     },
     title: {
       fontSize: '36px',
-      fontWeight: '700',
+      fontWeight: 800,
+      letterSpacing: '-0.02em',
       marginBottom: '8px',
     },
     lastUpdated: {
       fontSize: '14px',
-      color: isDarkMode ? '#888' : '#666',
+      color: color.textFaint,
       marginBottom: '40px',
     },
     section: {
@@ -37,14 +40,15 @@ export default function PrivacyPolicyPage() {
     },
     sectionTitle: {
       fontSize: '20px',
-      fontWeight: '600',
+      fontWeight: 700,
+      letterSpacing: '-0.01em',
       marginBottom: '12px',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      color: color.text,
     },
     paragraph: {
       fontSize: '16px',
       lineHeight: '1.8',
-      color: isDarkMode ? '#b0b0b0' : '#555',
+      color: color.textMuted,
       marginBottom: '12px',
     },
     list: {
@@ -54,7 +58,7 @@ export default function PrivacyPolicyPage() {
     listItem: {
       fontSize: '16px',
       lineHeight: '1.8',
-      color: isDarkMode ? '#b0b0b0' : '#555',
+      color: color.textMuted,
       marginBottom: '8px',
     },
     backLink: {
@@ -62,27 +66,30 @@ export default function PrivacyPolicyPage() {
       alignItems: 'center',
       gap: '8px',
       marginTop: '40px',
-      color: '#FF6B35',
+      color: color.accent,
       textDecoration: 'none',
       fontSize: '14px',
+      fontWeight: 600,
     },
     supportSection: {
       marginBottom: '32px',
       padding: '24px',
-      backgroundColor: isDarkMode ? '#1e3a2f' : '#e8f5e9',
-      borderRadius: '12px',
-      borderLeft: '4px solid #4CAF50',
+      backgroundColor: color.accentSoft,
+      borderRadius: radius.md,
+      border: `1px solid ${color.border}`,
+      borderLeft: `4px solid ${color.accent}`,
     },
     supportTitle: {
       fontSize: '22px',
-      fontWeight: '700',
+      fontWeight: 800,
+      letterSpacing: '-0.01em',
       marginBottom: '16px',
-      color: isDarkMode ? '#81c784' : '#2e7d32',
+      color: color.text,
     },
     supportEmail: {
       display: 'inline-block',
-      color: '#FF6B35',
-      fontWeight: '600',
+      color: color.accent,
+      fontWeight: 600,
     },
   };
 

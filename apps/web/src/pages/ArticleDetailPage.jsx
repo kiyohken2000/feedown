@@ -1,13 +1,18 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { LuCheck, LuStar, LuExternalLink, LuArrowLeft } from 'react-icons/lu';
 import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
+import { useTheme } from '../contexts/ThemeContext';
+import { getTokens } from '../styles/tokens';
 
 const ArticleDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { isDarkMode } = useTheme();
+  const { color, radius, shadow } = getTokens(isDarkMode);
 
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -82,75 +87,90 @@ const ArticleDetailPage = () => {
     }
   };
 
+  const buttonBase = {
+    padding: '0.7rem 1.35rem',
+    border: 'none',
+    borderRadius: radius.sm,
+    cursor: 'pointer',
+    fontSize: '1rem',
+    fontWeight: 600,
+    transition: 'all 0.2s',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.45rem',
+  };
+
   const styles = {
     container: {
       padding: '2rem',
-      maxWidth: '900px',
-      margin: '2rem auto',
+      maxWidth: '820px',
+      margin: '1.5rem auto',
     },
     article: {
-      backgroundColor: 'white',
-      borderRadius: '8px',
+      backgroundColor: color.surface,
+      borderRadius: radius.lg,
       padding: '2rem',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      border: `1px solid ${color.border}`,
+      boxShadow: shadow.sm,
     },
     title: {
-      color: '#333',
+      color: color.text,
       marginBottom: '1rem',
       fontSize: '2rem',
-      fontWeight: 'bold',
-      lineHeight: '1.3',
+      fontWeight: 800,
+      letterSpacing: '-0.02em',
+      lineHeight: '1.25',
     },
     meta: {
       display: 'flex',
       gap: '1rem',
       marginBottom: '1.5rem',
-      color: '#666',
+      color: color.textFaint,
       fontSize: '0.9rem',
     },
     description: {
-      color: '#555',
-      lineHeight: '1.6',
+      color: color.textMuted,
+      lineHeight: '1.7',
       marginBottom: '2rem',
       fontSize: '1.1rem',
+      whiteSpace: 'pre-wrap',
     },
     actions: {
       display: 'flex',
-      gap: '1rem',
+      gap: '0.6rem',
       marginBottom: '1.5rem',
       flexWrap: 'wrap',
     },
-    button: {
-      padding: '0.75rem 1.5rem',
-      backgroundColor: '#FF6B35',
-      color: 'white',
-      border: 'none',
-      borderRadius: '5px',
-      cursor: 'pointer',
-      fontSize: '1rem',
-      fontWeight: '600',
-      transition: 'background-color 0.3s',
+    primaryButton: {
+      ...buttonBase,
+      backgroundColor: color.surface2,
+      color: color.text,
     },
-    secondaryButton: {
-      backgroundColor: '#6c757d',
+    favoriteButton: {
+      ...buttonBase,
+      backgroundColor: color.surface2,
+      color: color.text,
     },
-    activeButton: {
-      backgroundColor: '#28a745',
+    favoriteButtonActive: {
+      backgroundColor: color.accentSoft,
+      color: color.accent,
     },
     externalLink: {
-      display: 'inline-block',
-      padding: '0.75rem 1.5rem',
-      backgroundColor: '#007bff',
-      color: 'white',
+      ...buttonBase,
+      backgroundColor: color.accent,
+      color: color.onAccent,
       textDecoration: 'none',
-      borderRadius: '5px',
-      fontSize: '1rem',
-      fontWeight: '600',
-      transition: 'background-color 0.3s',
+      boxShadow: shadow.sm,
+    },
+    backButton: {
+      ...buttonBase,
+      backgroundColor: color.surface,
+      color: color.text,
+      border: `1px solid ${color.border}`,
     },
     loadingSpinner: {
-      border: '4px solid #f3f3f3',
-      borderTop: '4px solid #FF6B35',
+      border: `4px solid ${color.surface2}`,
+      borderTop: `4px solid ${color.accent}`,
       borderRadius: '50%',
       width: '40px',
       height: '40px',
@@ -178,8 +198,8 @@ const ArticleDetailPage = () => {
         <div style={styles.container}>
           <h1>Article Not Found</h1>
           <p>The article you're looking for could not be found.</p>
-          <button onClick={() => navigate('/dashboard')} style={styles.button}>
-            Back to Dashboard
+          <button onClick={() => navigate('/dashboard')} style={styles.backButton}>
+            <LuArrowLeft /> Back to Dashboard
           </button>
         </div>
       </div>
@@ -202,24 +222,21 @@ const ArticleDetailPage = () => {
           <div style={styles.actions}>
             <button
               onClick={handleMarkAsRead}
-              style={{
-                ...styles.button,
-                ...(isRead ? styles.activeButton : {}),
-              }}
+              style={styles.primaryButton}
               disabled={isRead}
             >
-              {isRead ? '✓ Marked as Read' : 'Mark as Read'}
+              <LuCheck /> {isRead ? 'Marked as Read' : 'Mark as Read'}
             </button>
 
             <button
               onClick={handleToggleFavorite}
               style={{
-                ...styles.button,
-                ...styles.secondaryButton,
-                ...(isFavorite ? styles.activeButton : {}),
+                ...styles.favoriteButton,
+                ...(isFavorite ? styles.favoriteButtonActive : {}),
               }}
             >
-              {isFavorite ? '★ Favorited' : '☆ Add to Favorites'}
+              <LuStar fill={isFavorite ? 'currentColor' : 'none'} />
+              {isFavorite ? 'Favorited' : 'Add to Favorites'}
             </button>
 
             <a
@@ -228,7 +245,7 @@ const ArticleDetailPage = () => {
               rel="noopener noreferrer"
               style={styles.externalLink}
             >
-              Read Full Article →
+              <LuExternalLink /> Read Full Article
             </a>
           </div>
 
@@ -238,9 +255,9 @@ const ArticleDetailPage = () => {
 
           <button
             onClick={() => navigate('/dashboard')}
-            style={{ ...styles.button, ...styles.secondaryButton }}
+            style={styles.backButton}
           >
-            ← Back to Dashboard
+            <LuArrowLeft /> Back to Dashboard
           </button>
         </div>
       </div>

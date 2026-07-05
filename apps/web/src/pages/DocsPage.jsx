@@ -6,6 +6,7 @@ import { translations } from '../i18n/translations';
 import PublicHeader from '../components/PublicHeader';
 import Footer from '../components/Footer';
 import ImageZoom from '../components/ImageZoom';
+import { getTokens } from '../styles/tokens';
 
 // Web app screenshots
 import webApp8 from '../assets/images/web_screenshots/web_app_8.png';
@@ -29,14 +30,15 @@ export default function DocsPage() {
   const { language } = useLanguage();
   const t = translations[language].docs;
   const [activeSection, setActiveSection] = useState('what-is');
+  const { color, radius, shadow } = getTokens(isDarkMode);
 
   const styles = {
     page: {
       minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      backgroundColor: color.appBg,
+      color: color.text,
     },
     container: {
       flex: 1,
@@ -57,26 +59,28 @@ export default function DocsPage() {
     },
     sidebarTitle: {
       fontSize: '12px',
-      fontWeight: '600',
+      fontWeight: 700,
       textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      color: isDarkMode ? '#888' : '#999',
+      letterSpacing: '0.6px',
+      color: color.textFaint,
       marginBottom: '12px',
     },
     sidebarLink: {
       display: 'block',
       padding: '8px 12px',
-      borderRadius: '6px',
+      borderRadius: radius.sm,
       fontSize: '14px',
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      fontWeight: 500,
+      color: color.textMuted,
       textDecoration: 'none',
       cursor: 'pointer',
       transition: 'all 0.2s',
       marginBottom: '4px',
     },
     sidebarLinkActive: {
-      backgroundColor: isDarkMode ? '#2d2d2d' : '#f0f0f0',
-      color: '#FF6B35',
+      backgroundColor: color.accentSoft,
+      color: color.accent,
+      fontWeight: 600,
     },
     content: {
       maxWidth: '800px',
@@ -84,12 +88,13 @@ export default function DocsPage() {
     },
     title: {
       fontSize: '36px',
-      fontWeight: '700',
+      fontWeight: 800,
+      letterSpacing: '-0.02em',
       marginBottom: '8px',
     },
     subtitle: {
       fontSize: '18px',
-      color: isDarkMode ? '#888' : '#666',
+      color: color.textMuted,
       marginBottom: '40px',
     },
     section: {
@@ -97,16 +102,17 @@ export default function DocsPage() {
     },
     sectionTitle: {
       fontSize: '24px',
-      fontWeight: '600',
+      fontWeight: 700,
+      letterSpacing: '-0.01em',
       marginBottom: '16px',
-      color: isDarkMode ? '#e0e0e0' : '#333',
-      borderBottom: `2px solid ${isDarkMode ? '#333' : '#e0e0e0'}`,
+      color: color.text,
+      borderBottom: `1px solid ${color.border}`,
       paddingBottom: '8px',
     },
     paragraph: {
       fontSize: '16px',
       lineHeight: '1.8',
-      color: isDarkMode ? '#b0b0b0' : '#555',
+      color: color.textMuted,
       marginBottom: '16px',
     },
     list: {
@@ -117,22 +123,22 @@ export default function DocsPage() {
     listItem: {
       fontSize: '16px',
       lineHeight: '1.8',
-      color: isDarkMode ? '#b0b0b0' : '#555',
+      color: color.textMuted,
       marginBottom: '8px',
       textAlign: 'left',
     },
     screenshot: {
       width: '100%',
       maxWidth: '100%',
-      borderRadius: '8px',
-      border: `1px solid ${isDarkMode ? '#333' : '#e1e4e8'}`,
+      borderRadius: radius.md,
+      border: `1px solid ${color.border}`,
       marginBottom: '8px',
       marginTop: '16px',
-      boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.1)',
+      boxShadow: shadow.md,
     },
     screenshotCaption: {
       fontSize: '14px',
-      color: isDarkMode ? '#888' : '#666',
+      color: color.textFaint,
       textAlign: 'center',
       marginBottom: '16px',
       fontStyle: 'italic',
@@ -157,38 +163,40 @@ export default function DocsPage() {
     mobileScreenshot: {
       width: '100%',
       maxWidth: '200px',
-      borderRadius: '12px',
-      border: `1px solid ${isDarkMode ? '#333' : '#e1e4e8'}`,
+      borderRadius: radius.md,
+      border: `1px solid ${color.border}`,
       marginBottom: '8px',
-      boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.1)',
+      boxShadow: shadow.md,
     },
     faqItem: {
-      marginBottom: '24px',
+      marginBottom: '16px',
       padding: '20px',
-      borderRadius: '10px',
-      backgroundColor: isDarkMode ? '#1a1a1a' : '#f8f9fa',
+      borderRadius: radius.md,
+      backgroundColor: color.surface,
+      border: `1px solid ${color.border}`,
     },
     faqQuestion: {
       fontSize: '16px',
-      fontWeight: '600',
+      fontWeight: 700,
       marginBottom: '8px',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      color: color.text,
     },
     faqAnswer: {
       fontSize: '15px',
       lineHeight: '1.6',
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      color: color.textMuted,
     },
     setupLink: {
       display: 'inline-block',
       marginTop: '20px',
       padding: '12px 24px',
-      borderRadius: '8px',
-      backgroundColor: '#FF6B35',
-      color: '#fff',
+      borderRadius: radius.sm,
+      backgroundColor: color.accent,
+      color: color.onAccent,
       textDecoration: 'none',
       fontSize: '14px',
-      fontWeight: '500',
+      fontWeight: 600,
+      boxShadow: shadow.sm,
     },
   };
 

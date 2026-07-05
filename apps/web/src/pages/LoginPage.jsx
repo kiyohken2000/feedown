@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { translations } from '../i18n/translations';
+import { getTokens } from '../styles/tokens';
 import logoLarge from '../assets/images/logo-lg.png';
 
 const LoginPage = () => {
@@ -64,22 +64,23 @@ const LoginPage = () => {
     }
   };
 
+  const { color, radius, shadow } = getTokens(isDarkMode);
+
   const styles = {
     container: {
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: isDarkMode
-        ? 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'
-        : 'linear-gradient(135deg, #FF6B35 0%, #f7931e 100%)',
+      background: `radial-gradient(1200px 600px at 50% -10%, ${color.accentSoft} 0%, transparent 60%), linear-gradient(180deg, ${color.appBg} 0%, ${color.surface2} 100%)`,
       padding: '2rem',
     },
     card: {
-      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
+      backgroundColor: color.surface,
       padding: '3rem',
-      borderRadius: '12px',
-      boxShadow: isDarkMode ? '0 10px 40px rgba(0,0,0,0.6)' : '0 10px 40px rgba(0,0,0,0.2)',
+      borderRadius: radius.lg,
+      boxShadow: shadow.lg,
+      border: `1px solid ${color.border}`,
       maxWidth: '450px',
       width: '100%',
     },
@@ -88,46 +89,52 @@ const LoginPage = () => {
       marginBottom: '2rem',
     },
     logoImage: {
-      width: '120px',
-      height: '120px',
+      width: '110px',
+      height: '110px',
       margin: '0 auto 1rem',
       display: 'block',
-      borderRadius: '20px',
+      borderRadius: '22px',
     },
     logoText: {
-      fontSize: '2.5rem',
-      fontWeight: 'bold',
-      color: '#FF6B35',
-      marginBottom: '0.5rem',
+      fontSize: '2.4rem',
+      fontWeight: 800,
+      letterSpacing: '-0.03em',
+      color: color.text,
+      marginBottom: '0.4rem',
     },
     tagline: {
       fontSize: '1rem',
-      color: isDarkMode ? '#b0b0b0' : '#666',
-      fontStyle: 'italic',
+      color: color.textMuted,
     },
     tabs: {
-      display: 'flex',
+      display: 'inline-flex',
+      width: '100%',
       marginBottom: '2rem',
-      borderBottom: isDarkMode ? '2px solid #444' : '2px solid #e0e0e0',
+      padding: '0.25rem',
+      gap: '0.25rem',
+      backgroundColor: color.surface2,
+      borderRadius: radius.md,
+      border: `1px solid ${color.border}`,
     },
     tab: {
       flex: 1,
-      padding: '1rem',
+      padding: '0.65rem',
       textAlign: 'center',
       cursor: 'pointer',
-      fontWeight: '600',
-      color: isDarkMode ? '#b0b0b0' : '#999',
-      borderBottom: '3px solid transparent',
-      transition: 'all 0.3s',
+      fontWeight: 600,
+      color: color.textMuted,
+      borderRadius: radius.sm,
+      transition: 'all 0.2s',
     },
     activeTab: {
-      color: '#FF6B35',
-      borderBottomColor: '#FF6B35',
+      color: color.onAccent,
+      backgroundColor: color.accent,
+      boxShadow: shadow.sm,
     },
     form: {
       display: 'flex',
       flexDirection: 'column',
-      gap: '1.5rem',
+      gap: '1.25rem',
     },
     formGroup: {
       display: 'flex',
@@ -135,76 +142,78 @@ const LoginPage = () => {
       gap: '0.5rem',
     },
     label: {
-      fontWeight: '600',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      fontWeight: 600,
+      color: color.text,
       fontSize: '0.9rem',
     },
     input: {
-      padding: '0.75rem',
-      border: isDarkMode ? '2px solid #444' : '2px solid #e0e0e0',
-      borderRadius: '6px',
+      padding: '0.75rem 0.85rem',
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.sm,
       fontSize: '1rem',
-      transition: 'border-color 0.3s',
-      backgroundColor: isDarkMode ? '#1a1a1a' : 'white',
-      color: isDarkMode ? '#e0e0e0' : '#333',
+      transition: 'border-color 0.2s, box-shadow 0.2s',
+      backgroundColor: color.surface,
+      color: color.text,
     },
     button: {
-      padding: '1rem',
-      backgroundColor: '#FF6B35',
-      color: 'white',
+      padding: '0.9rem',
+      backgroundColor: color.accent,
+      color: color.onAccent,
       border: 'none',
-      borderRadius: '6px',
+      borderRadius: radius.sm,
       fontSize: '1rem',
-      fontWeight: '600',
+      fontWeight: 600,
       cursor: 'pointer',
-      transition: 'background-color 0.3s',
-      marginTop: '1rem',
+      transition: 'background-color 0.2s',
+      marginTop: '0.75rem',
+      boxShadow: shadow.sm,
     },
     buttonDisabled: {
-      backgroundColor: '#ccc',
+      backgroundColor: color.textFaint,
       cursor: 'not-allowed',
+      boxShadow: 'none',
     },
     quickCreateButton: {
-      padding: '1rem',
-      backgroundColor: '#3b82f6',
-      color: 'white',
-      border: 'none',
-      borderRadius: '6px',
+      padding: '0.9rem',
+      backgroundColor: color.surface,
+      color: color.text,
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.sm,
       fontSize: '1rem',
-      fontWeight: '600',
+      fontWeight: 600,
       cursor: 'pointer',
-      transition: 'background-color 0.3s',
+      transition: 'background-color 0.2s',
       marginTop: '0.5rem',
     },
     divider: {
       display: 'flex',
       alignItems: 'center',
       margin: '1.5rem 0',
-      color: isDarkMode ? '#666' : '#999',
+      color: color.textFaint,
     },
     dividerLine: {
       flex: 1,
       height: '1px',
-      backgroundColor: isDarkMode ? '#444' : '#e0e0e0',
+      backgroundColor: color.border,
     },
     dividerText: {
       padding: '0 1rem',
       fontSize: '0.85rem',
     },
     notice: {
-      backgroundColor: isDarkMode ? '#3a3a2a' : '#fff3cd',
-      border: isDarkMode ? '1px solid #666633' : '1px solid #ffc107',
-      borderRadius: '6px',
+      backgroundColor: color.accentSoft,
+      border: `1px solid ${color.accentBorder}`,
+      borderRadius: radius.sm,
       padding: '0.75rem',
       marginTop: '1rem',
       fontSize: '0.85rem',
-      color: isDarkMode ? '#e0e0a0' : '#856404',
+      color: isDarkMode ? '#e6b8a3' : '#9a4a24',
     },
     backLink: {
       display: 'block',
       textAlign: 'center',
       marginTop: '1.5rem',
-      color: isDarkMode ? '#b0b0b0' : '#666',
+      color: color.textMuted,
       textDecoration: 'none',
       fontSize: '0.9rem',
     },
@@ -251,8 +260,8 @@ const LoginPage = () => {
               style={styles.input}
               required
               disabled={loading}
-              onFocus={(e) => (e.target.style.borderColor = '#FF6B35')}
-              onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
+              onFocus={(e) => { e.target.style.borderColor = color.accent; e.target.style.boxShadow = `0 0 0 3px ${color.accentSoft}`; }}
+              onBlur={(e) => { e.target.style.borderColor = color.border; e.target.style.boxShadow = 'none'; }}
             />
           </div>
 
@@ -266,8 +275,8 @@ const LoginPage = () => {
               style={styles.input}
               required
               disabled={loading}
-              onFocus={(e) => (e.target.style.borderColor = '#FF6B35')}
-              onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
+              onFocus={(e) => { e.target.style.borderColor = color.accent; e.target.style.boxShadow = `0 0 0 3px ${color.accentSoft}`; }}
+              onBlur={(e) => { e.target.style.borderColor = color.border; e.target.style.boxShadow = 'none'; }}
             />
           </div>
 
@@ -278,8 +287,8 @@ const LoginPage = () => {
               ...(loading ? styles.buttonDisabled : {}),
             }}
             disabled={loading}
-            onMouseOver={(e) => !loading && (e.target.style.backgroundColor = '#e55a2b')}
-            onMouseOut={(e) => !loading && (e.target.style.backgroundColor = '#FF6B35')}
+            onMouseOver={(e) => !loading && (e.currentTarget.style.backgroundColor = color.accentHover)}
+            onMouseOut={(e) => !loading && (e.currentTarget.style.backgroundColor = color.accent)}
           >
             {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Create Account')}
           </button>
@@ -300,8 +309,8 @@ const LoginPage = () => {
                 ...(loading ? styles.buttonDisabled : {}),
               }}
               disabled={loading}
-              onMouseOver={(e) => !loading && (e.target.style.backgroundColor = '#2563eb')}
-              onMouseOut={(e) => !loading && (e.target.style.backgroundColor = '#3b82f6')}
+              onMouseOver={(e) => !loading && (e.currentTarget.style.backgroundColor = color.surfaceHover)}
+              onMouseOut={(e) => !loading && (e.currentTarget.style.backgroundColor = color.surface)}
             >
               Quick Create Test Account
             </button>
@@ -318,8 +327,8 @@ const LoginPage = () => {
         <Link
           to="/"
           style={styles.backLink}
-          onMouseOver={(e) => (e.target.style.color = '#FF6B35')}
-          onMouseOut={(e) => (e.target.style.color = isDarkMode ? '#b0b0b0' : '#666')}
+          onMouseOver={(e) => (e.currentTarget.style.color = color.accent)}
+          onMouseOut={(e) => (e.currentTarget.style.color = color.textMuted)}
         >
           ← {language === 'en' ? 'Back to Home' : 'ホームに戻る'}
         </Link>
