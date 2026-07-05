@@ -311,11 +311,11 @@ bash scripts/sync-envs.sh
 # ルートディレクトリから実行すること！
 npm run build:web
 
-# Pagesにデプロイ
-npx wrangler pages deploy apps/web/dist --project-name=feedown
+# Pagesにデプロイ（パス引数を付けない）
+npx wrangler pages deploy
 ```
 
-**重要**: 必ず**ルートディレクトリ**からデプロイしてください。`apps/web`からデプロイすると`functions`フォルダが含まれず、APIが動作しません。
+**重要**: `wrangler pages deploy` はリポジトリのルートから、**パス引数を付けずに**実行してください。`wrangler.toml` の `pages_build_output_dir = "apps/web/dist"` により静的アセットが自動で取り込まれ、同時に `functions/` も含まれます。`apps/web/dist` などのパス引数を付けると `functions/` が除外され、API が全て 405 になります。
 
 ### 3.4 環境変数をCloudflare Pagesに設定
 
@@ -461,13 +461,13 @@ npx expo start --clear
 POST /api/feeds 405 Method Not Allowed
 ```
 
-**原因**: `apps/web`ディレクトリからデプロイしている
+**原因**: `wrangler pages deploy` にパス引数（`apps/web/dist` 等）を付けて実行しており、`functions/` フォルダがデプロイ対象から除外されている
 
-**解決**: **ルートディレクトリから**デプロイする
+**解決**: リポジトリのルートから、**パス引数なし**でデプロイする
 ```bash
 cd /path/to/feedown  # ルートディレクトリ
 npm run build:web
-npx wrangler pages deploy apps/web/dist --project-name=feedown
+npx wrangler pages deploy   # パス引数を付けない（wrangler.toml の pages_build_output_dir が使われる）
 ```
 
 ### RLSエラー

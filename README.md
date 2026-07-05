@@ -13,6 +13,7 @@ English | [日本語](README.ja.md)
 - ⚡ **Serverless**: Zero infrastructure costs with Cloudflare Pages
 - 🔄 **Real-time**: Instant updates via Supabase Realtime
 - 🌐 **Offline-first**: Read articles without internet
+- 🤖 **On-device AI** (Mobile): Article summaries, multi-perspective takes, signal separation, chat, summary read-aloud (TTS), and translation — all run locally on your phone via llama.rn / ExecuTorch. Nothing is sent to a cloud AI service.
 - 🎨 **Modern UI**: Clean and responsive design with dark mode
 
 ## Tech Stack
@@ -80,12 +81,12 @@ yarn build:web
 #### Deploy to Cloudflare Pages
 
 ```bash
-# Build and deploy from root directory
+# Build and deploy from the repository root
 npm run build --workspace=apps/web
-npx wrangler pages deploy apps/web/dist --project-name=feedown
+npx wrangler pages deploy
 ```
 
-**Important**: Always deploy from the root directory to include the `functions` folder.
+**Important**: Run `wrangler pages deploy` from the repository root **with no path argument**. `wrangler.toml` sets `pages_build_output_dir = "apps/web/dist"`, so the static assets are picked up automatically while the `functions/` folder is still included. Passing a path (e.g. `apps/web/dist`) excludes `functions/`, and every API endpoint returns 405.
 
 #### Set Environment Variables
 

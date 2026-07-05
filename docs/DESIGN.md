@@ -382,8 +382,8 @@ const userId = user.id;
 # 2. Cloudflare Workers デプロイ
 cd workers && npx wrangler deploy
 
-# 3. Cloudflare Pages デプロイ
-npx wrangler pages deploy apps/web/dist --project-name=feedown
+# 3. Cloudflare Pages デプロイ（ルートから、パス引数なし。functions/ を含めるため）
+npx wrangler pages deploy
 
 # 4. 環境変数設定
 # Pages: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY

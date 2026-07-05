@@ -31,7 +31,7 @@
 | 10 | Web キーボードショートカット | B: Web UX | P3 | 小 | web |
 | 11 | Web 巨大ページの分割 | D: コード品質 | P3 | 中 | web |
 | 12 | Redux スタック整理 | D: コード品質 | P3 | 中 | mobile |
-| 13 | README / ドキュメント同期 | E: docs | P3 | 小 | docs, README |
+| 13 | README / ドキュメント同期 ✅ | E: docs | P3 | 小 | docs, README |
 | 14 | aiCache の 7日 TTL / eviction | F: AI | **P1** | 小 | mobile |
 | 15 | バックグラウンド先回り要約 | F: AI | P2 | 大 | mobile |
 | 16 | 本文読み上げ (Reader Mode TTS) | F: AI | P3 | 中 | mobile |

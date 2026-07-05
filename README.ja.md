@@ -12,6 +12,7 @@ Supabase と Cloudflare を使用したセルフホスト型 RSS リーダー
 - 🔒 **セルフホスト**: データはあなたの Supabase アカウントに保存されます
 - ⚡ **サーバーレス**: Cloudflare Pages によりインフラコストゼロ
 - 🌐 **オフラインファースト**: インターネットなしで記事を読める
+- 🤖 **オンデバイス AI**（モバイル）: 記事の要約・複数視点での要約・信号分離・チャット・要約の読み上げ（TTS）・翻訳を、すべて端末内で実行（llama.rn / ExecuTorch）。クラウドの AI サービスには一切送信されません。
 - 🎨 **モダンな UI**: クリーンでレスポンシブなデザイン
 
 ## 技術スタック
@@ -70,12 +71,12 @@ yarn build:web
 #### Cloudflare Pages へのデプロイ
 
 ```bash
-# ルートディレクトリからビルドとデプロイ
+# リポジトリのルートからビルドとデプロイ
 npm run build --workspace=apps/web
-npx wrangler pages deploy apps/web/dist --project-name=feedown
+npx wrangler pages deploy
 ```
 
-**重要**: `functions` フォルダを含めるために、必ずルートディレクトリからデプロイしてください。
+**重要**: `wrangler pages deploy` は必ずリポジトリのルートから、**パス引数を付けずに**実行してください。`wrangler.toml` に `pages_build_output_dir = "apps/web/dist"` が設定されているため静的アセットは自動的に取り込まれ、同時に `functions/` フォルダも含まれます。パス引数（例: `apps/web/dist`）を付けると `functions/` が除外され、全 API エンドポイントが 405 になります。
 
 ## プロジェクト構成
 
