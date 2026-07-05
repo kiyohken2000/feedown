@@ -19,7 +19,7 @@
 
 | # | 項目 | Track | 優先度 | 規模 | 対象 |
 |---|------|-------|--------|------|------|
-| 1 | 期限切れ記事のクリーンアップ | A: 信頼性 | **P1** | 小 | functions, docs |
+| 1 | 期限切れ記事のクリーンアップ ✅ | A: 信頼性 | **P1** | 小 | functions, docs |
 | 2 | バックグラウンド自動更新 (Cron) | A: 信頼性 | **P1** | 中 | workers, functions |
 | 3 | CI (GitHub Actions) | A: 信頼性 | **P1** | 小 | .github |
 | 4 | フィード取得エラーの可視化 | A: 信頼性 | **P1** | 小 | functions, web, mobile |

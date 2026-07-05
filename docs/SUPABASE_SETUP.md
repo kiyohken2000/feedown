@@ -152,7 +152,45 @@ CREATE POLICY "Anyone can read active recommended feeds" ON recommended_feeds
 ALTER PUBLICATION supabase_realtime ADD TABLE articles;
 ```
 
-## 4. APIキー取得
+## 4. 期限切れ記事の自動削除 (pg_cron)
+
+`articles` は7日TTL（`expires_at`）を持ち、`/api/refresh` 実行時にそのユーザーの期限切れ記事を削除します。ただしリフレッシュされないユーザー（長期間アプリを開かない等）の記事は残り続けるため、DB側でも日次クリーンアップを仕込むことを推奨します。Supabaseは `pg_cron` 拡張をサポートしています。
+
+SQL Editorで以下を実行します（無料枠500MBを守るための保険）。
+
+```sql
+-- pg_cron 拡張を有効化（Database → Extensions からGUIでも可）
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+-- 毎日 03:00 UTC に期限切れ記事を削除
+SELECT cron.schedule(
+  'delete-expired-articles',
+  '0 3 * * *',
+  $$DELETE FROM articles WHERE expires_at < NOW()$$
+);
+
+-- 記事削除に伴い孤児化する既読レコードも掃除
+SELECT cron.schedule(
+  'delete-orphaned-read-articles',
+  '10 3 * * *',
+  $$DELETE FROM read_articles ra
+    WHERE NOT EXISTS (SELECT 1 FROM articles a WHERE a.id = ra.article_id)$$
+);
+```
+
+登録済みジョブの確認・削除:
+
+```sql
+-- 一覧
+SELECT jobid, jobname, schedule FROM cron.job;
+
+-- 削除
+SELECT cron.unschedule('delete-expired-articles');
+```
+
+> `read_articles.article_id` は `articles` へのFKを持たないため（記事が先に消えても既読履歴を保持できる設計）、孤児レコードは上記の第2ジョブで明示的に掃除します。
+
+## 5. APIキー取得
 
 1. Supabaseダッシュボードで「Settings」→「API」を開く
 2. 以下の値をコピー:
@@ -160,7 +198,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE articles;
    - **anon/public key**: フロントエンドで使用
    - **service_role key**: バックエンドで使用（秘密）
 
-## 5. 環境変数設定
+## 6. 環境変数設定
 
 ### フロントエンド (.env.shared)
 
@@ -180,7 +218,7 @@ Cloudflare Pagesダッシュボードで「Settings」→「Environment variable
 | `SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 | `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 
-## 6. おすすめフィードの初期データ投入
+## 7. おすすめフィードの初期データ投入
 
 おすすめフィードはPythonスクリプトで管理します。
 
@@ -207,7 +245,7 @@ python scripts/sync_recommended_feeds.py --check
 
 フィードを追加・削除する場合は、`scripts/sync_recommended_feeds.py` 内の `RECOMMENDED_FEEDS` リストを編集して再実行します。新しいフィードを追加する前に `--test` でパース可能か確認することを推奨します。
 
-## 7. 認証設定
+## 8. 認証設定
 
 1. Supabaseダッシュボードで「Authentication」→「Providers」を開く
 2. 「Email」が有効になっていることを確認
@@ -217,7 +255,7 @@ python scripts/sync_recommended_feeds.py --check
    - **Allow anonymous sign-ins**: オフ
    - **Confirm email**: オフ
 
-## 8. 動作確認
+## 9. 動作確認
 
 1. アプリをローカルで起動: `yarn dev:web`
 2. 新規アカウント作成

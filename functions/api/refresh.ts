@@ -43,6 +43,13 @@ export async function onRequestPost(context: any): Promise<Response> {
     const url = new URL(request.url);
     const batchOffset = parseInt(url.searchParams.get('offset') || '0', 10);
 
+    // Delete expired articles once per refresh run (first batch only) to keep
+    // Supabase within the free-tier 500MB limit. Articles carry a 7-day TTL
+    // (expires_at) but were previously only filtered on read, never deleted.
+    if (batchOffset === 0) {
+      await deleteExpiredArticles(supabase, uid);
+    }
+
     // Get all user's feeds, prioritizing never-fetched and least-recently-fetched feeds
     const { data: allFeeds, error: feedsError } = await supabase
       .from('feeds')
@@ -554,6 +561,76 @@ async function generateArticleHash(feedId: string, guid: string): Promise<string
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   return hashHex.substring(0, 32);
+}
+
+/**
+ * Delete expired articles for a user.
+ * Articles have a 7-day TTL (expires_at); rows past that are read-filtered but
+ * were never removed, so they accumulated indefinitely. This reclaims the space.
+ * Best-effort: failures are logged but never block a refresh.
+ */
+async function deleteExpiredArticles(
+  supabase: any,
+  uid: string
+): Promise<void> {
+  try {
+    const now = new Date().toISOString();
+
+    // Collect expired article IDs first so their orphaned read_articles rows can
+    // be cleaned up too (read_articles.article_id has no FK to cascade on).
+    const expiredIds: string[] = [];
+    const PAGE_SIZE = 1000;
+    let offset = 0;
+    while (true) {
+      const { data: page, error } = await supabase
+        .from('articles')
+        .select('id')
+        .eq('user_id', uid)
+        .lt('expires_at', now)
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (error) {
+        console.error('[Cleanup] Get expired articles error:', error.message);
+        break;
+      }
+      if (!page || page.length === 0) break;
+      for (const a of page) expiredIds.push(a.id);
+      if (page.length < PAGE_SIZE) break;
+      offset += PAGE_SIZE;
+    }
+
+    if (expiredIds.length === 0) return;
+
+    const { error: delError } = await supabase
+      .from('articles')
+      .delete()
+      .eq('user_id', uid)
+      .lt('expires_at', now);
+
+    if (delError) {
+      console.error('[Cleanup] Delete expired articles error:', delError.message);
+      return;
+    }
+
+    // Remove read markers for the deleted articles (in chunks to bound the IN list).
+    const CHUNK = 200;
+    for (let i = 0; i < expiredIds.length; i += CHUNK) {
+      const chunk = expiredIds.slice(i, i + CHUNK);
+      const { error: readError } = await supabase
+        .from('read_articles')
+        .delete()
+        .eq('user_id', uid)
+        .in('article_id', chunk);
+      if (readError) {
+        console.error('[Cleanup] Delete orphaned read_articles error:', readError.message);
+        break;
+      }
+    }
+
+    console.log(`[Cleanup] Deleted ${expiredIds.length} expired articles for user ${uid}`);
+  } catch (error) {
+    console.error('[Cleanup] Unexpected error deleting expired articles:', error);
+  }
 }
 
 /**
