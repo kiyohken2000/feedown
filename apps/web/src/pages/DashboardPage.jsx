@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FaCheck, FaSync, FaArrowUp } from 'react-icons/fa';
+import { FaCheck, FaSync, FaArrowUp, FaKeyboard } from 'react-icons/fa';
 import { getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
@@ -16,6 +16,8 @@ const DashboardPage = () => {
   const [selectedFeedId, setSelectedFeedId] = useState(''); // '' = All Feeds
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1); // keyboard-focused article row
+  const [shortcutsOpen, setShortcutsOpen] = useState(false); // '?' help overlay
 
   const location = useLocation();
   const { isDarkMode } = useTheme();
@@ -329,6 +331,11 @@ const DashboardPage = () => {
     };
   }, [filteredArticles, readArticles, markAsRead, filter]);
 
+  // Reset keyboard focus when the visible list changes (filter / feed switch)
+  useEffect(() => {
+    setFocusedIndex(-1);
+  }, [filter, selectedFeedId]);
+
   // Setup Intersection Observer for infinite scroll
   useEffect(() => {
     if (loadMoreObserverRef.current) {
@@ -405,34 +412,131 @@ const DashboardPage = () => {
     markAsRead(selectedArticle.id);
   };
 
-  const handleToggleFavorite = async () => {
-    if (!selectedArticle) return;
+  const toggleFavoriteForArticle = useCallback(async (article) => {
+    if (!article) return;
 
     try {
-      if (favoritedArticles.has(selectedArticle.id)) {
-        await api.articles.removeFromFavorites(selectedArticle.id);
+      if (favoritedArticles.has(article.id)) {
+        await api.articles.removeFromFavorites(article.id);
         setFavoritedArticles(prev => {
           const newSet = new Set(prev);
-          newSet.delete(selectedArticle.id);
+          newSet.delete(article.id);
           return newSet;
         });
       } else {
         await api.articles.addToFavorites(
-          selectedArticle.id,
+          article.id,
           {
-            title: selectedArticle.title,
-            url: selectedArticle.url,
-            description: selectedArticle.description,
-            feedTitle: selectedArticle.feedTitle,
-            imageUrl: selectedArticle.imageUrl,
+            title: article.title,
+            url: article.url,
+            description: article.description,
+            feedTitle: article.feedTitle,
+            imageUrl: article.imageUrl,
           }
         );
-        setFavoritedArticles(prev => new Set([...prev, selectedArticle.id]));
+        setFavoritedArticles(prev => new Set([...prev, article.id]));
       }
     } catch (error) {
       console.error('Failed to toggle favorite:', error);
     }
-  };
+  }, [api, favoritedArticles, setFavoritedArticles]);
+
+  const handleToggleFavorite = () => toggleFavoriteForArticle(selectedArticle);
+
+  // Keyboard shortcuts (RSS-reader style). Disabled while typing in a field.
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const target = e.target;
+      const tag = target?.tagName;
+      const isTyping =
+        tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable;
+      if (isTyping) return;
+
+      // Modifier combos are for the browser, not us
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // Escape closes overlays first
+      if (e.key === 'Escape') {
+        if (shortcutsOpen) setShortcutsOpen(false);
+        else if (selectedArticle) setSelectedArticle(null);
+        return;
+      }
+
+      // '?' toggles the shortcut help overlay
+      if (e.key === '?') {
+        e.preventDefault();
+        setShortcutsOpen(prev => !prev);
+        return;
+      }
+
+      // While the help overlay or article modal is open, don't drive the list
+      if (shortcutsOpen || selectedArticle) return;
+
+      const list = filteredArticles;
+      const focusArticleAt = (index) => {
+        setFocusedIndex(index);
+        const article = list[index];
+        const el = article && articleRefs.current[article.id];
+        if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      };
+
+      switch (e.key) {
+        case 'j': // next article
+          e.preventDefault();
+          if (list.length > 0) focusArticleAt(Math.min(list.length - 1, focusedIndex + 1));
+          break;
+        case 'k': // previous article
+          e.preventDefault();
+          if (list.length > 0) focusArticleAt(Math.max(0, focusedIndex <= 0 ? 0 : focusedIndex - 1));
+          break;
+        case 'o': // open focused article
+        case 'Enter': {
+          const article = list[focusedIndex];
+          if (article) {
+            e.preventDefault();
+            handleArticleClick(article);
+          }
+          break;
+        }
+        case 'm': { // mark focused as read
+          const article = list[focusedIndex];
+          if (article && !readArticles.has(article.id)) {
+            e.preventDefault();
+            markAsRead(article.id);
+          }
+          break;
+        }
+        case 's': { // toggle favorite on focused
+          const article = list[focusedIndex];
+          if (article) {
+            e.preventDefault();
+            toggleFavoriteForArticle(article);
+          }
+          break;
+        }
+        case 'r': // refresh
+          e.preventDefault();
+          handleRefreshRef.current?.();
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [filteredArticles, focusedIndex, selectedArticle, shortcutsOpen, readArticles, markAsRead, toggleFavoriteForArticle]);
+
+  // Clicking anywhere outside an article card clears the keyboard focus highlight
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (!e.target.closest('[data-article-id]')) {
+        setFocusedIndex(-1);
+      }
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
 
   const getRelativeTime = (dateString) => {
     if (!dateString) return 'Unknown date';
@@ -576,6 +680,19 @@ const DashboardPage = () => {
       alignItems: 'center',
       gap: '0.4rem',
     },
+    shortcutsButton: {
+      padding: '0.5rem 0.85rem',
+      backgroundColor: '#6c757d',
+      color: 'white',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+      fontSize: '0.9rem',
+      fontWeight: '600',
+      transition: 'background-color 0.3s',
+      display: 'flex',
+      alignItems: 'center',
+    },
     buttonIcon: {
       fontSize: '0.85rem',
     },
@@ -597,6 +714,54 @@ const DashboardPage = () => {
     },
     articleCardRead: {
       opacity: 0.6,
+    },
+    articleCardFocused: {
+      border: '2px solid #FF6B35',
+      boxShadow: '0 0 0 3px rgba(255, 107, 53, 0.25)',
+    },
+    shortcutsOverlay: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1100,
+      padding: '1rem',
+    },
+    shortcutsPanel: {
+      backgroundColor: isDarkMode ? '#2d2d2d' : 'white',
+      color: isDarkMode ? '#e0e0e0' : '#333',
+      borderRadius: '12px',
+      padding: '1.5rem 2rem',
+      minWidth: '320px',
+      maxWidth: '90vw',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    },
+    shortcutsTitle: {
+      margin: '0 0 1rem',
+      fontSize: '1.3rem',
+      fontWeight: 'bold',
+    },
+    shortcutRow: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '1rem',
+      padding: '0.35rem 0',
+    },
+    kbd: {
+      display: 'inline-block',
+      minWidth: '5.5rem',
+      textAlign: 'center',
+      padding: '0.2rem 0.5rem',
+      borderRadius: '5px',
+      border: isDarkMode ? '1px solid #555' : '1px solid #ccc',
+      backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f5f5',
+      fontFamily: 'monospace',
+      fontSize: '0.85rem',
     },
     thumbnail: {
       width: '200px',
@@ -778,6 +943,14 @@ const DashboardPage = () => {
             >
               <FaArrowUp style={styles.buttonIcon} /> Top
             </button>
+            <button
+              onClick={() => setShortcutsOpen(true)}
+              style={styles.shortcutsButton}
+              title="Keyboard shortcuts (press ?)"
+              aria-label="Keyboard shortcuts"
+            >
+              <FaKeyboard style={styles.buttonIcon} />
+            </button>
             {articlesLoading && (
               <div style={styles.inlineSpinner}></div>
             )}
@@ -793,8 +966,9 @@ const DashboardPage = () => {
         {!articlesError && (
           <div style={styles.articlesList}>
             {filteredArticles.length > 0 ? (
-              filteredArticles.map((article) => {
+              filteredArticles.map((article, index) => {
                 const isRead = readArticles.has(article.id);
+                const isFocused = index === focusedIndex;
                 return (
                   <div
                     key={article.id}
@@ -803,6 +977,7 @@ const DashboardPage = () => {
                     style={{
                       ...styles.articleCard,
                       ...(isRead ? styles.articleCardRead : {}),
+                      ...(isFocused ? styles.articleCardFocused : {}),
                     }}
                     onClick={() => handleArticleClick(article)}
                     onMouseOver={(e) => {
@@ -882,6 +1057,32 @@ const DashboardPage = () => {
           isRead={readArticles.has(selectedArticle.id)}
           isFavorited={favoritedArticles.has(selectedArticle.id)}
         />
+      )}
+
+      {shortcutsOpen && (
+        <div
+          style={styles.shortcutsOverlay}
+          onClick={() => setShortcutsOpen(false)}
+        >
+          <div style={styles.shortcutsPanel} onClick={(e) => e.stopPropagation()}>
+            <h3 style={styles.shortcutsTitle}>Keyboard Shortcuts</h3>
+            {[
+              ['j', 'Next article'],
+              ['k', 'Previous article'],
+              ['o / Enter', 'Open focused article'],
+              ['m', 'Mark focused as read'],
+              ['s', 'Toggle favorite'],
+              ['r', 'Refresh'],
+              ['?', 'Toggle this help'],
+              ['Esc', 'Close dialog'],
+            ].map(([key, desc]) => (
+              <div key={key} style={styles.shortcutRow}>
+                <kbd style={styles.kbd}>{key}</kbd>
+                <span>{desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

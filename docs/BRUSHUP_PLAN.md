@@ -28,7 +28,7 @@
 | 7 | 未読件数バッジ | B: Web UX | P2 | 小 | functions, web, mobile |
 | 8 | モバイル オフラインキャッシュ | C: Mobile UX | P2 | 中 | mobile |
 | 9 | axios 等の依存更新 | D: コード品質 | P2 | 小 | mobile |
-| 10 | Web キーボードショートカット | B: Web UX | P3 | 小 | web |
+| 10 | Web キーボードショートカット ✅ | B: Web UX | P3 | 小 | web |
 | 11 | Web 巨大ページの分割 | D: コード品質 | P3 | 中 | web |
 | 12 | Redux スタック整理 | D: コード品質 | P3 | 中 | mobile |
 | 13 | README / ドキュメント同期 ✅ | E: docs | P3 | 小 | docs, README |
