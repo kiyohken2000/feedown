@@ -23,7 +23,7 @@
 | 2 | バックグラウンド自動更新 (Cron) | A: 信頼性 | **P1** | 中 | workers, functions |
 | 3 | CI (GitHub Actions) | A: 信頼性 | **P1** | 小 | .github |
 | 4 | フィード取得エラーの可視化 | A: 信頼性 | **P1** | 小 | functions, web, mobile |
-| 5 | Web リーダーモード | B: Web UX | P2 | 中 | web |
+| 5 | Web リーダーモード ✅ | B: Web UX | P2 | 中 | web |
 | 6 | 記事検索 | B: Web UX | P2 | 中 | functions, web, mobile |
 | 7 | 未読件数バッジ | B: Web UX | P2 | 小 | functions, web, mobile |
 | 8 | モバイル オフラインキャッシュ | C: Mobile UX | P2 | 中 | mobile |
