@@ -37,13 +37,14 @@
 | 16 | 本文読み上げ (Reader Mode TTS) | F: AI | P3 | 中 | mobile |
 | 17 | 意味検索 (embedding) | F: AI | P3 | 大 | mobile |
 | 18 | フィード自動発見 (サイトURLから追加) | G: 新機能 | P2 | 小 | functions, web, mobile |
-| 19 | フィードのフォルダ分類 | G: 新機能 | P2 | 中 | functions, web, mobile, docs |
-| 20 | キーワードミュート | G: 新機能 | P3 | 中 | functions, web, mobile, docs |
-| 21 | 今日のダイジェスト画面 | G: 新機能 | P3 | 中 | mobile |
-| 22 | 重複記事のグルーピング | G: 新機能 | P3 | 小 | web, mobile |
+| 19 | フィードのフォルダ分類 ❌ | G: 新機能 | P2 | 中 | functions, web, mobile, docs |
+| 20 | キーワードミュート ❌ | G: 新機能 | P3 | 中 | functions, web, mobile, docs |
+| 21 | 今日のダイジェスト画面 ⏸ | G: 新機能 | P3 | 中 | mobile |
+| 22 | 重複記事のグルーピング ❌ | G: 新機能 | P3 | 小 | web, mobile |
 | 23 | Web の PWA 化 ⏸ | G: 新機能 | P3 | 小 | web |
+| 24 | Web AI 要約・翻訳 (Chrome Built-in AI) | G: 新機能 | P2 | 小 | web |
 
-凡例: ✅ = 完了・出荷済み / ⏸ = 見送り（下記「判断記録」参照）
+凡例: ✅ = 完了・出荷済み / ⏸ = 見送り（下記「判断記録」参照）/ ❌ = 却下（同）
 
 実装順の推奨: 1 → 3 → 2 → 4 → 14 (P1 を先に固める) → 以降は任意の順。ただし 15 は 14 完了が前提、21 は 15 完了が前提。
 
@@ -60,6 +61,26 @@
   - **#11 Web 巨大ページの分割**: 純リファクタで即時のユーザー価値が薄いため保留。#5/#10 で `DashboardPage.jsx` を触った直後なので、再開時はコンフリクトに注意。
   - **#23 Web PWA 化**: P3・付加価値枠として保留。
 - 上記のうち #3 は「recommended 実装順」で本来 1 の次だが、今回はユーザー判断で飛ばした。順序はあくまで推奨。
+
+### 2026-07-07 セッション（新機能案の棚卸し）
+
+Track G 全項目 + セッション内で出た新規4案をひとつずつ検討した。前提として今回明言された方針: **自前モバイルアプリを使ってもらいたい**（サードパーティクライアントへの誘導は望まない）。
+
+**採用**:
+- **#18 フィード自動発見**: 採用・Track G 内で最優先。補足: `<link href>` は相対 URL が多いので `new URL(href, pageUrl)` で解決すること。
+- **#24 Web AI 要約・翻訳（Chrome Built-in AI）**: 新規採用（詳細は Track G の #24 節）。WebLLM/WebGPU による全ブラウザ対応（Phase B）は却下ではなく様子見 — Phase A の利用状況を見てから。
+
+**却下（❌・恒久判断。再提案時はここを読んでから）**:
+- **#19 フォルダ分類**: ユーザー自身が15年の RSS 利用でフォルダを使ったことがなく必要性を感じない。OPML 移行時の構造保持という価値は認識した上での判断。
+- **#20 キーワードミュート**: ノイズ含めてタイトルには目を通したい読み方なので、隠す機能は思想に合わない。
+- **#22 重複記事のグルーピング**: 厳密一致で捕まる重複は狭く、キーボードフォーカス・既読状態などダッシュボード描画に分岐が増える割に効果薄。類似度ベースは #17 をやる日が来たらそこで再検討。
+- **GReader/Fever API 互換レイヤー**（新案）: NetNewsWire 等から使えるようになるが、自前アプリ誘導方針と真っ向から衝突するため却下。実装・検証コストも4案中最重量だった。
+- **後で読む（Read Later）/ 本文アーカイブ**（新案）: Favorites との差別化が UX 上困難。「未読スターをキュー扱いする」運用で足りる。本文自動保存（Pocket 式）への昇格案も却下。
+- **Podcast / YouTube フィード対応**（新案）: 専用クライアントに勝てない。Podcast は background audio の App Store 審査リスク（2.5.4 リジェクトの経緯）と7日削除仕様との相性も最悪。
+
+**保留（⏸）**:
+- **#21 ダイジェスト画面**: 単独判断不能。前提の #15（先回り要約・大）の採否を決めるときに「#15+#21 セット」として再判断する。
+- **#23 PWA 化**: 保留継続。スマホへのインストール導線はアプリ誘導方針と軽く逆行するため、優先度は前回よりさらに低い扱い。
 
 ---
 
@@ -292,7 +313,22 @@ mobile に `@reduxjs/toolkit ^1.5.1` + `redux ^4` + `react-redux ^7` + `redux-lo
 
 **検証**: `https://example-blog.com/`（HTML トップページ）を入れてフィードが登録されること。フィードを持たない HTML サイトで妥当なエラーが出ること。既存テストの「HTML 拒否」ケースを「HTML→発見試行」に更新。
 
-### 19. フィードのフォルダ分類 【P2・中】
+**実装計画（2026-07-07 詳細化・未着手）**:
+
+1. **`functions/api/feeds/index.ts`**（本体）
+   - `onRequestPost` 内の fetch(10s timeout, UA) → `looksLikeFeed` → `hasFeedItems` を `fetchAndValidateFeed(url): { ok, xmlText?, errorMessage? }` に切り出す（発見後の再検証で再利用するため）。
+   - `discoverFeedUrl(html, pageUrl): string | null` を追加: `parseHTML`（linkedom、functions は同一バンドルなので依存追加なし）で `<link>` を走査。条件は `rel` トークンに `alternate` を含み `type` が `application/rss+xml` / `application/atom+xml`（大文字小文字無視）。**document order の先頭1件**を採用（WordPress はコメントフィードが後ろに並ぶ通例）。`new URL(href, pageUrl)` で相対 URL を解決、http/https 以外は棄却。
+   - `looksLikeFeed` が false の分岐で発見を試行 → 発見 URL を `fetchAndValidateFeed` で再取得・再検証（**再帰しない**: 発見先がまた HTML なら即エラー）→ 通れば**発見 URL で** DB 登録（既存 unique 制約が重複防止に働く）。レスポンスに `discoveredFrom: <元のサイトURL>` を追加。
+   - 失敗時のエラー文言は「フィードではなく、ページ内からもフィードを発見できなかった」旨に更新。
+   - 既存経路（フィード URL 直貼り・OPML）への影響なし。増えるのは従来即 400 だった HTML での追加 fetch 1回のみ。
+2. **`functions/test/api.spec.ts`**: ①HTML + link あり → 201・登録 URL が発見 URL・`discoveredFrom` 返却 ②相対 href が絶対解決 ③link なし HTML → 400 ④発見先がまた HTML → 400（非再帰）。着手時に既存 fetch モックが「1回の追加リクエスト」に対応できる構造か先に確認すること。
+3. **`apps/web/src/pages/FeedsPage.jsx`**: `handleAddFeed` 成功時に `response.discoveredFrom` があれば発見した旨の toast に出し分け。入力欄ヒントに「サイトの URL でも OK」を追加。
+4. **Mobile `apps/mobile/src/contexts/FeedsContext.js` + `scenes/read/Read.js`**: 同様の成功メッセージ出し分けのみ（JS のみ）。
+5. **docs**: `docs/API.md` に `discoveredFrom` と HTML 時の挙動変更を追記。完了後に本計画の #18 へ ✅。
+
+作業順は 1→2（ここで機能完結・デプロイ可能）→3→4→5。規模: サーバー +80行程度 + 同量のテスト。
+
+### 19. フィードのフォルダ分類 ❌ 【P2・中】
 
 **問題**: フィードがフラットな 1 リストしかない。数十フィード購読する古参ユーザーには分類が必須級の機能。OPML には元々フォルダ構造（nested outline）があるのに、インポート時に捨てている。
 
@@ -305,7 +341,7 @@ mobile に `@reduxjs/toolkit ^1.5.1` + `redux ^4` + `react-redux ^7` + `redux-lo
 
 **検証**: フォルダ付き OPML（Feedly エクスポート等）をインポートして構造が保持されること。フォルダ選択で記事が絞り込まれること。
 
-### 20. キーワードミュート 【P3・中】
+### 20. キーワードミュート ❌ 【P3・中】
 
 **内容**: 指定キーワードをタイトルに含む記事を一覧から隠す。ノイズの多いフィードを購読し続けるための古典的パワーユーザー機能。
 
@@ -317,7 +353,7 @@ mobile に `@reduxjs/toolkit ^1.5.1` + `redux ^4` + `react-redux ^7` + `redux-lo
 
 **検証**: キーワード追加で該当記事が一覧から消え、削除で戻ること。大文字小文字・日本語で機能すること。
 
-### 21. 今日のダイジェスト画面（モバイル）【P3・中・#15 完了後】
+### 21. 今日のダイジェスト画面（モバイル）⏸ 【P3・中・#15 完了後】
 
 **内容**: #15（バックグラウンド先回り要約）で貯まった `brief` 要約を活かし、「今日の未読ダイジェスト」を 1 画面で流し読みできるようにする。先回り要約の価値を体感できる場所を作る、という位置づけ。
 
@@ -329,7 +365,7 @@ mobile に `@reduxjs/toolkit ^1.5.1` + `redux ^4` + `react-redux ^7` + `redux-lo
 
 **検証**: 先回り要約済み記事だけがカード表示されること。連続読み上げが最後まで走り、途中停止できること。
 
-### 22. 重複記事のグルーピング 【P3・小】
+### 22. 重複記事のグルーピング ❌ 【P3・小】
 
 **内容**: 同じ話題を複数フィードが配信した場合（同一ソースの転載や、プレスリリース起点の同文記事）に、一覧で重複を折りたたむ。
 
@@ -340,7 +376,7 @@ mobile に `@reduxjs/toolkit ^1.5.1` + `redux ^4` + `react-redux ^7` + `redux-lo
 
 **検証**: 同一 URL を配信する 2 フィードを購読し、1 カードに畳まれること。展開で両方の記事に到達できること。
 
-### 23. Web の PWA 化 【P3・小】
+### 23. Web の PWA 化 ⏸ 【P3・小】
 
 **内容**: Web 版をインストール可能な PWA にし、アプリシェルをオフラインキャッシュする。モバイル #8（オフラインキャッシュ）の Web 版に相当する最小限。
 
@@ -351,6 +387,21 @@ mobile に `@reduxjs/toolkit ^1.5.1` + `redux ^4` + `react-redux ^7` + `redux-lo
 - デプロイ後に SW 更新が正しく配信されるか（旧 SW が居座らないか）を必ず確認。`registerType: 'autoUpdate'` を使う。
 
 **検証**: Lighthouse PWA チェック合格。デプロイ 2 回目で新アセットが反映されること。オフラインでシェルが開き、API 依存部分は適切なエラー表示になること。
+
+### 24. Web AI 要約・翻訳（Chrome Built-in AI）【P2・小】
+
+**内容**（2026-07-07 採用）: モバイルのオンデバイス AI と同じ「API キー不要・プライバシー・オンデバイス」の思想を Web にも通す第一歩。Chrome 138+ に標準搭載された Built-in AI（Gemini Nano ベースの `Summarizer` / `Translator` API）を feature detect して使う。モデルのダウンロード・管理はブラウザの責務なので、こちらの実装は薄い。
+
+**実装方針**:
+- リーダーモード（`ArticleReader.jsx` / `/api/article-content`）で抽出した本文を入力に、「要約」「翻訳」ボタンをリーダーモード表示時に追加。
+- `'Summarizer' in self` 等で feature detect し、**非対応ブラウザではボタン自体を出さない**（フォールバック実装はしない）。
+- `availability()` が `downloadable` の場合は初回にモデル DL が走るので、進捗 UI（`downloadprogress` イベント）を出す。
+- 出力はドロワー/モーダル内の記事本文上部にカードで表示。トークン化済みのデザイン（`tokens.js`）に従う。
+- API キー・サーバー変更・スキーマ変更なし。web のみで完結。
+
+**見送った拡張**: WebLLM/WebGPU による全ブラウザ対応（Phase B）は、モデル 400MB+ の DL UX・Cloudflare Pages の 25MB/ファイル制限（配信は R2 か HF CDN 必須）・タブのメモリ消費など課題が重く、Phase A の利用状況を見てから再判断。
+
+**検証**: Chrome 138+ で要約・翻訳が動くこと。Firefox/Safari でボタンが出ず既存機能に影響がないこと。Google の API は Origin Trial 期を経て仕様変動があったため、実装時に MDN で最新のシグネチャを確認すること。
 
 ---
 
