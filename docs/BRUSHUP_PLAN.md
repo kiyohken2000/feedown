@@ -43,6 +43,7 @@
 | 22 | 重複記事のグルーピング ❌ | G: 新機能 | P3 | 小 | web, mobile |
 | 23 | Web の PWA 化 ⏸ | G: 新機能 | P3 | 小 | web |
 | 24 | Web AI 要約・翻訳 (Chrome Built-in AI) | G: 新機能 | P2 | 小 | web |
+| 25 | 自然言語ハイライトルール (SemIf 方式) ⏸ | F: AI | P3 | 中 | mobile |
 
 凡例: ✅ = 完了・出荷済み / ⏸ = 見送り（下記「判断記録」参照）/ ❌ = 却下（同）
 
@@ -61,6 +62,11 @@
   - **#11 Web 巨大ページの分割**: 純リファクタで即時のユーザー価値が薄いため保留。#5/#10 で `DashboardPage.jsx` を触った直後なので、再開時はコンフリクトに注意。
   - **#23 Web PWA 化**: P3・付加価値枠として保留。
 - 上記のうち #3 は「recommended 実装順」で本来 1 の次だが、今回はユーザー判断で飛ばした。順序はあくまで推奨。
+
+### 2026-09-21 セッション（SemIf 方式の実機検証）
+
+- **#25 自然言語ハイライトルール**: Ember セッションからの引継ぎで llama.rn 上の SemIf 方式 (1 トークン生成 + ラベル確率) を iPhone 13 mini で実測。Qwen3.5 2B が 10/12・530 ms/件で唯一使える水準。**「まだ実装しない、計画だけ残す」** — 仕様は MOBILE_ON_DEVICE_AI_PLAN.md 機能7。#20 却下理由 (隠す機能は思想に合わない) を踏まえ、隠す用途は含めない。着手条件は FeedOwn 用フィクスチャでの精度確認。
+- 副産物として llama.rn の 3 バグを Issue #401 で報告 (logit_bias クラッシュ / completion_probabilities 蓄積 / n_probs が post-sampling)。Benchmark 画面に `judge` kind と Qwen3.5 2B/0.8B・対照 2 モデルの bench-only DL を追加済み (本番 UI には出ない)。
 
 ### 2026-07-07 セッション（新機能案の棚卸し）
 
@@ -295,6 +301,14 @@ mobile に `@reduxjs/toolkit ^1.5.1` + `redux ^4` + `react-redux ^7` + `redux-lo
 - 関連記事チャット（Phase 8）と音声ダイジェストは、意味検索の基盤（embedding + SQLite）ができてから再評価。本計画では対象外。
 
 ---
+
+### 25. 自然言語ハイライトルール (SemIf 方式) ⏸ 【P3・中】
+
+**内容**（2026-09-21 保留）: ユーザーが関心を自然文で書き、新着記事の title + description を llama.rn (Qwen3.5 2B) で 1 トークン判定してハイライト / 「要チェック」セクション / #15 の対象選定に使う。記事を隠す用途は #20 の却下理由により含めない。
+
+**一次資料**: `docs/MOBILE_ON_DEVICE_AI_PLAN.md` 機能7（方式・実測値・llama.rn の制約・実行モデル・着手前の検証項目）。判定関数 `apps/mobile/src/ai/llama/judge.js` と Benchmark 画面の `judge` kind は実装済み。
+
+**着手条件**: FeedOwn の実フィード 30〜50 件で単純条件ルールの正解率と p の分離を確認できること。llama.rn Issue #401 の修正状況と 0.12.9 バンプも合わせて確認。
 
 ## Track G: 新機能提案
 
