@@ -29,6 +29,13 @@ import {
   clearBenchmarkResults,
 } from '../../ai/benchmarkStorage'
 import { showToast, showErrorToast } from '../../utils/showToast'
+import {
+  SEMIF_JUDGE_MODELS,
+  canRunOnDevice,
+  getModelStatus as getLlamaModelStatus,
+  downloadModel as downloadLlamaModel,
+  deleteModel as deleteLlamaModel,
+} from '../../ai/llama'
 
 function fmtMs(ms) {
   if (!ms || ms <= 0) return '—'
@@ -46,6 +53,45 @@ function fmtBytes(bytes) {
   if (!bytes || bytes <= 0) return '—'
   const GB = 1024 ** 3
   return `${(bytes / GB).toFixed(1)} GB`
+}
+
+function fmtP(p) {
+  if (!Number.isFinite(p)) return 'n/a'
+  return p.toFixed(2)
+}
+
+function fmtProbs(probs) {
+  if (!probs || probs.length === 0) return '(none)'
+  return probs.map((x) => `${JSON.stringify(x.tok_str)}:${x.prob.toFixed(3)}`).join(' ')
+}
+
+function buildJudgeResultBlock(result, name) {
+  const lines = []
+  const j = result.judge ?? {}
+  const verdict = evaluateResult(result, 'judge')
+  lines.push(`## ${name} [judge]`)
+  lines.push(`Rule: ${j.rule ?? ''}`)
+  lines.push(`Verdict: ${verdict.label} — ${verdict.detail}`)
+  lines.push(
+    `Cold load: ${result.coldLoadMs > 0 ? fmtMs(result.coldLoadMs) : '(warm)'}`,
+  )
+  if (j.error) lines.push(`Error: ${j.error}`)
+  lines.push('')
+  for (const it of j.items ?? []) {
+    const mark = it.correct ? 'ok ' : 'NG '
+    const cache = it.cacheN != null ? ` cache ${it.cacheN}/${it.promptN}` : ''
+    lines.push(
+      `- ${mark}#${it.id} exp ${it.expected} got ${it.predicted ?? '?'} p=${fmtP(it.p)} (A ${it.pA.toFixed(3)} / B ${it.pB.toFixed(3)}) ${Math.round(it.ms)} ms${cache}${it.note ? ` [${it.note}]` : ''}`,
+    )
+  }
+  if (j.biasCheck) {
+    lines.push('')
+    lines.push('Bias check (#1, top-5 probs):')
+    for (const [key, v] of Object.entries(j.biasCheck)) {
+      lines.push(`- ${key}: p=${fmtP(v.p)} text=${JSON.stringify(v.text)} ${fmtProbs(v.probs)}`)
+    }
+  }
+  return lines.join('\n')
 }
 
 function fmtDate(ts) {
@@ -76,6 +122,7 @@ function buildResultBlock(result) {
   const model = getBenchmarkModelById(result.modelId)
   const name = model?.displayName ?? result.modelId
   const kind = model?.kind ?? 'summary'
+  if (kind === 'judge') return buildJudgeResultBlock(result, name)
   const verdict = evaluateResult(result, kind)
   const prompts = result.prompts ?? []
   const avgRate =
@@ -141,9 +188,67 @@ export default function Benchmark() {
     [],
   )
 
-  // ダウンロード済みのモデル一覧 (executorch + Hy-MT2)
+  // SemIf judge モデルは AI Settings に出さず、この画面から直接 DL する。
+  // ディスク上の状態を見るだけで aiSettings には記録しない (bench 専用)。
+  const [judgeStatus, setJudgeStatus] = useState({}) // { [id]: { downloaded, bytes } }
+  const [judgeDl, setJudgeDl] = useState(null) // { id, percent } | null
+  const refreshJudgeStatus = useCallback(async () => {
+    const next = {}
+    for (const m of SEMIF_JUDGE_MODELS) {
+      next[m.id] = await getLlamaModelStatus(m)
+    }
+    setJudgeStatus(next)
+  }, [])
+  useEffect(() => {
+    refreshJudgeStatus()
+  }, [refreshJudgeStatus])
+
+  const onDownloadJudge = useCallback(
+    async (m) => {
+      if (judgeDl) return
+      const gate = canRunOnDevice(m)
+      if (!gate.ok) {
+        showErrorToast({ title: 'Not enough RAM', body: gate.reason })
+        return
+      }
+      setJudgeDl({ id: m.id, percent: 0 })
+      try {
+        await downloadLlamaModel(m, ({ percent }) =>
+          setJudgeDl({ id: m.id, percent }),
+        )
+        showToast({ title: 'Downloaded', body: m.displayName })
+      } catch (err) {
+        showErrorToast({ title: 'Download failed', body: err?.message ?? 'Unknown error' })
+      } finally {
+        setJudgeDl(null)
+        refreshJudgeStatus()
+      }
+    },
+    [judgeDl, refreshJudgeStatus],
+  )
+
+  const onDeleteJudge = useCallback(
+    (m) => {
+      Alert.alert('Delete model', `Delete ${m.displayName}?`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteLlamaModel(m)
+            setCheckedIds((prev) => prev.filter((x) => x !== m.id))
+            refreshJudgeStatus()
+          },
+        },
+      ])
+    },
+    [refreshJudgeStatus],
+  )
+
+  // ダウンロード済みのモデル一覧 (executorch + Hy-MT2 + judge)
   const downloadedIds = aiSettings.downloadedModelIds ?? []
   const benchmarkableModels = ALL_BENCHMARK_MODELS.filter((m) => {
+    if (m.kind === 'judge') return judgeStatus[m.id]?.downloaded === true
     if (m.backend === 'executorch') return downloadedIds.includes(m.id)
     if (m.backend === 'llama.rn') return aiSettings.hyMt2Downloaded === true
     return false
@@ -291,6 +396,9 @@ export default function Benchmark() {
   const innerLabel = (() => {
     if (phase === 'loading') return 'loading model…'
     if (phase === 'running' && progress) {
+      if (outerProgress?.kind === 'judge') {
+        return `item ${progress.promptIdx + 1}/${progress.total}`
+      }
       const list =
         outerProgress?.kind === 'translation'
           ? BENCHMARK_PROMPTS_TRANSLATION
@@ -429,13 +537,13 @@ export default function Benchmark() {
                               styles.kindBadge,
                               {
                                 color:
-                                  model.kind === 'translation'
-                                    ? colors.bluePrimary
-                                    : theme.textMuted,
+                                  model.kind === 'summary'
+                                    ? theme.textMuted
+                                    : colors.bluePrimary,
                                 borderColor:
-                                  model.kind === 'translation'
-                                    ? colors.bluePrimary
-                                    : theme.border,
+                                  model.kind === 'summary'
+                                    ? theme.border
+                                    : colors.bluePrimary,
                               },
                             ]}
                           >
@@ -527,6 +635,69 @@ export default function Benchmark() {
           </View>
         </View>
 
+        {/* SemIf judge models (bench-only download) */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
+            SemIf judge models
+          </Text>
+          <View style={[styles.card, { backgroundColor: theme.card }]}>
+            {SEMIF_JUDGE_MODELS.map((m) => {
+              const st = judgeStatus[m.id]
+              const gate = canRunOnDevice(m)
+              const dl = judgeDl?.id === m.id ? judgeDl : null
+              return (
+                <View key={m.id} style={[styles.judgeRow, { borderColor: theme.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.modelName, { color: theme.text }]}>
+                      {m.displayName}
+                    </Text>
+                    <Text style={[styles.modelNote, { color: theme.textMuted }]}>
+                      {st?.downloaded
+                        ? `Downloaded · ${fmtBytes(st.bytes)}`
+                        : dl
+                          ? `Downloading… ${Math.round(dl.percent * 100)}%`
+                          : gate.ok
+                            ? `${fmtBytes(m.expectedBytes)} · not downloaded`
+                            : gate.reason}
+                    </Text>
+                  </View>
+                  {st?.downloaded ? (
+                    <TouchableOpacity
+                      onPress={() => onDeleteJudge(m)}
+                      disabled={isRunning}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={[styles.headerActionText, { color: colors.redSecondary }]}>
+                        Delete
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => onDownloadJudge(m)}
+                      disabled={!!judgeDl || !gate.ok || isRunning}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text
+                        style={[
+                          styles.headerActionText,
+                          { color: judgeDl || !gate.ok ? theme.textMuted : colors.primary },
+                        ]}
+                      >
+                        Download
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )
+            })}
+            <Text style={[styles.modelHint, { color: theme.textMuted }]}>
+              Single-token classification bench (12 fixed Japanese items, rule:
+              political insults). Downloads here only; these models are not
+              used by any feature.
+            </Text>
+          </View>
+        </View>
+
         {/* Saved results */}
         {savedEntries.length > 0 && (
           <View style={styles.section}>
@@ -601,6 +772,46 @@ export default function Benchmark() {
                     )}
                   </View>
 
+                  {kind === 'judge' ? (
+                    <>
+                      <View style={[styles.divider, { backgroundColor: theme.border }]} />
+                      <Text style={[styles.promptLabel, { color: theme.textMuted }]}>
+                        Cold load {r.coldLoadMs > 0 ? fmtMs(r.coldLoadMs) : '(warm)'} · rule: {r.judge?.rule}
+                      </Text>
+                      {(r.judge?.items ?? []).map((it) => (
+                        <View key={it.id} style={styles.promptRow}>
+                          <Text
+                            style={[
+                              styles.promptMetric,
+                              { color: it.correct ? theme.text : colors.redSecondary },
+                            ]}
+                          >
+                            {it.correct ? '✓' : '✗'} #{it.id} exp {it.expected} · p={fmtP(it.p)} · {Math.round(it.ms)} ms
+                            {it.cacheN != null ? ` · cache ${it.cacheN}/${it.promptN}` : ''}
+                            {it.note ? ` · ${it.note}` : ''}
+                          </Text>
+                        </View>
+                      ))}
+                      {!!r.judge?.biasCheck && (
+                        <View style={styles.promptRow}>
+                          <Text style={[styles.promptLabel, { color: theme.textMuted }]}>
+                            Bias check (#1)
+                          </Text>
+                          {Object.entries(r.judge.biasCheck).map(([key, v]) => (
+                            <Text key={key} style={[styles.promptMetric, { color: theme.text }]}>
+                              {key}: p={fmtP(v.p)} {fmtProbs(v.probs)}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+                      {!!r.judge?.error && (
+                        <Text style={[styles.promptMetric, { color: colors.redSecondary }]}>
+                          {r.judge.error}
+                        </Text>
+                      )}
+                    </>
+                  ) : (
+                  <>
                   <View style={styles.resultStatsRow}>
                     <View style={styles.resultStatCell}>
                       <Text style={[styles.resultStatLabel, { color: theme.textMuted }]}>
@@ -648,6 +859,8 @@ export default function Benchmark() {
                       </View>
                     </View>
                   ))}
+                  </>
+                  )}
                 </View>
               )
             })}
@@ -807,6 +1020,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   divider: { height: 1, marginVertical: 12 },
+  judgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
   promptRow: { marginBottom: 8 },
   promptLabel: {
     fontSize: fontSize.small,

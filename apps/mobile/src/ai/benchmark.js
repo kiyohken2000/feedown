@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAi } from '../contexts/AiContext'
 import { FEEDOWN_LLM_MODELS } from './models'
-import { HY_MT2_TRANSLATION_MODEL, HY_MT2_SAMPLING } from './llama/models'
+import {
+  HY_MT2_TRANSLATION_MODEL,
+  HY_MT2_SAMPLING,
+  SEMIF_JUDGE_MODELS,
+} from './llama/models'
+import { judge } from './llama/judge'
+import { JUDGE_SYSTEM, JUDGE_RULE, JUDGE_FIXTURES } from './llama/judgeFixtures'
 
 // 固定プロンプト 3 本 (summary 系モデル用)。reproducibility 優先で英語のみ、
 // トークナイザ依存の言語差を排除する。
@@ -80,7 +86,11 @@ const EXECUTORCH_GENERATION_CONFIG = {
 // Benchmark 対象モデル一覧 (canonical)。Benchmark 画面はこのリストから
 // ダウンロード済みのものだけを表示する。
 //   backend: 'executorch' | 'llama.rn'
-//   kind:    'summary'    | 'translation'  — verdict 閾値の切替に使う
+//   kind:    'summary'    | 'translation' | 'judge'  — verdict 閾値の切替に使う
+//
+// judge = SemIf 方式の意味分類 (src/ai/llama/judge.js)。summary/translation
+// と違い生成速度ではなく「12 件の正解数と確率の分布 (飽和していないか)」を
+// 見る。モデルは Benchmark 画面からだけ DL する (AI Settings には出さない)。
 export const ALL_BENCHMARK_MODELS = [
   ...FEEDOWN_LLM_MODELS.map((m) => ({
     id: m.id,
@@ -98,6 +108,14 @@ export const ALL_BENCHMARK_MODELS = [
     backend: 'llama.rn',
     kind: 'translation',
   },
+  ...SEMIF_JUDGE_MODELS.map((m) => ({
+    id: m.id,
+    displayName: m.displayName,
+    notes: `SemIf judge bench (${(m.expectedBytes / 1024 ** 3).toFixed(2)} GB)`,
+    llamaModel: m,
+    backend: 'llama.rn',
+    kind: 'judge',
+  })),
 ]
 
 export function getBenchmarkModelById(id) {
@@ -124,6 +142,7 @@ function now() {
 //
 // 必要に応じて将来 calibration し直す。
 export function evaluateResult(result, kind = 'summary') {
+  if (kind === 'judge') return evaluateJudgeResult(result)
   const prompts = result?.prompts ?? []
   if (prompts.length === 0) {
     return { tier: 'unknown', label: 'No data', detail: '' }
@@ -200,6 +219,63 @@ export function evaluateResult(result, kind = 'summary') {
     label: '✗ Too slow',
     detail:
       'Too slow for practical daily use on this device. Try a smaller model.',
+  }
+}
+
+// judge: 正解数と確率の飽和度で評価する。デスクトップ実測 (handoff §4) では
+// 「該当 0.97–0.99 / 非該当 0.01–0.24 / 境界 0.45–0.54」が使える分布、
+// 「全件 0 か 1」が飽和 (閾値が効かない)、「ほぼ全件該当」が yes バイアス。
+// 飽和判定は p が 0.02–0.98 の外にある件数で見る。
+function evaluateJudgeResult(result) {
+  const items = result?.judge?.items ?? []
+  if (items.length === 0) {
+    return { tier: 'unknown', label: 'No data', detail: '' }
+  }
+  const total = items.length
+  const correct = items.filter((it) => it.correct).length
+  const valid = items.filter((it) => Number.isFinite(it.p))
+  const saturated = valid.filter((it) => it.p <= 0.02 || it.p >= 0.98).length
+  const predictedA = valid.filter((it) => it.p >= 0.5).length
+  const avgMs = items.reduce((s, it) => s + (it.ms ?? 0), 0) / total
+  const base = `${correct}/${total} correct · ${Math.round(avgMs)} ms/item`
+
+  if (valid.length < total) {
+    return {
+      tier: 'poor',
+      label: `✗ ${base}`,
+      detail: `${total - valid.length} item(s) returned no label probability — check tok_str matching / n_probs.`,
+    }
+  }
+  if (correct <= total * 0.6) {
+    const bias =
+      predictedA >= total * 0.8
+        ? ' Almost everything judged as matching (yes bias).'
+        : ''
+    return {
+      tier: 'poor',
+      label: `✗ ${base}`,
+      detail: `Accuracy too low for a filter.${bias}`,
+    }
+  }
+  if (saturated >= total - 1) {
+    return {
+      tier: 'slow',
+      label: `△ ${base}`,
+      detail:
+        'Probabilities saturate at 0/1 — accuracy OK but a confidence threshold cannot separate borderline cases.',
+    }
+  }
+  if (correct >= total - 1) {
+    return {
+      tier: 'snappy',
+      label: `✓ ${base}`,
+      detail: `Usable distribution (${saturated}/${total} saturated). Pick a threshold from the per-item p values.`,
+    }
+  }
+  return {
+    tier: 'good',
+    label: `✓ ${base}`,
+    detail: `Probabilities are spread (${saturated}/${total} saturated); accuracy is moderate.`,
   }
 }
 
@@ -459,10 +535,110 @@ export function useBenchmarkRunner() {
     [runWithLlamaRn],
   )
 
+  // SemIf judge benchmark。12 件を grammar + 対称 logit_bias で判定し、P(A)
+  // と期待ラベルを突き合わせる。1 件目だけ追加で「grammar 無し・bias 無し」
+  // 「grammar 無し・bias 有り」を回して top-5 probs を並べる — n_probs が
+  // サンプラ適用後の値であること (llama.rn Issue の根拠、handoff §6-2) の
+  // 実機確認用。
+  const runJudgeBenchmark = useCallback(
+    async (targetModel) => {
+      setPhase('loading')
+      setProgress(null)
+
+      const overallStart = now()
+      let coldLoadMs = 0
+      const items = []
+      let biasCheck = null
+      let error = null
+      const llamaModel = targetModel.llamaModel
+
+      try {
+        await runWithLlamaRn({
+          model: llamaModel,
+          // prompt は ~200 トークン。4096 は無駄なので小さく取り RAM を節約
+          contextParams: { n_ctx: 1024 },
+          onSession: async (ctx) => {
+            coldLoadMs = now() - overallStart
+            if (cancelRef.current) return
+            setPhase('running')
+
+            for (let i = 0; i < JUDGE_FIXTURES.length; i++) {
+              if (cancelRef.current) break
+              setProgress({ promptIdx: i, total: JUDGE_FIXTURES.length })
+              const fx = JUDGE_FIXTURES[i]
+              const r = await judge(ctx, {
+                system: JUDGE_SYSTEM,
+                rule: JUDGE_RULE,
+                body: fx.body,
+              })
+              const predicted = Number.isFinite(r.p)
+                ? r.p >= 0.5
+                  ? 'A'
+                  : 'B'
+                : null
+              items.push({
+                id: fx.id,
+                expected: fx.expected,
+                note: fx.note ?? null,
+                predicted,
+                correct: predicted === fx.expected,
+                ...r,
+              })
+            }
+
+            if (cancelRef.current) return
+            const fx = JUDGE_FIXTURES[0]
+            const variants = [
+              { key: 'grammar+bias', withGrammar: true, withBias: true },
+              { key: 'plain', withGrammar: false, withBias: false },
+              { key: 'bias only', withGrammar: false, withBias: true },
+            ]
+            biasCheck = {}
+            for (const v of variants) {
+              if (cancelRef.current) break
+              const r = await judge(ctx, {
+                system: JUDGE_SYSTEM,
+                rule: JUDGE_RULE,
+                body: fx.body,
+                withGrammar: v.withGrammar,
+                withBias: v.withBias,
+              })
+              biasCheck[v.key] = {
+                p: r.p,
+                text: r.text,
+                probs: r.probs,
+                cacheN: r.cacheN,
+              }
+            }
+          },
+        })
+      } catch (err) {
+        error = err?.message ?? String(err)
+        console.warn('[benchmark] judge run failed:', error)
+      }
+
+      const cancelled = cancelRef.current
+      setPhase(cancelled ? 'cancelled' : 'done')
+      setProgress(null)
+      return {
+        modelId: targetModel.id,
+        coldLoadMs,
+        prompts: [],
+        judge: { rule: JUDGE_RULE, items, biasCheck, error },
+        runAt: Date.now(),
+        cancelled,
+      }
+    },
+    [runWithLlamaRn],
+  )
+
   const runBenchmark = useCallback(
     async (targetModel) => {
       if (!targetModel) return null
       try {
+        if (targetModel.kind === 'judge') {
+          return await runJudgeBenchmark(targetModel)
+        }
         if (targetModel.backend === 'llama.rn') {
           return await runLlamaRnBenchmark(targetModel)
         }
@@ -475,7 +651,7 @@ export function useBenchmarkRunner() {
         return null
       }
     },
-    [runExecutorchBenchmark, runLlamaRnBenchmark],
+    [runExecutorchBenchmark, runLlamaRnBenchmark, runJudgeBenchmark],
   )
 
   const reset = useCallback(() => {

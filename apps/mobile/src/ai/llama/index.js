@@ -14,3 +14,6 @@ export {
   deleteModel,
   toNativePath,
 } from './download'
+
+export { SEMIF_JUDGE_MODELS, JUDGE_SAMPLING } from './models'
+export { judge, prepareJudge, buildJudgeMessages, JUDGE_LABELS } from './judge'
