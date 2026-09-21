@@ -6,7 +6,7 @@ import {
   HY_MT2_SAMPLING,
   SEMIF_JUDGE_MODELS,
 } from './llama/models'
-import { judge } from './llama/judge'
+import { judge, prepareJudge, buildJudgeMessages } from './llama/judge'
 import { JUDGE_SYSTEM, JUDGE_RULE, JUDGE_FIXTURES } from './llama/judgeFixtures'
 
 // 固定プロンプト 3 本 (summary 系モデル用)。reproducibility 優先で英語のみ、
@@ -120,6 +120,12 @@ export const ALL_BENCHMARK_MODELS = [
 
 export function getBenchmarkModelById(id) {
   return ALL_BENCHMARK_MODELS.find((m) => m.id === id) ?? null
+}
+
+// ネイティブクラッシュの直前のログが Metro に届くよう、log 後に少し待つ。
+async function flushLog(msg) {
+  console.log(msg)
+  await new Promise((r) => setTimeout(r, 200))
 }
 
 // performance.now() は React Native でも利用可能 (Hermes)。
@@ -535,11 +541,12 @@ export function useBenchmarkRunner() {
     [runWithLlamaRn],
   )
 
-  // SemIf judge benchmark。12 件を grammar + 対称 logit_bias で判定し、P(A)
-  // と期待ラベルを突き合わせる。1 件目だけ追加で「grammar 無し・bias 無し」
-  // 「grammar 無し・bias 有り」を回して top-5 probs を並べる — n_probs が
-  // サンプラ適用後の値であること (llama.rn Issue の根拠、handoff §6-2) の
-  // 実機確認用。
+  // SemIf judge benchmark。12 件を grammar + 切り捨て無しサンプラで判定し、
+  // P(A) と期待ラベルを突き合わせる。1 件目だけ追加で「grammar 無し」
+  // 「grammar 無し + llama.cpp 既定の切り捨て」を回して top-5 probs を並べる
+  // — n_probs がサンプラ適用後の値であること (llama.rn Issue の根拠、
+  // handoff §6-2) の実機確認用。logit_bias は llama.rn 側のバグで使えない
+  // (src/ai/llama/judge.js 冒頭)。
   const runJudgeBenchmark = useCallback(
     async (targetModel) => {
       setPhase('loading')
@@ -551,6 +558,7 @@ export function useBenchmarkRunner() {
       let biasCheck = null
       let error = null
       const llamaModel = targetModel.llamaModel
+      console.log(`[judge] loading ${llamaModel.id}`)
 
       try {
         await runWithLlamaRn({
@@ -559,18 +567,42 @@ export function useBenchmarkRunner() {
           contextParams: { n_ctx: 1024 },
           onSession: async (ctx) => {
             coldLoadMs = now() - overallStart
+            await flushLog(`[judge] ctx ready in ${Math.round(coldLoadMs)} ms`)
             if (cancelRef.current) return
             setPhase('running')
+            const ids = await prepareJudge(ctx)
+            await flushLog('[judge] label ids ' + JSON.stringify(ids))
+            // 実際にモデルへ渡る prompt (chat template 適用後) を 1 回だけ確認
+            try {
+              const formatted = await ctx.getFormattedChat(
+                buildJudgeMessages({
+                  system: JUDGE_SYSTEM,
+                  rule: JUDGE_RULE,
+                  body: JUDGE_FIXTURES[0].body,
+                }),
+                undefined,
+                { enable_thinking: false },
+              )
+              const promptText =
+                typeof formatted === 'string' ? formatted : formatted?.prompt
+              await flushLog('[judge] formatted prompt (#1):' + '\n' + promptText)
+            } catch (e) {
+              await flushLog('[judge] getFormattedChat failed: ' + (e?.message ?? e))
+            }
 
             for (let i = 0; i < JUDGE_FIXTURES.length; i++) {
               if (cancelRef.current) break
               setProgress({ promptIdx: i, total: JUDGE_FIXTURES.length })
               const fx = JUDGE_FIXTURES[i]
+              await flushLog(`[judge] item #${fx.id} start`)
               const r = await judge(ctx, {
                 system: JUDGE_SYSTEM,
                 rule: JUDGE_RULE,
                 body: fx.body,
               })
+              console.log(
+                `[judge] item #${fx.id} p=${r.p} text=${JSON.stringify(r.text)} ${Math.round(r.ms)} ms cache ${r.cacheN}/${r.promptN}`,
+              )
               const predicted = Number.isFinite(r.p)
                 ? r.p >= 0.5
                   ? 'A'
@@ -589,19 +621,20 @@ export function useBenchmarkRunner() {
             if (cancelRef.current) return
             const fx = JUDGE_FIXTURES[0]
             const variants = [
-              { key: 'grammar+bias', withGrammar: true, withBias: true },
-              { key: 'plain', withGrammar: false, withBias: false },
-              { key: 'bias only', withGrammar: false, withBias: true },
+              { key: 'grammar', withGrammar: true },
+              { key: 'plain', withGrammar: false },
+              { key: 'plain+default-sampler', withGrammar: false, sampling: {} },
             ]
             biasCheck = {}
             for (const v of variants) {
               if (cancelRef.current) break
+              await flushLog(`[judge] sampler check: ${v.key}`)
               const r = await judge(ctx, {
                 system: JUDGE_SYSTEM,
                 rule: JUDGE_RULE,
                 body: fx.body,
                 withGrammar: v.withGrammar,
-                withBias: v.withBias,
+                ...(v.sampling ? { sampling: v.sampling } : {}),
               })
               biasCheck[v.key] = {
                 p: r.p,

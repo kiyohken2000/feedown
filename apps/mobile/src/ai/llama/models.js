@@ -96,4 +96,22 @@ export const SEMIF_JUDGE_MODELS = [
     minDeviceRamBytes: RAM_TIER.TIER_4GB,
     sampling: JUDGE_SAMPLING,
   },
+  // 対照用の plain transformer。Qwen3.5 2B が 13 mini で全件同一 logits を
+  // 返した (0.12.4 の hybrid 対応疑い) ので、p が本文ごとに変わるかの確認。
+  {
+    id: 'Qwen3-0.6B-Q4_K_M',
+    displayName: 'Qwen3 0.6B Q4_K_M (control)',
+    url: 'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
+    expectedBytes: 460_000_000, // ~460 MB
+    minDeviceRamBytes: RAM_TIER.TIER_4GB,
+    sampling: JUDGE_SAMPLING,
+  },
+  {
+    id: 'gemma-3-1B-it-Q4_K_M',
+    displayName: 'Gemma 3 1B-IT Q4_K_M (control)',
+    url: 'https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf',
+    expectedBytes: 806_000_000, // ~806 MB
+    minDeviceRamBytes: RAM_TIER.TIER_4GB,
+    sampling: JUDGE_SAMPLING,
+  },
 ]

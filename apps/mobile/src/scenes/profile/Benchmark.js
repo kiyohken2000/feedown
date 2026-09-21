@@ -86,7 +86,7 @@ function buildJudgeResultBlock(result, name) {
   }
   if (j.biasCheck) {
     lines.push('')
-    lines.push('Bias check (#1, top-5 probs):')
+    lines.push('Sampler check (#1, top-5 probs):')
     for (const [key, v] of Object.entries(j.biasCheck)) {
       lines.push(`- ${key}: p=${fmtP(v.p)} text=${JSON.stringify(v.text)} ${fmtProbs(v.probs)}`)
     }
@@ -795,7 +795,7 @@ export default function Benchmark() {
                       {!!r.judge?.biasCheck && (
                         <View style={styles.promptRow}>
                           <Text style={[styles.promptLabel, { color: theme.textMuted }]}>
-                            Bias check (#1)
+                            Sampler check (#1)
                           </Text>
                           {Object.entries(r.judge.biasCheck).map(([key, v]) => (
                             <Text key={key} style={[styles.promptMetric, { color: theme.text }]}>
