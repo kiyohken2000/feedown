@@ -794,10 +794,15 @@ apps/mobile/app.config.js                    # iOS BGTaskSchedulerPermittedIdent
 生成させ、ラベルトークンの確率を読んで判定する。生成テキストをパースしない。
 確率が取れるので「不確実なら判定しない」ができる。
 
-- ランタイムは既存の llama.rn (`runWithLlamaRn`)。executorch (LFM2.5) は
-  logprobs を出せないので使えない
+- **ランタイムは 3 択になった (2026-10-28 時点)**。着手時に横並び比較して決める:
+  (a) llama.rn 0.13.0-rc の `decide()` API — 下記「本命」節、
+  (b) llama.rn 従来方式 (`runWithLlamaRn` + 自前 judge) — 2026-09-21 に実測済み、
+  (c) react-native-executorch 0.11.0 で logits 直読 — 検証時点の 0.9.1 は logprobs を
+  出せなかったが **0.11.0 でこの制約は解消された**
+  (→「保留中の検討事項 › react-native-executorch 0.11.0」)
 - 実装済みの判定関数: `apps/mobile/src/ai/llama/judge.js` (`judge(ctx, {system, rule, body})`
-  → `{p, pA, pB, ms, ...}`)。ベンチ UI は Benchmark 画面の `judge` kind
+  → `{p, pA, pB, ms, ...}`)。ベンチ UI は Benchmark 画面の `judge` kind。
+  **(a) を採るなら `judge.js` は不要になる**
 - `_temp/HANDOFF_llama_rn_semif.md` (Ember セッションからの引継ぎ、git 管理外) に
   方式の背景と llama.rn API の対応表がある
 
@@ -826,7 +831,69 @@ apps/mobile/app.config.js                    # iOS BGTaskSchedulerPermittedIdent
 2. 非並列 `completion()` の `completion_probabilities` が completion 間で蓄積し `[0]` が最初の値のまま → **末尾要素を読む** (judge.js 実装済み)
 3. `n_probs` はサンプラ適用後の確率 → `temperature: 1, top_k: 0, top_p: 1, min_p: 0` を明示 (judge.js の `JUDGE_FULL_DIST`)
 
-1・2 が上流で直ってリリースされたら回避策を外す。
+3 件とも上流で修正され Issue は CLOSED (`de41ad43` / `bcff59dc`、2026-09-23)。
+**修正は v0.13.0-rc.5 (2026-09-23) 以降に入っており npm で入手できる** (compare で
+祖先関係を確認済み)。ただし安定版の系列は **0.12.9 (2026-08-04) で止まっており**、
+npm の `latest` タグは RC (`0.13.0-rc.8` / 2026-10-22) が占めている。手元の pin は
+`0.12.4`。
+
+回避策を外す版では `post_sampling_probs: false` + `tok_id` でラベル確率を読むのが
+正道。ただし下記 `decide()` API を使うなら `judge.js` ごと不要になる。
+
+### llama.rn 0.13.0-rc の `decide()` API (2026-10-28 確認) — 本命
+
+PR [#408](https://github.com/mybigday/llama.rn/pull/408) (rc.7) と
+[#412](https://github.com/mybigday/llama.rn/pull/412) (rc.8) で
+**"typed decision models (System One)"** という専用 API が入った。
+**本節で手書きしていた SemIf 方式そのものがライブラリ機能になった**ので、
+着手時は `judge.js` を捨ててこちらに寄せるのが第一候補。
+
+```ts
+const { answers, usage } = await context.decide({
+  state: { utterance: '<title + description>' },
+  questions: {
+    is_release_note: { type: 'noul',   instructions: '新しいモデルのリリース告知' },
+    topic:           { type: 'choice', instructions: 'どの話題?', criteria: { rust: 'Rust', none: null } },
+    urgency:         { type: 'score',  instructions: '緊急度',   criteria: ['低', '中', '高'] },
+  },
+})
+```
+
+- **1 回答 = 1 forward パス、生成トークンゼロ、キャリブレーション済み確率**。
+  n_probs / logit_bias / grammar を触る必要がない → Issue #401 の回避策が不要
+- 質問型は `noul` (該当/非該当) / `choice` (選択肢) / `score` (順序尺度)。
+  機能7 のハイライトルールは `noul`、将来の優先度付けは `score` が素直
+- readout に **`openjev` / `jev` がそのまま実装されている**。他に `lev` / `kev` /
+  `laya` / `nimble` / `clef` / `letter_slot` / `rank_head`
+- `letter_slot` readout なら**汎用 causal モデル**でも使え、**全質問を 1 プロンプト**に
+  まとめられる (ルールが複数本あるときの prefill を 1 回に圧縮できる)
+- `parallel.decide()`、画像/音声入力、llama-server の `/v1/systemone` 互換
+- 対応モデル: Jevling 0.8B / Kev 0.8B・4B / Laya / lev / Julia-1 / Clef-Flash /
+  pplx-decider 27B / **LiquidAI d1-3B** / **LiquidAI d1-omni-600M**
+
+**モデル選択への影響**: `d1-omni-600M` は 600M の LFM2 系で、**Qwen3.5 2B (1.28 GB) を
+3 つ目のモデル DL として入れる前提が崩れる可能性がある**。機能7 の「コスト / 前提」節は
+このモデルで測り直してから確定させる。
+
+**未確認のリスク**:
+
+- **iOS 実機未検証** (#408 の "Not done: iOS device run")。A15 / 4 GB で動くかは自分で測る
+- `decide()` 対応モデルの一部は embedding モードで動くため `completion()` が拒否される
+  → 要約 / 翻訳と**同じコンテキストを共用できない**。セッション排他の設計に影響する
+- 日本語 jev の `modernbert-ja-jev` (rank_head) は存在するが、GGUF に
+  `classifier.pooling_type` が無く upstream の UGM トークナイザの穴に当たって動かない
+- 0.13.0 は RC 系列。llama.cpp は b11804 まで同期済みだが chat API refactor (b11531) は
+  未取り込みで別 PR 待ち
+
+**0.12.5 〜 0.13.0-rc.8 でその他に効くもの**:
+
+- rc.7: `loadPrompt` の SWA prefix reuse に guard / checkpoint ([#410](https://github.com/mybigday/llama.rn/pull/410))
+  → 530 ms/件 (毎回 ~110 トークン全 prefill) の短縮に直結しうる
+- rc.6: Metal Flash Attention ソースの同梱、JSI がコンテキストを atomically claim して
+  重複操作を直列化 (AiContext の排他制御と関係する)
+- rc.2: iOS で RN 0.87 互換 (duck-typed protocol 経由で bridge runtime にアクセス)
+- rc.8: OpenCL Adreno E031.38 の GQA 修正、classic draft model による speculative decoding
+- 0.12.8: Gemma MTP + KV キャッシュ再利用 / 0.12.9: キャンセルされた並行 completion の後始末
 
 ### 機能の形
 
@@ -869,7 +936,15 @@ apps/mobile/app.config.js                    # iOS BGTaskSchedulerPermittedIdent
    で手ラベルし、2B で正解率と p の分布を見る。今回の 12 件は掲示板レス用なので
    そのままでは判断材料にならない
 2. llama.rn 0.12.9 へバンプして prefix 再利用ありの ms/件 を再計測
-3. Issue #401 の修正状況を確認し、回避策の要否を決める
+3. **`decide()` API を iPhone 13 mini で動かす**。llama.rn 0.13.0-rc.8 以降 +
+   `d1-omni-600M` (または Jevling 0.8B) で、1 の同じフィクスチャに対する
+   正解率 / ms-per-件 / メモリを取る。iOS 実機は上流未検証なので「動くか」から
+   確かめる必要がある
+4. ランタイム 3 択を同じフィクスチャで横並び比較してから実装方式を決める:
+   (a) llama.rn `decide()` + d1-omni-600M (第一候補)、
+   (b) llama.rn 従来方式 + Qwen3.5 2B (実測済み・判定関数も実装済み)、
+   (c) executorch 0.11.0 で logits 直読 + LFM2.5 (既存ロード経路に相乗りできるので
+   追加 DL ゼロ。→「保留中の検討事項 › react-native-executorch 0.11.0」)
 
 上記 1 で閾値 0.55 前後に十分な分離 (該当 ≥ 0.65 / 非該当 ≤ 0.35 が大半) が出なければ
 見送り。
@@ -3103,3 +3178,85 @@ iOS バイナリに `mlx.metallib` + `libbackend_mlx_ios.a` が追加される�
 - software-mansion が `.pte` E4B を公開するのを待つ (現在は E2B のみ)
 - 自前で executorch export script を回して E4B を `.pte` 化 (= 重い作業)
 - 別ランタイム (MediaPipe LLM Inference, llama.rn など) に踏み込む = 統合改修
+
+### react-native-executorch 0.11.0 (2026-10-27 リリース / 更新は保留)
+
+#### 結論
+
+**いずれ更新する。今はしない。** 0.9.1 → 0.11.0 は API 全面再構成だが
+`react-native-executorch/legacy` サブパスが残っているため、import 元を差し替える
+だけの段階移行ができる。最大の収穫は **SemIf 方式 (機能7) が executorch 上で
+実装できるようになったこと**。
+
+#### バージョン状況 (2026-10-28 時点)
+
+| | |
+|---|---|
+| 手元 | `^0.9.1` (`apps/mobile/package.json`) |
+| npm `latest` | `0.11.0` (2026-10-27) |
+| npm `legacy` | `0.10.7` |
+
+「0.9.2 を 1.0.14 で取り込む」という BRUSHUP_PLAN.md の既定方針はこれで古い。
+
+#### 機能7 (SemIf) に効く変更 — PR #1508
+
+LLM の生成ループが C++ から **TypeScript に移った**
+(`src/extensions/llm/runners/llmTextRunner.ts`)。
+
+```ts
+const tLogits = tensor('float32', [1, vocabSize])   // JS 側の Tensor
+model.execute('forward', [tTokens, tCurPos], [tLogits])
+const nextToken = sample(tLogits, { generatedTokens }, samplingConfig)
+```
+
+- `Tensor.getData(new Float32Array(vocabSize))` が公開 API → **logits を JS で直読できる**
+- SemIf は「prefill 1 回 → 最終位置の logits → ラベル 2 トークンの softmax」で
+  完結するので、**サンプラーを一切通さずに実装できる**。`math.softmax` / `gather` /
+  `argmax` もネイティブ提供 (`react-native-executorch/math`)
+- `sample(logits, ctx, config)` が単体公開され、
+  `constraints: (ctx) => ({ allowedTokens })` で constrained decoding ができる。
+  llama.rn で `logit_bias` を使ってやろうとしていた「A / B しか出させない」が正式 API
+- サンプラーは llama.cpp 準拠 (temperature / topK / topP / minP / repetitionPenalty /
+  penaltyLastN / **seed** / DRY / XTC)。`seed` があるので judge の再現性が取れる
+- Issue #401 で踏んだ 3 バグは、probs を native から受け取らない設計なので
+  **構造的に発生しない**
+- 16k コンテキストまでの LLM 再エクスポート、MiniCPM5-2B 追加、
+  `enable_thinking` chat template オプション
+
+#### その他 FeedOwn に関係する変更 (0.10.1〜0.11.0)
+
+- **Kokoro に word timestamps** (#1495) → 読み上げ中の文字ハイライトに直結。
+  中国語も追加されたが **日本語はまだ無い** (Phase 6 の日本語読み上げ問題は未解決)
+- 長い数字 (電話番号等) を桁ごとに読むよう修正 (phonemis 0.3.1 / 0.10.7)
+- XNNPACK int8 が Whisper / MiniLM / mpnet / CLIP / Supertonic に拡大、
+  Core ML text embedder も int8 配信
+- Android は Vulkan がデフォルト (YOLO26 / RF-DETR / FastSAM / SDXS 等)
+- `createVectorStore` (in-memory top-k cosine/dot + メタデータフィルタ) +
+  ColBERT (LFM2.5-ColBERT-350M, `maxSim`) → 「将来拡張 › 意味検索」の手段が揃った
+- **デバイス別のレイテンシ / メモリ実測表が公式ドキュメントに掲載**
+  (docs.swmansion.com/react-native-executorch/docs/benchmarks) →
+  iPhone 13 mini 級の見積りに使える
+- RN 0.87/0.88 + Expo SDK 58 対応 (0.10.6)
+- 深度推定 (Depth Anything V2/V3, ZipDepth)、画像インペインティング (MI-GAN)、
+  MediaPipe Face Mesh — FeedOwn では使わない
+
+#### 移行時の注意
+
+- `exports` に `./legacy` がある (`packages/react-native-executorch/legacy/` 配下に
+  `useLLM` / `LLMModule` / `LLMController` が健在)。**まず import 元を `/legacy` に
+  変えて現状維持で上げ、その後に新 API へ移すのが安全**
+- peerDependencies が変わった: `react-native-blob-util >= 0.24.11`、
+  `react-native-worklets >= 0.10.0 <0.14.0`、
+  `@kesha-antonov/react-native-background-downloader >= 4.4.0`
+- **bf16/fp16 の XNNPACK LLM 15 variant が削除**。量子化版のある 66 variant は
+  v1.0.0 で削除予定。使用中の `lfm2_5_1_2b_instruct_quantized` は量子化版なので
+  直撃はしないが、レジストリのモデル ID は要確認
+- `@experimental` LLM runner API は変更済み (chat / generation API は不変)
+- ネイティブ側が変わるので **EAS ビルド必須**。llama.rn のバンプと同じビルドに相乗りさせる
+
+#### 着手順の案
+
+1. `/legacy` 経由で 0.11.0 に上げ、既存の要約 / 翻訳 / TTS が壊れないか実機確認
+2. 新 API (`createLLMRunner` または `loadModel` + `execute('forward')`) で SemIf judge を
+   書き、機能7「着手前に必要な検証」のフィクスチャで llama.rn 版とベンチ比較
+3. Kokoro の word timestamps を読み上げ UI に反映

@@ -44,6 +44,7 @@
 | 23 | Web の PWA 化 ⏸ | G: 新機能 | P3 | 小 | web |
 | 24 | Web AI 要約・翻訳 (Chrome Built-in AI) | G: 新機能 | P2 | 小 | web |
 | 25 | 自然言語ハイライトルール (SemIf 方式) ⏸ | F: AI | P3 | 中 | mobile |
+| 26 | Expo SDK 58 + executorch + llama.rn 一括更新 | D: コード品質 | **P1** | 大 | mobile |
 
 凡例: ✅ = 完了・出荷済み / ⏸ = 見送り（下記「判断記録」参照）/ ❌ = 却下（同）
 
@@ -62,6 +63,16 @@
   - **#11 Web 巨大ページの分割**: 純リファクタで即時のユーザー価値が薄いため保留。#5/#10 で `DashboardPage.jsx` を触った直後なので、再開時はコンフリクトに注意。
   - **#23 Web PWA 化**: P3・付加価値枠として保留。
 - 上記のうち #3 は「recommended 実装順」で本来 1 の次だが、今回はユーザー判断で飛ばした。順序はあくまで推奨。
+
+### 2026-10-28 セッション（executorch 0.11.0 / llama.rn 0.13.0-rc の内容確認）
+
+- 0.11.0 が 2026-10-27 にリリース。**「いずれ更新する。今はしない」**と判断し、調査結果のみドキュメント化（MOBILE_ON_DEVICE_AI_PLAN.md「保留中の検討事項 › react-native-executorch 0.11.0」）。
+- 最大の収穫: PR #1508 で LLM 生成ループが TypeScript 化され、`Tensor.getData()` で logits を JS から直読できるようになった。**#25 の SemIf 方式が executorch 上で実装可能になり**、「executorch は logprobs を出せない」という機能7 の前提が無効化された。`sample()` の `constraints.allowedTokens` による constrained decoding、`seed` 指定、llama.cpp 準拠サンプラーも入った。
+- FeedOwn 向けのその他: Kokoro に word timestamps（読み上げハイライト用、ただし**日本語音声はまだ無い**）、`createVectorStore` + ColBERT（将来拡張「意味検索」の基盤）、公式ドキュメントにデバイス別レイテンシ/メモリ実測表。
+- 移行コスト: `legacy` サブパス経由なら現状維持で上げられる。bf16/fp16 の XNNPACK LLM variant 削除あり（使用中モデルは量子化版なので直撃せず）。EAS ビルド必須。
+- 続けて **llama.rn の更新状況も確認**。安定版は 0.12.9（2026-08-04）止まりで、npm `latest` は RC の 0.13.0-rc.8（2026-10-22）。Issue #401 の 3 修正は rc.5 以降に入っており npm で入手可能（compare で祖先関係を確認）。
+- **次にやること（ユーザー決定）**: `react-native-executorch` / `llama.rn` / **Expo SDK 58** の 3 つを**まとめて 1 回のビルドで上げる**。時期は未定（「そのうちまとめて行おう」）。調べた結果 3 つは `react-native-worklets` のバージョンレンジと RN 0.88 互換で**相互に必須**の関係にあり分割できない → **#26** として記録。
+- **さらに大きい発見**: PR #408（rc.7）/ #412（rc.8）で `context.decide()` =「typed decision models (System One)」が追加され、**#25 で手書きしていた SemIf 方式がライブラリ機能になった**。`openjev`/`jev` readout 実装済み、1 回答 1 forward・生成トークンゼロ・キャリブレーション済み確率。対応モデルの **LiquidAI d1-omni-600M** が使えればモデル DL のコスト前提が変わる。ただし **iOS 実機は上流未検証**で RC 系列。→ #25 のランタイム選択を 3 択として記録し、どれも未着手のまま保留。
 
 ### 2026-09-21 セッション（SemIf 方式の実機検証）
 
@@ -221,8 +232,63 @@ j/k: 記事移動、Enter/o: 詳細を開く、m: 既読トグル、s: お気に
 
 - **`axios ^0.21.2` (mobile)**: 古すぎる。0.21.x には既知 CVE（SSRF 等）があり、現行は 1.x。`apps/mobile/src/utils/api.js` ほか使用箇所の breaking change（エラーハンドリング、`AxiosError`）を確認して 1.x へ。使用箇所が薄ければ fetch への置き換えも可。
 - **確認のみ**: `moment`（重いが動いている。置換は任意）、`react-native-tab-view ^3.x`（RN 0.83 との整合）。
-- **この項目では触らない**: `llama.rn 0.12.4` と `react-native-executorch 0.9.1`。これらは AI 基盤の依存で、モバイル 1.0.14 リリースに紐づくバンプ計画がある（Track F 冒頭の注記を参照）。
+- **この項目では触らない**: `llama.rn 0.12.4`、`react-native-executorch 0.9.1`、`expo 55`。これらは **#26（一括更新）** で扱う。
 - 更新後は EAS ビルドが必要な変更か（ネイティブ側に触れるか）を必ず判定し、コミットメッセージに明記。
+
+### 26. Expo SDK 58 + executorch + llama.rn の一括更新 【P1・大】
+
+**方針（2026-10-28 にユーザー決定）**: **次にやりたいのはこれ。`react-native-executorch` / `llama.rn` / Expo SDK 58 の 3 つをまとめて 1 回のビルドで上げる。「そのうちまとめて行おう」= 時期は未定、着手前にこの節を読み直す。**
+
+**なぜ「まとめて」が正しいか — 3 つは相互に必須**（調べた結果、単に効率が良いという話ではない）:
+
+| | 現状 | 目標 | 理由 |
+|---|---|---|---|
+| `expo` | `^55.0.23` | **58.0.20** | SDK 58 が `react-native 0.88.0` / `react 19.3.0` / **`react-native-worklets 0.13.0`** を連れてくる |
+| `react-native-executorch` | `^0.9.1` | **0.11.0** | peerDeps が `react-native-worklets >=0.10.0 <0.14.0`。**現状の 0.7.4 では要件を満たせない → Expo の更新が前提**。逆に SDK 58 の 0.13.0 はレンジ内で一致する |
+| `llama.rn` | `0.12.4` | **0.12.9 または 0.13.0-rc** | RN 0.87 互換（bridge runtime の duck-typed アクセス）が入ったのは **0.13.0-rc.2**。**RN 0.88 に上げるなら 0.12.4 のままは危険** |
+
+つまり「Expo を上げると executorch も上げざるを得ず、executorch/RN を上げると llama.rn も上げざるを得ない」。3 つを別々のリリースに分けると、どのビルドも整合しない期間ができる。
+
+**Expo SDK 58 が要求するバージョン**（`expo@58.0.20` の `bundledNativeModules.json` 実測）:
+
+```
+react-native                 0.88.0      (現 0.83.6)
+react                        19.3.0      (現 19.2.0)
+react-native-reanimated      4.7.1       (現 4.2.1)
+react-native-worklets        0.13.0      (現 0.7.4)   ← executorch 0.11 の鍵
+react-native-gesture-handler ~3.3.0      (現 ~2.30.0) ← メジャー
+react-native-pager-view      9.0.7       (現 8.0.0)   ← メジャー
+react-native-screens         ~4.30.0     (現 ~4.23.0)
+react-native-safe-area-context ~5.10.1   (現 ~5.6.0)
+react-native-svg             15.16.0     (現 15.15.3)
+react-native-web             ~0.21.4     (現 ^0.21.0)
+```
+
+**追加で必要になる依存**（executorch 0.11.0 の peerDeps。現在 `package.json` に無い）:
+
+- `react-native-blob-util >= 0.24.11`
+- `@kesha-antonov/react-native-background-downloader >= 4.4.0`
+
+**注意点 / 落とし穴**:
+
+- **SDK 55 → 58 はメジャー 3 つ飛び**。Expo の公式推奨は 1 つずつ。56 → 57 → 58 と刻んで各段で起動確認する方が、まとめて飛ばすより早く終わる可能性が高い
+- `react-native-gesture-handler` 2.x → 3.x と `react-native-pager-view` 8 → 9 はメジャー。後者は `react-native-tab-view ^3.1.1` と組み合わせて使っているので**タブ UI の回帰確認が必須**（#9 に「`react-native-tab-view` の RN 整合を確認」という既存メモあり）
+- `expo-file-system/legacy` を `apps/mobile/src/ai/ttsService.js` と `apps/mobile/src/ai/llama/download.js` で使っている。**SDK 58 で legacy サブパスが残っているか確認**。消えていれば新 API への書き換えが必要
+- executorch は `react-native-executorch/legacy` サブパス経由なら既存コードのまま上げられる（import 元の差し替えのみ）。新 API への移行はこの項目に含めず別途
+- llama.rn は **安定版が 0.12.9 止まり**で `latest` タグは RC（`0.13.0-rc.8`）。#25 の `decide()` API は RC にしかない。**この項目では「RN 0.88 で動く最小構成」を目的に 0.12.9 を第一候補とし、RC を踏むかは #25 着手時に判断する**のが安全
+- 当然 **EAS ビルド必須**。Windows からクラウドビルドで iPhone 13 mini 実機確認（過去の手順は `docs/llama-rn-post-merge-plan.md`）
+- 回帰確認の必須項目: 要約 / 翻訳（Hy-MT2）/ チャット / 信号分離 / ベンチマーク画面 / モデル DL（resource fetcher の経路が変わる）。TTS は現在 `AiContext.js` でコメントアウト中なので対象外
+- App Store 提出を伴うなら、過去の 2.5.4（バックグラウンドオーディオ）と JSON Parse の経緯があるため審査ノートの用意を忘れない
+
+**着手順の案**:
+
+1. `expo` を 56 → 57 → 58 と刻んで上げ、各段で `npx expo-doctor` と起動確認（executorch / llama.rn は触らない。壊れたままでよい）
+2. SDK 58 に乗ったら `react-native-executorch` を 0.11.0 へ。import 元を `react-native-executorch/legacy` に差し替え、peerDeps 2 つを追加
+3. `llama.rn` を 0.12.9 へ
+4. EAS development build → iPhone 13 mini 実機で上記の回帰確認
+5. 通ったら production build / 1.0.14 として提出
+
+一次資料: executorch 側の詳細は `docs/MOBILE_ON_DEVICE_AI_PLAN.md`「保留中の検討事項 › react-native-executorch 0.11.0」、llama.rn 側は同書「機能7 › llama.rn 0.13.0-rc の `decide()` API」。
 
 ### 11. Web 巨大ページの分割 【P3・中】
 
@@ -258,9 +324,9 @@ mobile に `@reduxjs/toolkit ^1.5.1` + `redux ^4` + `react-redux ^7` + `redux-lo
 **現状**: `docs/MOBILE_ON_DEVICE_AI_PLAN.md` の Phase 1〜6 が実装・出荷済み。`apps/mobile/src/ai/` 配下に要約 (`useArticleAi.js`)・翻訳 (`useArticleTranslation.js`, Hy-MT2)・TTS (`ttsService.js`)・チャット・信号分離・ベンチマーク UI が揃っている。以下は同計画書に仕様が書かれた未実装分と将来拡張。**各項目の詳細仕様は MOBILE_ON_DEVICE_AI_PLAN.md が一次資料**であり、本書は優先度と着手順だけを定める。
 
 **依存バンプの既定方針**（この Track の項目に着手する前に確認）:
-- `react-native-executorch` 0.9.1 → 0.9.2 はモバイル 1.0.14 のタイミングで取り込む方針（caret 解決なので lockfile 更新のみ）。
-- `llama.rn` 0.12.4 → 0.12.5（Gemma MTP 対応）へのバンプ予定あり。ネイティブ側が変わるため EAS ビルドが必要。
-- どちらも「1.0.14 リリース作業」として Track F の実装と同じビルドに相乗りさせるとビルド・審査回数を節約できる。
+- `react-native-executorch` 0.9.1 → **0.11.0**（2026-10-27 リリース）。0.9.2 で済ませる当初方針は無効。API 全面再構成だが `react-native-executorch/legacy` サブパスが残っており、import 元の差し替えで段階移行できる。peerDeps（`react-native-blob-util >= 0.24.11` など）とネイティブ側が変わるため **EAS ビルド必須**。詳細と着手順は MOBILE_ON_DEVICE_AI_PLAN.md「保留中の検討事項 › react-native-executorch 0.11.0」。
+- `llama.rn` 0.12.4 →（2026-10-28 時点）**安定版の最新は 0.12.9（2026-08-04）で、npm の `latest` タグは RC の `0.13.0-rc.8`（2026-10-22）が占めている**。Issue #401 の 3 修正は `0.13.0-rc.5` 以降に入っており、#25 で本命になった `decide()` API（下記 #25 参照）は `0.13.0-rc.7`/`rc.8` でしか使えない。→ **#25 に着手するなら RC を踏む判断が必要**。要約/翻訳の安定性だけなら 0.12.9 止まりが無難。ネイティブ側が変わるため EAS ビルドが必要。
+- **この 2 つと Expo SDK 58 への更新は #26（一括更新）として 1 回のビルドでまとめて行う方針（2026-10-28 ユーザー決定）**。3 つは `react-native-worklets` のバージョンレンジと RN 0.88 互換で相互に必須の関係にあるため、分割できない。詳細は #26。
 
 ### 14. aiCache の 7日 TTL / eviction 【P1・小】
 
@@ -309,6 +375,14 @@ mobile に `@reduxjs/toolkit ^1.5.1` + `redux ^4` + `react-redux ^7` + `redux-lo
 **一次資料**: `docs/MOBILE_ON_DEVICE_AI_PLAN.md` 機能7（方式・実測値・llama.rn の制約・実行モデル・着手前の検証項目）。判定関数 `apps/mobile/src/ai/llama/judge.js` と Benchmark 画面の `judge` kind は実装済み。
 
 **着手条件**: FeedOwn の実フィード 30〜50 件で単純条件ルールの正解率と p の分離を確認できること。llama.rn Issue #401 の修正状況と 0.12.9 バンプも合わせて確認。
+
+**ランタイムが 3 択になった（2026-10-28）** — 着手時に同じフィクスチャで横並び比較してから決める。詳細は MOBILE_ON_DEVICE_AI_PLAN.md 機能7:
+
+- **(a) llama.rn 0.13.0-rc の `decide()` API — 第一候補**。PR #408/#412 で "typed decision models (System One)" が入り、**本機能で手書きしていた SemIf 方式がライブラリ機能になった**。`noul`/`choice`/`score` 型の質問を 1 回答 1 forward・生成トークンゼロ・キャリブレーション済み確率で答える。readout に `openjev`/`jev` が実装済みで、Issue #401 の回避策も不要になる。対応モデルに **LiquidAI d1-omni-600M（600M, LFM2 系）** があり、**Qwen3.5 2B（1.28 GB）を 3 つ目の DL として入れる前提が崩れる可能性がある**。リスクは **iOS 実機が上流未検証**・RC 系列・embedding モードのモデルは `completion()` 不可（セッション共用に影響）。
+- **(b) llama.rn 従来方式 + Qwen3.5 2B**。2026-09-21 に実測済みで `judge.js` も実装済み。確実だが追加 DL 1.28 GB。
+- **(c) executorch 0.11.0 で logits 直読 + LFM2.5**。生成ループが TS 化され `Tensor.getData()` で logits を読める。既存の LFM2.5 ロード経路に相乗りできるので**追加 DL ゼロ**。
+
+(a) を採る場合 `judge.js` は不要になる。
 
 ## Track G: 新機能提案
 
