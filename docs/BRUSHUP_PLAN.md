@@ -271,7 +271,10 @@ react-native-web             ~0.21.4     (現 ^0.21.0)
 
 **注意点 / 落とし穴**:
 
-- **SDK 55 → 58 はメジャー 3 つ飛び**。Expo の公式推奨は 1 つずつ。56 → 57 → 58 と刻んで各段で起動確認する方が、まとめて飛ばすより早く終わる可能性が高い
+- **SDK 55 → 最新は一気に上げる（2026-10-28 ユーザー決定）**。メジャー 3 つ飛びで、Expo の公式推奨（1 つずつ）とは異なる。代償は「どの段の変更で壊れたか」の切り分けが難しくなることなので、**着手前に SDK 56 / 57 / 58 の changelog（breaking changes）を全部読んで該当箇所を洗い出しておく**。
+  - バージョンは `expo@^58` のように明示する（`yarn add expo` 素の「最新」は SDK 59 が出た時点で 59 になる）。着手時に 59 が出ていたら、下の相互依存（worklets レンジ / RN 0.88）を取り直す
+  - **`yarn.lock` は消さない**。ルート共有の lockfile で web / functions の推移的依存まで一斉にドリフトし、原因の切り分けがさらに難しくなる。消すのは `node_modules` だけ。ルートに `package-lock.json` も併存しているので yarn に一本化する
+  - `npx expo install --fix` は executorch / llama.rn / tab-view / executorch の新 peerDeps には触れない。手動で上げる。`--fix` は差分が出なくなるまで繰り返す
 - `react-native-gesture-handler` 2.x → 3.x と `react-native-pager-view` 8 → 9 はメジャー。後者は `react-native-tab-view ^3.1.1` と組み合わせて使っているので**タブ UI の回帰確認が必須**（#9 に「`react-native-tab-view` の RN 整合を確認」という既存メモあり）
 - `expo-file-system/legacy` を `apps/mobile/src/ai/ttsService.js` と `apps/mobile/src/ai/llama/download.js` で使っている。**SDK 58 で legacy サブパスが残っているか確認**。消えていれば新 API への書き換えが必要
 - executorch は `react-native-executorch/legacy` サブパス経由なら既存コードのまま上げられる（import 元の差し替えのみ）。新 API への移行はこの項目に含めず別途
@@ -282,9 +285,10 @@ react-native-web             ~0.21.4     (現 ^0.21.0)
 
 **着手順の案**:
 
-1. `expo` を 56 → 57 → 58 と刻んで上げ、各段で `npx expo-doctor` と起動確認（executorch / llama.rn は触らない。壊れたままでよい）
-2. SDK 58 に乗ったら `react-native-executorch` を 0.11.0 へ。import 元を `react-native-executorch/legacy` に差し替え、peerDeps 2 つを追加
+1. `apps/mobile` で `yarn add expo@^58` → `npx expo install --fix`（収束するまで）→ `npx expo-doctor`。changelog で洗い出した箇所（`expo-file-system/legacy` 等）を修正
+2. `react-native-executorch` を 0.11.0 へ。import 元を `react-native-executorch/legacy` に差し替え、peerDeps 2 つを追加
 3. `llama.rn` を 0.12.9 へ
+   - 1〜3 は**それぞれ別コミット**にする。llama.rn 0.12.4 は RN 0.88 で安全でないため 1 の時点では dev build を作れない可能性が高く、実機確認は 3 の後にまとめて行う。壊れたときはコミット単位で戻して切り分ける
 4. EAS development build → iPhone 13 mini 実機で上記の回帰確認
 5. 通ったら production build / 1.0.14 として提出
 
