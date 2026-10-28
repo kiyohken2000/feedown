@@ -37,6 +37,11 @@ import {
   deleteModel as deleteLlamaModel,
 } from '../../ai/llama'
 
+// SemIf judge の bench は llama.rn 0.13.0-rc.8 で completion 中にネイティブ
+// クラッシュする (iPhone 13 mini, 2026-10-28)。どの機能も使っていないので #25
+// 着手まで隠す。DL 済みの judge モデルだけは削除できるよう一覧に残す。
+const SHOW_SEMIF_JUDGE = false
+
 function fmtMs(ms) {
   if (!ms || ms <= 0) return '—'
   if (ms < 1000) return `${Math.round(ms)} ms`
@@ -248,13 +253,17 @@ export default function Benchmark() {
   // ダウンロード済みのモデル一覧 (executorch + Hy-MT2 + judge)
   const downloadedIds = aiSettings.downloadedModelIds ?? []
   const benchmarkableModels = ALL_BENCHMARK_MODELS.filter((m) => {
-    if (m.kind === 'judge') return judgeStatus[m.id]?.downloaded === true
+    if (m.kind === 'judge') return SHOW_SEMIF_JUDGE && judgeStatus[m.id]?.downloaded === true
     if (m.backend === 'executorch') return downloadedIds.includes(m.id)
     if (m.backend === 'llama.rn') return aiSettings.hyMt2Downloaded === true
     return false
   })
 
   const isRunning = outerProgress !== null
+
+  const visibleJudgeModels = SHOW_SEMIF_JUDGE
+    ? SEMIF_JUDGE_MODELS
+    : SEMIF_JUDGE_MODELS.filter((m) => judgeStatus[m.id]?.downloaded)
 
   const toggleChecked = useCallback(
     (id) => {
@@ -636,67 +645,69 @@ export default function Benchmark() {
         </View>
 
         {/* SemIf judge models (bench-only download) */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
-            SemIf judge models
-          </Text>
-          <View style={[styles.card, { backgroundColor: theme.card }]}>
-            {SEMIF_JUDGE_MODELS.map((m) => {
-              const st = judgeStatus[m.id]
-              const gate = canRunOnDevice(m)
-              const dl = judgeDl?.id === m.id ? judgeDl : null
-              return (
-                <View key={m.id} style={[styles.judgeRow, { borderColor: theme.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.modelName, { color: theme.text }]}>
-                      {m.displayName}
-                    </Text>
-                    <Text style={[styles.modelNote, { color: theme.textMuted }]}>
-                      {st?.downloaded
-                        ? `Downloaded · ${fmtBytes(st.bytes)}`
-                        : dl
-                          ? `Downloading… ${Math.round(dl.percent * 100)}%`
-                          : gate.ok
-                            ? `${fmtBytes(m.expectedBytes)} · not downloaded`
-                            : gate.reason}
-                    </Text>
-                  </View>
-                  {st?.downloaded ? (
-                    <TouchableOpacity
-                      onPress={() => onDeleteJudge(m)}
-                      disabled={isRunning}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text style={[styles.headerActionText, { color: colors.redSecondary }]}>
-                        Delete
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      onPress={() => onDownloadJudge(m)}
-                      disabled={!!judgeDl || !gate.ok || isRunning}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text
-                        style={[
-                          styles.headerActionText,
-                          { color: judgeDl || !gate.ok ? theme.textMuted : colors.primary },
-                        ]}
-                      >
-                        Download
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )
-            })}
-            <Text style={[styles.modelHint, { color: theme.textMuted }]}>
-              Single-token classification bench (12 fixed Japanese items, rule:
-              political insults). Downloads here only; these models are not
-              used by any feature.
+        {visibleJudgeModels.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
+              SemIf judge models
             </Text>
+            <View style={[styles.card, { backgroundColor: theme.card }]}>
+              {visibleJudgeModels.map((m) => {
+                const st = judgeStatus[m.id]
+                const gate = canRunOnDevice(m)
+                const dl = judgeDl?.id === m.id ? judgeDl : null
+                return (
+                  <View key={m.id} style={[styles.judgeRow, { borderColor: theme.border }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.modelName, { color: theme.text }]}>
+                        {m.displayName}
+                      </Text>
+                      <Text style={[styles.modelNote, { color: theme.textMuted }]}>
+                        {st?.downloaded
+                          ? `Downloaded · ${fmtBytes(st.bytes)}`
+                          : dl
+                            ? `Downloading… ${Math.round(dl.percent * 100)}%`
+                            : gate.ok
+                              ? `${fmtBytes(m.expectedBytes)} · not downloaded`
+                              : gate.reason}
+                      </Text>
+                    </View>
+                    {st?.downloaded ? (
+                      <TouchableOpacity
+                        onPress={() => onDeleteJudge(m)}
+                        disabled={isRunning}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={[styles.headerActionText, { color: colors.redSecondary }]}>
+                          Delete
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => onDownloadJudge(m)}
+                        disabled={!!judgeDl || !gate.ok || isRunning}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text
+                          style={[
+                            styles.headerActionText,
+                            { color: judgeDl || !gate.ok ? theme.textMuted : colors.primary },
+                          ]}
+                        >
+                          Download
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )
+              })}
+              <Text style={[styles.modelHint, { color: theme.textMuted }]}>
+                {SHOW_SEMIF_JUDGE
+                  ? 'Single-token classification bench (12 fixed Japanese items, rule: political insults). Downloads here only; these models are not used by any feature.'
+                  : 'The judge benchmark is currently disabled. These models are not used by any feature and can be deleted.'}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Saved results */}
         {savedEntries.length > 0 && (
