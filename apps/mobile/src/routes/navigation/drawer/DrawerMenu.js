@@ -4,7 +4,7 @@ import { View, Text } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DrawerActions } from '@react-navigation/native'
-import FontIcon from 'react-native-vector-icons/FontAwesome5'
+import FontIcon from '@expo/vector-icons/FontAwesome5'
 import { colors } from 'theme'
 
 const styles = {
