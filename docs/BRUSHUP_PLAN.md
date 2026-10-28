@@ -293,7 +293,7 @@ react-native-web             ~0.21.4     (現 ^0.21.0)
 - llama.rn は **安定版が 0.12.9 止まり**で `latest` タグは RC（`0.13.0-rc.8`）。~~0.12.9 を第一候補~~ → 0.12.9 は RN 0.88 でビルドできないため **RC 必須**（上の進捗参照）。#25 の `decide()` API も RC で使えるようになる
 - **iPhone Duo（Apple 初の折りたたみ、2026-10-23 発売、iOS 27）対応**: SDK 58 は iOS 27 / Duo 対応のリリース。内側 7.6" 画面の全面レイアウトには iOS 27.1 SDK（Xcode 27.1）でのビルドが必要（古い SDK のビルドも動くが全面表示から外れる）。RN にヒンジ / 姿勢 API は無く、ウィンドウサイズ基準 + 左右含む各辺の safe area で対応する（以下はまとめ記事ベース。着手時に expo.dev/blog/supporting-iphone-duo で一次確認）
   - `app.json` が `orientation: "portrait"` / `supportsTablet: false`。Duo 内側画面でこれがどう扱われるか（全面か互換表示か）は未確認 → Duo シミュレーターで確認
-  - モジュール読み込み時に `Dimensions.get('window')` で固定している箇所は開閉に追従しない → `useWindowDimensions` へ置き換え: `src/components/EmptyScreen.js` / `ErrorScreen.js` / `LoadingScreen.js` / `BlurBox/constants/index.js`（`ArticleReader` 等は既に `useWindowDimensions` で OK）
+  - ~~モジュール読み込み時に `Dimensions.get('window')` で固定している箇所~~ → `EmptyScreen` / `ErrorScreen` / `LoadingScreen` を `useWindowDimensions` に置き換え済み（2026-10-28）。`BlurBox/` はどこからも import されておらず、未インストールの `@shopify/react-native-skia` に依存する死にコードなので触っていない
   - EAS のビルドイメージが Xcode 27.1 になっているか確認
 - 当然 **EAS ビルド必須**。Windows からクラウドビルドで iPhone 13 mini 実機確認（過去の手順は `docs/llama-rn-post-merge-plan.md`）
 - 回帰確認の必須項目: 要約 / 翻訳（Hy-MT2）/ チャット / 信号分離 / ベンチマーク画面 / モデル DL（resource fetcher の経路が変わる）。TTS は現在 `AiContext.js` でコメントアウト中なので対象外

@@ -1,10 +1,12 @@
 import React, { useRef, useContext } from 'react'
-import { StyleSheet, Dimensions, View, Text } from "react-native"
+import { StyleSheet, useWindowDimensions, View, Text } from "react-native"
 import LottieView from "lottie-react-native"
 import { colors, fontSize } from '../theme';
 
 export default function EmptyScreen(props) {
   const animation = useRef(null);
+  // Read per render so the size follows window changes (e.g. folding an iPhone Duo).
+  const { height, width } = useWindowDimensions()
   const { text } = props
   const label = text?text:'現金残高の登録がありません。'
   
@@ -13,7 +15,7 @@ export default function EmptyScreen(props) {
       <LottieView
         ref={animation}
         source={require("../../assets/lottie/emptyAnimation.json")}
-        style={styles.animation}
+        style={{ width: width * 0.3, height: height * 0.3 }}
         autoPlay
       />
       <Text style={[styles.text, {color: colors.black}]}>{label}</Text>
@@ -21,12 +23,7 @@ export default function EmptyScreen(props) {
   )
 }
 
-const { height, width } = Dimensions.get('window')
 const styles = StyleSheet.create({
-  animation: {
-    width: width * 0.3,
-    height: height * 0.3,
-  },
   container: {
     flex: 1,
     justifyContent: 'center',
