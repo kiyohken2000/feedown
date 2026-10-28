@@ -47,6 +47,9 @@
         "VIBRATE",
         "CAMERA",
         "RECORD_AUDIO"
+      ],
+      "blockedPermissions": [
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
       ]
     },
     "packagerOpts": {
