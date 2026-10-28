@@ -2,16 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { View } from 'react-native'
 import { Provider } from 'react-redux'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { initExecutorch } from 'react-native-executorch/legacy'
-import { ExpoResourceFetcher } from 'react-native-executorch-expo-resource-fetcher/legacy'
 import store from 'utils/store'
 import 'utils/ignore'
 import { UserContextProvider } from './contexts/UserContext'
 import { FeedsContextProvider } from './contexts/FeedsContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AiProvider } from './contexts/AiContext'
-
-initExecutorch({ resourceFetcher: ExpoResourceFetcher })
 
 // assets
 import { imageAssets } from 'theme/images'

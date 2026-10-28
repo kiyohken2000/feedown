@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+// TTS: uncomment to re-enable (needs porting to the 0.11 new API first)
+/*
 import {
-  useLLM,
-  // TTS: uncomment to re-enable
   // useTextToSpeech,
   // KOKORO_SMALL,
   // KOKORO_VOICE_AF_HEART,
@@ -12,7 +12,7 @@ import {
   // KOKORO_VOICE_BF_EMMA,
   // KOKORO_VOICE_BM_DANIEL,
 } from 'react-native-executorch/legacy'
-import { ExpoResourceFetcher } from 'react-native-executorch-expo-resource-fetcher/legacy'
+*/
 import { initLlama } from 'llama.rn'
 import {
   FEEDOWN_DEFAULT_LLM_ID,
@@ -26,11 +26,32 @@ import {
 } from '../ai/aiStorage'
 import { modelPathFor, toNativePath } from '../ai/llama'
 import { canRunOnDevice } from '../ai/llama/models'
+import { useExecutorchLLM } from '../ai/executorch/useExecutorchLLM'
+import {
+  deleteModelFiles,
+  getDownloadedBytes,
+  modelUrls,
+  removeLegacyModelFiles,
+} from '../ai/executorch/files'
 
-function modelSources(model) {
-  if (!model?.executorchModel) return []
-  const { modelSource, tokenizerSource, tokenizerConfigSource } = model.executorchModel
-  return [modelSource, tokenizerSource, tokenizerConfigSource].filter(Boolean)
+// Bumped when the on-disk executorch model files change format. 2 = the
+// react-native-executorch 0.11 new-API exports (v0.11.0), which replace the
+// 0.9 / legacy files: those are deleted and every model must be downloaded
+// again, so downloadedModelIds is cleared and auto-load is turned off.
+const EXECUTORCH_STORE_VERSION = 2
+
+async function migrateExecutorchStore(loaded) {
+  if (loaded.executorchStoreVersion === EXECUTORCH_STORE_VERSION) return loaded
+  const removed = await removeLegacyModelFiles()
+  console.log(`[ai] executorch store → v${EXECUTORCH_STORE_VERSION}: removed ${removed} legacy files`)
+  const next = {
+    ...loaded,
+    executorchStoreVersion: EXECUTORCH_STORE_VERSION,
+    downloadedModelIds: [],
+    downloadEnabled: false,
+  }
+  await saveAiSettings(next)
+  return next
 }
 
 // TTS: uncomment to re-enable
@@ -58,16 +79,18 @@ export function AiProvider({ children }) {
   const markedRef = useRef(new Set())
 
   useEffect(() => {
-    getAiSettings().then((loaded) => {
-      setSettings(loaded)
-      setInitialized(true)
-    })
+    getAiSettings()
+      .then(migrateExecutorchStore)
+      .then((loaded) => {
+        setSettings(loaded)
+        setInitialized(true)
+      })
   }, [])
 
   const selectedModel = useMemo(() => {
     // 保存された selectedModelId が現端末の RAM 要件を満たさない場合
     // (e.g., Gemma 4 を選択済みの状態で 4GB 端末で起動) はデフォルトに
-    // フォールバック。useLLM がロード試行して jetsam OOM するのを防ぐ。
+    // フォールバック。useExecutorchLLM がロード試行して jetsam OOM するのを防ぐ。
     const m = getModelById(settings.selectedModelId)
     if (m && canRunOnDevice(m).ok) return m
     return getModelById(FEEDOWN_DEFAULT_LLM_ID)
@@ -75,7 +98,7 @@ export function AiProvider({ children }) {
 
   // preventLoad: AI 無効 / 初期化未完了 / ユーザーが Download を押していない
   // / llama.rn セッションが GPU を占有中
-  const llm = useLLM({
+  const llm = useExecutorchLLM({
     model: selectedModel?.executorchModel ?? FEEDOWN_LLM_MODELS[0].executorchModel,
     preventLoad: !initialized || !settings.enabled || !settings.downloadEnabled || llamaActive,
   })
@@ -140,21 +163,28 @@ export function AiProvider({ children }) {
     await saveAiSettings(next)
   }
 
+  // URLs used by the other downloaded models. Models of one family share
+  // tokenizer files, so deleting one model must keep those.
+  const downloadedIdsRef = useRef([])
+  downloadedIdsRef.current = settings.downloadedModelIds ?? []
+  const sharedUrlsExcept = useCallback(
+    (modelId) =>
+      downloadedIdsRef.current
+        .filter((id) => id !== modelId)
+        .flatMap((id) => modelUrls(getModelById(id)?.executorchModel)),
+    [],
+  )
+
   // Returns total bytes on disk for the given model, or 0 if not downloaded
   const getModelSize = useCallback(async (modelId) => {
     const model = getModelById(modelId)
-    const sources = modelSources(model)
-    if (sources.length === 0) return 0
-    try {
-      return await ExpoResourceFetcher.getFilesTotalSize(...sources)
-    } catch {
-      return 0
-    }
+    if (!model?.executorchModel) return 0
+    return getDownloadedBytes(model.executorchModel)
   }, [])
 
   // Run a llama.rn (GGUF) session — used by the translation feature with
   // Hy-MT2. Swaps the GPU owner: executorch is suspended (preventLoad=true
-  // → useLLM cleanup releases its Metal allocations), then llama.cpp loads
+  // → useExecutorchLLM cleanup releases its Metal allocations), then llama.cpp loads
   // the GGUF, the caller drives one or more completions inside `onSession`,
   // then the ctx is released and executorch is allowed to reload (eager on
   // the next render — fine for warm Metal cache).
@@ -197,36 +227,29 @@ export function AiProvider({ children }) {
     }
   }, [])
 
-  // 進行中の DL を中断する。useLLM は単一インスタンスで selectedModel
-  // しか追跡しないため、別モデルへの切替や AI 無効化で DL が中途半端に
-  // 放棄されると partial file が残る。Cancel ではまず downloadEnabled を
-  // 落として useLLM のクリーンアップを誘発し、その後 deleteResources で
-  // 部分ファイルを掃除して次回 DL が clean に始まるようにする。
+  // 進行中の DL を中断する。useExecutorchLLM は単一インスタンスで
+  // selectedModel しか追跡しないため、別モデルへの切替や AI 無効化で DL が
+  // 中途半端に放棄されると partial file が残る。Cancel ではまず
+  // downloadEnabled を落として hook のクリーンアップ (download の abort) を
+  // 誘発し、その後 partial を含むファイルを消して次回 DL を clean に始める。
   const cancelDownload = useCallback(async (modelId) => {
     setSettings((prev) => {
       const next = { ...prev, downloadEnabled: false }
       saveAiSettings(next)
       return next
     })
-    // useLLM が preventLoad=true で unmount → 内部の fetch を abort する
-    // 猶予を少し置いてから partial ファイルを削除
+    // preventLoad=true で download が abort される猶予を少し置いてから削除
     await new Promise((r) => setTimeout(r, 300))
     const model = getModelById(modelId)
-    const sources = modelSources(model)
-    if (sources.length === 0) return
-    try {
-      await ExpoResourceFetcher.deleteResources(...sources)
-    } catch (e) {
-      console.warn('[AiContext] cancel cleanup failed:', e?.message ?? e)
-    }
-  }, [])
+    if (!model?.executorchModel) return
+    await deleteModelFiles(model.executorchModel, sharedUrlsExcept(modelId))
+  }, [sharedUrlsExcept])
 
   // Delete the on-disk files for the given model and update settings
   const deleteModel = useCallback(async (modelId) => {
     const model = getModelById(modelId)
-    const sources = modelSources(model)
-    if (sources.length === 0) return
-    await ExpoResourceFetcher.deleteResources(...sources)
+    if (!model?.executorchModel) return
+    await deleteModelFiles(model.executorchModel, sharedUrlsExcept(modelId))
     markedRef.current.delete(modelId)
     setSettings((prev) => {
       const next = {
@@ -240,7 +263,7 @@ export function AiProvider({ children }) {
       saveAiSettings(next)
       return next
     })
-  }, [])
+  }, [sharedUrlsExcept])
 
   return (
     <AiContext.Provider

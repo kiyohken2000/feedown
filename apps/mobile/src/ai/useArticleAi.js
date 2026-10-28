@@ -257,7 +257,8 @@ export function useArticleAi(article, readerContent = null) {
     const cleaned = stripThinkTags(rawResponse)
     const trimmed = cleaned?.trim()
     if (!trimmed) {
-      setChatError('No response received. Please try again.')
+      // Stopped before the first token: nothing to keep, and not an error.
+      setChatError(pending.stopped ? null : 'No response received. Please try again.')
       setIsLoadingChat(false)
       pendingRef.current = null
       return
@@ -457,7 +458,10 @@ export function useArticleAi(article, readerContent = null) {
       // isGenerating → false transition and keeps the partial reply
       // (it also clears isLoadingChat). Summary / signals output would be
       // truncated JSON, so drop those.
-      if (pendingRef.current?.feature === 'chat') return
+      if (pendingRef.current?.feature === 'chat') {
+        pendingRef.current = { ...pendingRef.current, stopped: true }
+        return
+      }
       setIsLoadingSummary(false)
       setIsLoadingSignals(false)
       pendingRef.current = null

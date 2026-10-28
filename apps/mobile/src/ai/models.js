@@ -1,13 +1,27 @@
-import {
-  LFM2_5_1_2B_INSTRUCT_QUANTIZED,
-  LFM2_5_350M_QUANTIZED,
-  QWEN3_0_6B_QUANTIZED,
-  QWEN3_1_7B_QUANTIZED,
-  QWEN3_5_0_8B_QUANTIZED,
-  QWEN3_5_2B_QUANTIZED,
-  models,
-} from 'react-native-executorch/legacy'
+import { Platform } from 'react-native'
+import { models } from 'react-native-executorch'
 import { RAM_TIER } from './llama/models'
+
+// executorchModel = { modelPath, tokenizerPath, tokenizerConfigPath } as
+// remote URLs (react-native-executorch 0.11 new API, v0.11.0 exports).
+// XNNPACK 8da4w everywhere except Gemma, matching the 0.9 / legacy picks.
+//
+// Context lengths of the v0.11.0 exports (get_max_context_len):
+//   LFM2.5 1.2B / 350M: 16384, Qwen3: 8192, Qwen3.5: 2048 (same as 0.9).
+//
+// Qwen3.5 is not in the 0.11 registry, but v0.11.0 files exist on the hub.
+const QWEN3_5_BASE_URL =
+  'https://huggingface.co/software-mansion/react-native-executorch-qwen-3.5/resolve/v0.11.0'
+const QWEN3_5_0_8B_XNNPACK_8DA4W = {
+  modelPath: `${QWEN3_5_BASE_URL}/0_8b/xnnpack/qwen_3_5_0_8b_xnnpack_8da4w.pte`,
+  tokenizerPath: `${QWEN3_5_BASE_URL}/0_8b/tokenizer.json`,
+  tokenizerConfigPath: `${QWEN3_5_BASE_URL}/0_8b/tokenizer_config.json`,
+}
+const QWEN3_5_2B_XNNPACK_8DA4W = {
+  modelPath: `${QWEN3_5_BASE_URL}/2b/xnnpack/qwen_3_5_2b_xnnpack_8da4w.pte`,
+  tokenizerPath: `${QWEN3_5_BASE_URL}/2b/tokenizer.json`,
+  tokenizerConfigPath: `${QWEN3_5_BASE_URL}/2b/tokenizer_config.json`,
+}
 
 export const FEEDOWN_DEFAULT_LLM_ID = 'lfm2_5_1_2b_instruct_quantized'
 export const MODEL_DEFINITION_VERSION = '1'
@@ -22,7 +36,7 @@ export const DEFAULT_MAX_INPUT_CHARS = 4000
 export const FEEDOWN_LLM_MODELS = [
   {
     id: 'lfm2_5_1_2b_instruct_quantized',
-    executorchModel: LFM2_5_1_2B_INSTRUCT_QUANTIZED,
+    executorchModel: models.llm.LFM2_5_1_2B.XNNPACK_8DA4W,
     displayName: 'LFM 2.5 - 1.2B Instruct',
     recommendation: 'recommended',
     features: ['summary'],
@@ -31,7 +45,7 @@ export const FEEDOWN_LLM_MODELS = [
   },
   {
     id: 'qwen3_0_6b_quantized',
-    executorchModel: QWEN3_0_6B_QUANTIZED,
+    executorchModel: models.llm.QWEN3_0_6B.XNNPACK_8DA4W,
     displayName: 'Qwen 3 - 0.6B',
     recommendation: 'candidate',
     features: ['summary'],
@@ -40,7 +54,7 @@ export const FEEDOWN_LLM_MODELS = [
   },
   {
     id: 'qwen3_1_7b_quantized',
-    executorchModel: QWEN3_1_7B_QUANTIZED,
+    executorchModel: models.llm.QWEN3_1_7B.XNNPACK_8DA4W,
     displayName: 'Qwen 3 - 1.7B',
     recommendation: 'candidate',
     features: ['summary'],
@@ -49,7 +63,7 @@ export const FEEDOWN_LLM_MODELS = [
   },
   {
     id: 'qwen3_5_0_8b_quantized',
-    executorchModel: QWEN3_5_0_8B_QUANTIZED,
+    executorchModel: QWEN3_5_0_8B_XNNPACK_8DA4W,
     displayName: 'Qwen 3.5 - 0.8B',
     recommendation: 'candidate',
     features: ['summary'],
@@ -58,7 +72,7 @@ export const FEEDOWN_LLM_MODELS = [
   },
   {
     id: 'qwen3_5_2b_quantized',
-    executorchModel: QWEN3_5_2B_QUANTIZED,
+    executorchModel: QWEN3_5_2B_XNNPACK_8DA4W,
     displayName: 'Qwen 3.5 - 2B',
     recommendation: 'candidate',
     features: ['summary'],
@@ -67,7 +81,7 @@ export const FEEDOWN_LLM_MODELS = [
   },
   {
     id: 'lfm2_5_350m_quantized',
-    executorchModel: LFM2_5_350M_QUANTIZED,
+    executorchModel: models.llm.LFM2_5_350M.XNNPACK_8DA4W,
     displayName: 'LFM 2.5 - 350M',
     recommendation: 'fallback',
     features: ['summary'],
@@ -85,9 +99,10 @@ export const FEEDOWN_LLM_MODELS = [
     // LFM 2.5 1.2B の半分程度、初回 cold load は Metal shader コンパイル
     // で ~54s かかる点に注意。
     id: 'gemma4_e2b',
-    // 0.11 legacy dropped the GEMMA4_E2B constant; this accessor resolves to
-    // the same per-platform URLs (iOS: mlx, Android: vulkan).
-    executorchModel: models.llm.gemma4_e2b(),
+    executorchModel:
+      Platform.OS === 'ios'
+        ? models.llm.GEMMA4_E2B.MLX_INT4
+        : models.llm.GEMMA4_E2B.VULKAN_8DA4W,
     displayName: 'Gemma 4 - E2B (experimental)',
     recommendation: 'candidate',
     features: ['summary'],

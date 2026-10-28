@@ -9697,11 +9697,6 @@ react-native-enriched-markdown@^0.5.0:
   resolved "https://registry.yarnpkg.com/react-native-enriched-markdown/-/react-native-enriched-markdown-0.5.0.tgz#0d2e9a965963ca253c592136741d8329734d434f"
   integrity sha512-CYihNlcg8IjsrVbmypDjFHsDF6Z6vYO0yraw6CkR30SDsg99J6fcBrOkyWOItO8PIDD21jw8yD1eYP/0LBOCdA==
 
-react-native-executorch-expo-resource-fetcher@0.11.0:
-  version "0.11.0"
-  resolved "https://registry.yarnpkg.com/react-native-executorch-expo-resource-fetcher/-/react-native-executorch-expo-resource-fetcher-0.11.0.tgz#c2a94b95baf142a227b073388497fa55799d702b"
-  integrity sha512-upGk/XBwCQRcvHDSz5zqlggZrqw0sdBSMiIJOWkLBqiF7g0NWjIRN4TflTVPmla5QlP79NV5UY4vSG1i0J+utg==
-
 react-native-executorch@0.11.0:
   version "0.11.0"
   resolved "https://registry.yarnpkg.com/react-native-executorch/-/react-native-executorch-0.11.0.tgz#7e373fb662f01ca5699fa71c295ade800a7e476b"
@@ -11458,10 +11453,15 @@ urijs@^1.19.6:
   resolved "https://registry.npmjs.org/urijs/-/urijs-1.19.11.tgz"
   integrity sha512-HXgFDgDommxn5/bIv0cnQZsPhHDA90NPHD6+c/v21U5+Sx5hoP8+dP9IZXBU1gIfvdRfhG8cel9QNPeionfcCQ==
 
-use-latest-callback@0.1.9, use-latest-callback@^0.1.5, use-latest-callback@^0.2.4:
+use-latest-callback@^0.1.5:
   version "0.1.9"
   resolved "https://registry.yarnpkg.com/use-latest-callback/-/use-latest-callback-0.1.9.tgz#10191dc54257e65a8e52322127643a8940271e2a"
   integrity sha512-CL/29uS74AwreI/f2oz2hLTW7ZqVeV5+gxFeGudzQrgkCytrHw33G4KbnQOrRlAEzzAFXi7dDLMC9zhWcVpzmw==
+
+use-latest-callback@^0.2.4:
+  version "0.2.6"
+  resolved "https://registry.yarnpkg.com/use-latest-callback/-/use-latest-callback-0.2.6.tgz#e5ea752808c86219acc179ace0ae3c1203255e77"
+  integrity sha512-FvRG9i1HSo0wagmX63Vrm8SnlUU3LMM3WyZkQ76RnslpBrX694AdG4A0zQBx2B3ZifFA0yv/BaEHGBnEax5rZg==
 
 use-sync-external-store@^1.5.0:
   version "1.6.0"
