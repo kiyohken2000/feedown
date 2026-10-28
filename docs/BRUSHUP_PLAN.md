@@ -239,7 +239,12 @@ j/k: 記事移動、Enter/o: 詳細を開く、m: 既読トグル、s: お気に
 
 **方針（2026-10-28 にユーザー決定）**: **次にやりたいのはこれ。`react-native-executorch` / `llama.rn` / Expo SDK 58 の 3 つをまとめて 1 回のビルドで上げる。「そのうちまとめて行おう」= 時期は未定、着手前にこの節を読み直す。**
 
-**進捗（2026-10-28）**: 手順 1〜3 をローカルコミット済み（`f04339f` SDK 58 / `724f4c1` executorch 0.11.0 / `fb98dd3` llama.rn 0.13.0-rc.8）。各段で `expo export --platform ios` のバンドルは通過。**次は手順 4（EAS development build → 実機回帰確認）**。
+**進捗（2026-10-28）**: 手順 1〜3（`f04339f` SDK 58 / `724f4c1` executorch 0.11.0 / `fb98dd3` llama.rn 0.13.0-rc.8）→ EAS dev build は iOS / Android とも成功（iOS は iOS 27.1 SDK でビルド）→ 13 mini 実機で回帰確認しながら修正。**残りは手順 4 の残り（翻訳 LFM フォールバック / 信号分離 / ベンチマークの再確認、Duo シミュレーター）と手順 5（1.0.14 提出）**。
+- **executorch は `/legacy` ではなく新 API へ移行済み**（`74aa5fb`）。legacy は 0.9 のモデル（コンテキスト 2048）に固定されており、日本語 2817 文字の記事で prompt 2043 トークン → 4 トークンで打ち切り → 要約失敗 / 短縮リトライで品質低下、が起きたため。v0.11.0 版は LFM2.5 16384 / Qwen3 8192（Qwen3.5 は 2048 のまま）。`src/ai/executorch/useExecutorchLLM.js` が legacy `useLLM` と同じ形を返すので呼び出し側は無変更。**初回起動で旧モデルを消し全モデル再 DL（1.0.14 のリリースノートに書く）**
+- 実機で見つかって直したもの: `@react-navigation/stack` 7.6 の `InteractionManager`（RN 0.88 で削除）→ 7.x 最新へ / `StyleSheet.absoluteFillObject` 削除で QR 画面のオーバーレイ崩れ / SDK 56 で `@expo/vector-icons` が expo から外れタブアイコンが「?」/ Android dev build の Gradle OOM → `resourceClass: large` / チャット Stop が効かない（元からのバグ + 新 API で prefill 256 トークン分割）
+- SemIf judge ベンチは llama.rn rc.8 で completion 中にネイティブクラッシュ → `SHOW_SEMIF_JUDGE = false` で非表示（#25 着手時に調査。iPhone のクラッシュログ `.ips` が必要）
+- 残る警告（対応保留）: `react-native-gifted-chat` 2.8.1 が Reanimated 4.7 / Worklets 0.13 で `Dependencies should only be used on the web` / `Cannot copy value of type Date` を出す（動作は正常。最新 3.4.0 はメジャー更新）
+- TTS（Kokoro）は AiContext でコメントアウト中のまま legacy import を残している。再有効化するときは新 API への移植が必要
 - **llama.rn は 0.12.9 ではなく 0.13.0-rc.8 に決定**: 0.12.9 は RN 0.88 で iOS コンパイル不可（`RNLlama.mm` が `RCTCxxBridge` にキャストして `.runtime` を読むが、RN 0.88 の `RCTBridge+Private.h` からそのクラス宣言が消えている）。duck-typed な `RNLlamaBridgeRuntimeAccess` は rc.2 以降のみ。アプリが使う `initLlama` / `completion` / `tokenize` / `getFormattedChat` / `stopCompletion` / `release` とパラメータ名は rc.8 でも同じ
 - **executorch 0.11 の `/legacy` で `GEMMA4_E2B` 定数が消えた** → `models.llm.gemma4_e2b()`（同じ URL: iOS mlx / Android vulkan）に置換。他の 6 モデルの URL は 0.9.1 と完全一致（DL 済みモデルはそのまま使える）。resource fetcher も `/legacy` を使う（0.9.1 と同じ `expo-file-system/legacy` 経路・同じ保存先）
 - **Windows で `yarn add` するときは PowerShell から**: Git Bash だと llama.rn の postinstall が Git の `tar` を使い `C:` をリモートホストと解釈して失敗する（yarn が package.json だけ更新して lockfile を更新しない半端な状態になる）。PowerShell なら `System32	ar.exe` が使われ通る
