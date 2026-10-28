@@ -81,6 +81,9 @@
         {
           "ios": {
             "deploymentTarget": "17.0"
+          },
+          "android": {
+            "extraProguardRules": "-dontwarn com.tencent.mmkv.**"
           }
         }
       ],
