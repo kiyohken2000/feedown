@@ -14,6 +14,9 @@
       "channel": "development",
       "ios": {
         "simulator": false
+      },
+      "android": {
+        "resourceClass": "large"
       }
     },
     "preview": {
