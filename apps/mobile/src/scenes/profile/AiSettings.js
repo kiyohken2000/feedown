@@ -413,11 +413,13 @@ export default function AiSettings() {
                 </Text>
               </View>
               <Switch
-                value={aiSettings.translationEngine === 'hy-mt2'}
+                // Show ON while downloading so the tap visibly took effect;
+                // the engine itself only switches once the download finishes.
+                value={aiSettings.translationEngine === 'hy-mt2' || hyMt2Downloading}
                 onValueChange={handleToggleHyMt2}
                 disabled={hyMt2Downloading || !ramGate.ok}
                 trackColor={{ false: '#767577', true: colors.primary }}
-                thumbColor={aiSettings.translationEngine === 'hy-mt2' ? colors.white : '#f4f3f4'}
+                thumbColor={aiSettings.translationEngine === 'hy-mt2' || hyMt2Downloading ? colors.white : '#f4f3f4'}
               />
             </View>
 
@@ -429,8 +431,15 @@ export default function AiSettings() {
 
             {hyMt2Downloading && (
               <View style={{ marginTop: 12 }}>
-                <Text style={[styles.modelHint, { color: theme.textMuted, marginTop: 0 }]}>
-                  Downloading… {Math.round(hyMt2DlProgress * 100)}%
+                <Text style={[styles.hyMt2DlLabel, { color: theme.text }]}>
+                  Downloading Hy-MT2… {Math.round(hyMt2DlProgress * 100)}%
+                </Text>
+                <View style={[styles.hyMt2DlTrack, { backgroundColor: theme.border }]}>
+                  <View style={[styles.hyMt2DlFill, { width: `${Math.round(hyMt2DlProgress * 100)}%` }]} />
+                </View>
+                <Text style={[styles.modelHint, { color: theme.textMuted }]}>
+                  Translation switches to Hy-MT2 automatically when the download
+                  finishes.
                 </Text>
               </View>
             )}
@@ -733,6 +742,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   downloadButtonText: { fontSize: fontSize.normal, fontWeight: '600' },
+  hyMt2DlLabel: {
+    fontSize: fontSize.small,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  hyMt2DlTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  hyMt2DlFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+  },
   hyMt2InfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
