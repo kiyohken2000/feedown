@@ -14,6 +14,7 @@
     "eas-build-pre-install": "node scripts/eas-build-pre-install.js"
   },
   "dependencies": {
+    "@kesha-antonov/react-native-background-downloader": "^4.4.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.4.7",
     "@react-navigation/drawer": "^7.5.8",
@@ -51,10 +52,11 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",
+    "react-native-blob-util": "^0.24.11",
     "react-native-element-dropdown": "^2.12.4",
     "react-native-enriched-markdown": "^0.5.0",
-    "react-native-executorch": "^0.9.1",
-    "react-native-executorch-expo-resource-fetcher": "^0.9.1",
+    "react-native-executorch": "0.11.0",
+    "react-native-executorch-expo-resource-fetcher": "0.11.0",
     "react-native-gesture-handler": "~3.3.0",
     "react-native-gifted-chat": "^2.8.1",
     "react-native-keyboard-aware-scroll-view": "^0.9.5",

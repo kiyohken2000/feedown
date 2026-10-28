@@ -11,8 +11,8 @@ import {
   // KOKORO_VOICE_AM_MICHAEL,
   // KOKORO_VOICE_BF_EMMA,
   // KOKORO_VOICE_BM_DANIEL,
-} from 'react-native-executorch'
-import { ExpoResourceFetcher } from 'react-native-executorch-expo-resource-fetcher'
+} from 'react-native-executorch/legacy'
+import { ExpoResourceFetcher } from 'react-native-executorch-expo-resource-fetcher/legacy'
 import { initLlama } from 'llama.rn'
 import {
   FEEDOWN_DEFAULT_LLM_ID,

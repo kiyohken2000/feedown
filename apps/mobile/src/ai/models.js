@@ -1,12 +1,12 @@
 import {
-  GEMMA4_E2B,
   LFM2_5_1_2B_INSTRUCT_QUANTIZED,
   LFM2_5_350M_QUANTIZED,
   QWEN3_0_6B_QUANTIZED,
   QWEN3_1_7B_QUANTIZED,
   QWEN3_5_0_8B_QUANTIZED,
   QWEN3_5_2B_QUANTIZED,
-} from 'react-native-executorch'
+  models,
+} from 'react-native-executorch/legacy'
 import { RAM_TIER } from './llama/models'
 
 export const FEEDOWN_DEFAULT_LLM_ID = 'lfm2_5_1_2b_instruct_quantized'
@@ -85,7 +85,9 @@ export const FEEDOWN_LLM_MODELS = [
     // LFM 2.5 1.2B の半分程度、初回 cold load は Metal shader コンパイル
     // で ~54s かかる点に注意。
     id: 'gemma4_e2b',
-    executorchModel: GEMMA4_E2B,
+    // 0.11 legacy dropped the GEMMA4_E2B constant; this accessor resolves to
+    // the same per-platform URLs (iOS: mlx, Android: vulkan).
+    executorchModel: models.llm.gemma4_e2b(),
     displayName: 'Gemma 4 - E2B (experimental)',
     recommendation: 'candidate',
     features: ['summary'],
