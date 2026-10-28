@@ -142,6 +142,19 @@ export function useArticleAi(article, readerContent = null) {
     }
   }
 
+  // 生成トークン数がごく少ないまま終わった = EOS ではなく context 上限で
+  // 打ち切られた、とみなす。正常な要約 JSON は 100 トークンを下回らない。
+  function isContextCutOff(rawResponse) {
+    if (pendingRef.current?.retryingShort) return false
+    let generated
+    try {
+      generated = llm.getGeneratedTokenCount()
+    } catch {
+      return false
+    }
+    return generated < 16 && (rawResponse?.trim().length ?? 0) < 64
+  }
+
   function handleSummaryComplete(rawResponse, pending) {
     // race ガード: 1st generate が失敗して空 response で完了した直後に
     // .catch から短縮 retry がキックされる。useEffect on isGenerating は
@@ -169,6 +182,17 @@ export function useArticleAi(article, readerContent = null) {
       setIsLoadingSummary(false)
       pendingRef.current = null
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+    } else if (!pending.retrying && isContextCutOff(rawResponse)) {
+      // prompt がコンテキスト上限の直前まで埋まっていると、例外にならず数
+      // トークンだけ生成して止まる (LFM2.5 1.2B: prompt 2043 / 上限 2048 で
+      // 4 トークン)。repair は prompt がさらに長くなって必ず溢れるので、
+      // 直接短縮 retry に回す。
+      console.log(`[ai] handleSummaryComplete: output cut off by context → short retry. response=${rawResponse?.length ?? 0} chars`)
+      handleSummaryGenerateError(
+        new Error('context cut off'),
+        pending.perspective,
+        pending.outputLanguage,
+      )
     } else if (!pending.retrying) {
       console.log(`[ai] handleSummaryComplete: parse failed → repair retry. response=${rawResponse?.length ?? 0} chars`)
       const repairMessages = buildRepairPromptMessages(pending.messages, rawResponse)
@@ -177,12 +201,10 @@ export function useArticleAi(article, readerContent = null) {
         console.warn('LLM repair generate failed:', err)
         const cur = pendingRef.current
         if (cur?.feature !== 'summary') return
-        setSummaryErrors((prev) => ({
-          ...prev,
-          [cur.perspective]: 'Model failed to generate. Try a shorter article or a smaller model.',
-        }))
-        setIsLoadingSummary(false)
-        pendingRef.current = null
+        // repair prompt は元の prompt + 出力なので context overflow しやすい。
+        // 諦める前に短縮 retry を試す (短縮済み / 短い記事ならエラー表示)。
+        pendingRef.current = { ...cur, retrying: false }
+        handleSummaryGenerateError(err, cur.perspective, cur.outputLanguage)
       })
     } else {
       console.log(`[ai] handleSummaryComplete: parse failed AGAIN, giving up. response=${rawResponse?.length ?? 0} chars`)
@@ -431,6 +453,11 @@ export function useArticleAi(article, readerContent = null) {
   const interrupt = () => {
     if (llm.isGenerating) {
       llm.interrupt()
+      // Chat keeps pendingRef so handleChatComplete runs on the
+      // isGenerating → false transition and keeps the partial reply
+      // (it also clears isLoadingChat). Summary / signals output would be
+      // truncated JSON, so drop those.
+      if (pendingRef.current?.feature === 'chat') return
       setIsLoadingSummary(false)
       setIsLoadingSignals(false)
       pendingRef.current = null
