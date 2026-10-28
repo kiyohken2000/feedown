@@ -235,9 +235,16 @@ j/k: 記事移動、Enter/o: 詳細を開く、m: 既読トグル、s: お気に
 - **この項目では触らない**: `llama.rn 0.12.4`、`react-native-executorch 0.9.1`、`expo 55`。これらは **#26（一括更新）** で扱う。
 - 更新後は EAS ビルドが必要な変更か（ネイティブ側に触れるか）を必ず判定し、コミットメッセージに明記。
 
-### 26. Expo SDK 58 + executorch + llama.rn の一括更新 【P1・大】
+### 26. Expo SDK 58 + executorch + llama.rn の一括更新 🚧 【P1・大】
 
 **方針（2026-10-28 にユーザー決定）**: **次にやりたいのはこれ。`react-native-executorch` / `llama.rn` / Expo SDK 58 の 3 つをまとめて 1 回のビルドで上げる。「そのうちまとめて行おう」= 時期は未定、着手前にこの節を読み直す。**
+
+**進捗（2026-10-28）**: 手順 1〜3 をローカルコミット済み（`f04339f` SDK 58 / `724f4c1` executorch 0.11.0 / `fb98dd3` llama.rn 0.13.0-rc.8）。各段で `expo export --platform ios` のバンドルは通過。**次は手順 4（EAS development build → 実機回帰確認）**。
+- **llama.rn は 0.12.9 ではなく 0.13.0-rc.8 に決定**: 0.12.9 は RN 0.88 で iOS コンパイル不可（`RNLlama.mm` が `RCTCxxBridge` にキャストして `.runtime` を読むが、RN 0.88 の `RCTBridge+Private.h` からそのクラス宣言が消えている）。duck-typed な `RNLlamaBridgeRuntimeAccess` は rc.2 以降のみ。アプリが使う `initLlama` / `completion` / `tokenize` / `getFormattedChat` / `stopCompletion` / `release` とパラメータ名は rc.8 でも同じ
+- **executorch 0.11 の `/legacy` で `GEMMA4_E2B` 定数が消えた** → `models.llm.gemma4_e2b()`（同じ URL: iOS mlx / Android vulkan）に置換。他の 6 モデルの URL は 0.9.1 と完全一致（DL 済みモデルはそのまま使える）。resource fetcher も `/legacy` を使う（0.9.1 と同じ `expo-file-system/legacy` 経路・同じ保存先）
+- **Windows で `yarn add` するときは PowerShell から**: Git Bash だと llama.rn の postinstall が Git の `tar` を使い `C:` をリモートホストと解釈して失敗する（yarn が package.json だけ更新して lockfile を更新しない半端な状態になる）。PowerShell なら `System32	ar.exe` が使われ通る
+- `yarn test` は**更新前から壊れている**（jest 本体も jest 設定も無く、`react-test-renderer@16`）。jest-expo 58 は `jest` / `@react-native/jest-preset` が peer になった。今回は触っていない
+- `expo-doctor` 指摘のうち `app.json` の `privacy`（スキーマ違反）は削除済み。ルートの `package-lock.json`（未追跡）は残っているので EAS 前に削除を検討。`react-native-render-html` は unmaintained 判定（動作には影響なし）
 
 **なぜ「まとめて」が正しいか — 3 つは相互に必須**（調べた結果、単に効率が良いという話ではない）:
 
@@ -245,7 +252,7 @@ j/k: 記事移動、Enter/o: 詳細を開く、m: 既読トグル、s: お気に
 |---|---|---|---|
 | `expo` | `^55.0.23` | **58.0.20** | SDK 58 が `react-native 0.88.0` / `react 19.3.0` / **`react-native-worklets 0.13.0`** を連れてくる |
 | `react-native-executorch` | `^0.9.1` | **0.11.0** | peerDeps が `react-native-worklets >=0.10.0 <0.14.0`。**現状の 0.7.4 では要件を満たせない → Expo の更新が前提**。逆に SDK 58 の 0.13.0 はレンジ内で一致する |
-| `llama.rn` | `0.12.4` | **0.12.9 または 0.13.0-rc** | RN 0.87 互換（bridge runtime の duck-typed アクセス）が入ったのは **0.13.0-rc.2**。**RN 0.88 に上げるなら 0.12.4 のままは危険** |
+| `llama.rn` | `0.12.4` | **0.13.0-rc.8**（0.12.9 は RN 0.88 でビルド不可） | RN 0.87 互換（bridge runtime の duck-typed アクセス）が入ったのは **0.13.0-rc.2**。**RN 0.88 に上げるなら 0.12.4 のままは危険** |
 
 つまり「Expo を上げると executorch も上げざるを得ず、executorch/RN を上げると llama.rn も上げざるを得ない」。3 つを別々のリリースに分けると、どのビルドも整合しない期間ができる。
 
@@ -278,7 +285,11 @@ react-native-web             ~0.21.4     (現 ^0.21.0)
 - `react-native-gesture-handler` 2.x → 3.x と `react-native-pager-view` 8 → 9 はメジャー。後者は `react-native-tab-view ^3.1.1` と組み合わせて使っているので**タブ UI の回帰確認が必須**（#9 に「`react-native-tab-view` の RN 整合を確認」という既存メモあり）
 - `expo-file-system/legacy` を `apps/mobile/src/ai/ttsService.js` と `apps/mobile/src/ai/llama/download.js` で使っている。**SDK 58 で legacy サブパスが残っているか確認**。消えていれば新 API への書き換えが必要
 - executorch は `react-native-executorch/legacy` サブパス経由なら既存コードのまま上げられる（import 元の差し替えのみ）。新 API への移行はこの項目に含めず別途
-- llama.rn は **安定版が 0.12.9 止まり**で `latest` タグは RC（`0.13.0-rc.8`）。#25 の `decide()` API は RC にしかない。**この項目では「RN 0.88 で動く最小構成」を目的に 0.12.9 を第一候補とし、RC を踏むかは #25 着手時に判断する**のが安全
+- llama.rn は **安定版が 0.12.9 止まり**で `latest` タグは RC（`0.13.0-rc.8`）。~~0.12.9 を第一候補~~ → 0.12.9 は RN 0.88 でビルドできないため **RC 必須**（上の進捗参照）。#25 の `decide()` API も RC で使えるようになる
+- **iPhone Duo（Apple 初の折りたたみ、2026-10-23 発売、iOS 27）対応**: SDK 58 は iOS 27 / Duo 対応のリリース。内側 7.6" 画面の全面レイアウトには iOS 27.1 SDK（Xcode 27.1）でのビルドが必要（古い SDK のビルドも動くが全面表示から外れる）。RN にヒンジ / 姿勢 API は無く、ウィンドウサイズ基準 + 左右含む各辺の safe area で対応する（以下はまとめ記事ベース。着手時に expo.dev/blog/supporting-iphone-duo で一次確認）
+  - `app.json` が `orientation: "portrait"` / `supportsTablet: false`。Duo 内側画面でこれがどう扱われるか（全面か互換表示か）は未確認 → Duo シミュレーターで確認
+  - モジュール読み込み時に `Dimensions.get('window')` で固定している箇所は開閉に追従しない → `useWindowDimensions` へ置き換え: `src/components/EmptyScreen.js` / `ErrorScreen.js` / `LoadingScreen.js` / `BlurBox/constants/index.js`（`ArticleReader` 等は既に `useWindowDimensions` で OK）
+  - EAS のビルドイメージが Xcode 27.1 になっているか確認
 - 当然 **EAS ビルド必須**。Windows からクラウドビルドで iPhone 13 mini 実機確認（過去の手順は `docs/llama-rn-post-merge-plan.md`）
 - 回帰確認の必須項目: 要約 / 翻訳（Hy-MT2）/ チャット / 信号分離 / ベンチマーク画面 / モデル DL（resource fetcher の経路が変わる）。TTS は現在 `AiContext.js` でコメントアウト中なので対象外
 - App Store 提出を伴うなら、過去の 2.5.4（バックグラウンドオーディオ）と JSON Parse の経緯があるため審査ノートの用意を忘れない
@@ -287,9 +298,9 @@ react-native-web             ~0.21.4     (現 ^0.21.0)
 
 1. `apps/mobile` で `yarn add expo@^58` → `npx expo install --fix`（収束するまで）→ `npx expo-doctor`。changelog で洗い出した箇所（`expo-file-system/legacy` 等）を修正
 2. `react-native-executorch` を 0.11.0 へ。import 元を `react-native-executorch/legacy` に差し替え、peerDeps 2 つを追加
-3. `llama.rn` を 0.12.9 へ
+3. `llama.rn` を 0.13.0-rc.8 へ
    - 1〜3 は**それぞれ別コミット**にする。llama.rn 0.12.4 は RN 0.88 で安全でないため 1 の時点では dev build を作れない可能性が高く、実機確認は 3 の後にまとめて行う。壊れたときはコミット単位で戻して切り分ける
-4. EAS development build → iPhone 13 mini 実機で上記の回帰確認
+4. EAS development build → iPhone 13 mini 実機で上記の回帰確認。Duo はシミュレーターで開閉・内側画面の表示を確認（`Dimensions.get` 固定箇所の置き換えはここで別コミット）
 5. 通ったら production build / 1.0.14 として提出
 
 一次資料: executorch 側の詳細は `docs/MOBILE_ON_DEVICE_AI_PLAN.md`「保留中の検討事項 › react-native-executorch 0.11.0」、llama.rn 側は同書「機能7 › llama.rn 0.13.0-rc の `decide()` API」。
