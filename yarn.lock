@@ -3129,81 +3129,81 @@
     invariant "^2.2.4"
     nullthrows "^1.1.1"
 
-"@react-navigation/bottom-tabs@^7.4.7":
-  version "7.9.0"
-  resolved "https://registry.npmjs.org/@react-navigation/bottom-tabs/-/bottom-tabs-7.9.0.tgz"
-  integrity sha512-024FWdHp3ZsE5rP8tmGI4vh+1z3wg8u8E9Frep8eeGoYo1h9rQhvgofQDGxknmrKsb7t8o8Dim+IZSvl57cPFQ==
+"@react-navigation/bottom-tabs@^7.21.0":
+  version "7.21.0"
+  resolved "https://registry.yarnpkg.com/@react-navigation/bottom-tabs/-/bottom-tabs-7.21.0.tgz#43fe7fb7ea0eea5cff83bbcde5265b3062aa6223"
+  integrity sha512-G3P88TPiHw9rxGhstwdeVgaBj3YQl8emiF8zLgyfXOF2AIk31myIrtDQeu2Mg5Ad7YWMs4W8zkXuD78xChlTHQ==
   dependencies:
-    "@react-navigation/elements" "^2.9.3"
+    "@react-navigation/elements" "^2.9.45"
     color "^4.2.3"
     sf-symbols-typescript "^2.1.0"
 
-"@react-navigation/core@^7.13.7":
-  version "7.13.7"
-  resolved "https://registry.npmjs.org/@react-navigation/core/-/core-7.13.7.tgz"
-  integrity sha512-k2ABo3250vq1ovOh/iVwXS6Hwr5PVRGXoPh/ewVFOOuEKTvOx9i//OBzt8EF+HokBxS2HBRlR2b+aCOmscRqBw==
+"@react-navigation/core@^7.24.0":
+  version "7.24.0"
+  resolved "https://registry.yarnpkg.com/@react-navigation/core/-/core-7.24.0.tgz#d6104ebcf8696f7858772c158822e553170a6d6f"
+  integrity sha512-PPMHGSgLB65eqWOBHeD/nGyzGJV3rcZ5sZbsCXlaC37HnLmwTEjB4CaOQn8CBVVv/Sc0Kl/W5dpPLls9Stk2WA==
   dependencies:
-    "@react-navigation/routers" "^7.5.3"
+    "@react-navigation/routers" "^7.6.5"
     escape-string-regexp "^4.0.0"
     fast-deep-equal "^3.1.3"
-    nanoid "^3.3.11"
-    query-string "^7.1.3"
     react-is "^19.1.0"
     use-latest-callback "^0.2.4"
     use-sync-external-store "^1.5.0"
 
-"@react-navigation/drawer@^7.5.8":
-  version "7.7.10"
-  resolved "https://registry.npmjs.org/@react-navigation/drawer/-/drawer-7.7.10.tgz"
-  integrity sha512-FGYU5Ebd2whTa4Z+RBCxnWqmyWIQGTJ7PAAhk2RjlVrEXLU0HaFR5JGmEHuNm/Cm9xX3xCwOxYZiA0Xi/DeyAA==
+"@react-navigation/drawer@^7.14.4":
+  version "7.14.4"
+  resolved "https://registry.yarnpkg.com/@react-navigation/drawer/-/drawer-7.14.4.tgz#7ec5182ff48325ed0b33e07315b2e9076eccdea6"
+  integrity sha512-RF3hhxokFrPPLgH13vsEMj4v7of3KI/LX1NAjwlutQPd0dbq/vJ6hS1lSuPsGpxt6sFv6F+OK+AjFnQYda0FUw==
   dependencies:
-    "@react-navigation/elements" "^2.9.3"
+    "@react-navigation/elements" "^2.9.45"
     color "^4.2.3"
-    react-native-drawer-layout "^4.2.1"
+    react-native-drawer-layout "^4.2.12"
     use-latest-callback "^0.2.4"
 
-"@react-navigation/elements@^2.9.3":
-  version "2.9.3"
-  resolved "https://registry.npmjs.org/@react-navigation/elements/-/elements-2.9.3.tgz"
-  integrity sha512-3+eyvWiVPIEf6tN9UdduhOEHcTuNe3R5WovgiVkfH9+jApHMTZDc2loePTpY/i2HDJhObhhChpJzO6BVjrpdYQ==
+"@react-navigation/elements@^2.9.45":
+  version "2.9.45"
+  resolved "https://registry.yarnpkg.com/@react-navigation/elements/-/elements-2.9.45.tgz#bc87d3476813db3ce481841b37ab6d78e9353392"
+  integrity sha512-r64qCgjA6asQo4Zlv2lAl68ARkfPbV+BNRm3n9JlMoFr4Ma2A+92Z+sWT1coJRoSXkAwVNb70+LjpM6fo6/D4A==
   dependencies:
     color "^4.2.3"
     use-latest-callback "^0.2.4"
     use-sync-external-store "^1.5.0"
 
-"@react-navigation/material-top-tabs@^7.3.7":
-  version "7.4.11"
-  resolved "https://registry.npmjs.org/@react-navigation/material-top-tabs/-/material-top-tabs-7.4.11.tgz"
-  integrity sha512-RSC/f1bSpodnx1oSXw7jNrwe83JddRhb12ehCY8oZZDtrNhm3atSHzlfvHN37i3E8cln7Tmc1ieLxjWrU65n/Q==
+"@react-navigation/material-top-tabs@^7.8.1":
+  version "7.8.1"
+  resolved "https://registry.yarnpkg.com/@react-navigation/material-top-tabs/-/material-top-tabs-7.8.1.tgz#14e60bf9c1ee71164c8ed238457690632cd1fb85"
+  integrity sha512-n1KMx8diAXI652DebdChQjVubnhtanBzkaS2a9kt9HkRadh7h0Kr8BuKRhFzeFayHSUzHFUgWS+oauq+oFktSg==
   dependencies:
-    "@react-navigation/elements" "^2.9.3"
+    "@react-navigation/elements" "^2.9.45"
     color "^4.2.3"
-    react-native-tab-view "^4.2.2"
+    react-native-tab-view "^4.3.4"
+    use-latest-callback "^0.2.4"
 
-"@react-navigation/native@^7.1.17":
-  version "7.1.26"
-  resolved "https://registry.npmjs.org/@react-navigation/native/-/native-7.1.26.tgz"
-  integrity sha512-RhKmeD0E2ejzKS6z8elAfdfwShpcdkYY8zJzvHYLq+wv183BBcElTeyMLcIX6wIn7QutXeI92Yi21t7aUWfqNQ==
+"@react-navigation/native@^7.5.1":
+  version "7.5.1"
+  resolved "https://registry.yarnpkg.com/@react-navigation/native/-/native-7.5.1.tgz#8af9e9c9b9e40379d27aed94a3be99139275a558"
+  integrity sha512-p9xOvhG8q8rq0FPAoh0JC22ALbyRZt7U2uH8XrHRDjvqOEFrumME7szM6LaWW2WctolAVeZAfOTV+pUKULI/kQ==
   dependencies:
-    "@react-navigation/core" "^7.13.7"
+    "@react-navigation/core" "^7.24.0"
     escape-string-regexp "^4.0.0"
     fast-deep-equal "^3.1.3"
     nanoid "^3.3.11"
+    standard-navigation "^0.0.8"
     use-latest-callback "^0.2.4"
 
-"@react-navigation/routers@^7.5.3":
-  version "7.5.3"
-  resolved "https://registry.npmjs.org/@react-navigation/routers/-/routers-7.5.3.tgz"
-  integrity sha512-1tJHg4KKRJuQ1/EvJxatrMef3NZXEPzwUIUZ3n1yJ2t7Q97siwRtbynRpQG9/69ebbtiZ8W3ScOZF/OmhvM4Rg==
+"@react-navigation/routers@^7.6.5":
+  version "7.6.5"
+  resolved "https://registry.yarnpkg.com/@react-navigation/routers/-/routers-7.6.5.tgz#c7c4dde9e42d7a10540b5bf675e0a01ae0005051"
+  integrity sha512-hpvpVFt6wu3U014F/0Qy45VZCErlUvIV8kN1L6HovN5P9OpbXAzFTaRQmG7VW6czg2tSkUL5S3dZA0HIu5QirQ==
   dependencies:
     nanoid "^3.3.11"
 
-"@react-navigation/stack@^7.4.8":
-  version "7.6.13"
-  resolved "https://registry.npmjs.org/@react-navigation/stack/-/stack-7.6.13.tgz"
-  integrity sha512-Zs8W2k9AGltBVkUw0QXU97rTDLbfTikCWA3fstzpjVDVTXp+h0irXm1MTnAl79D3B1wcyZasUIwMZdyUqwMT6g==
+"@react-navigation/stack@^7.12.1":
+  version "7.12.1"
+  resolved "https://registry.yarnpkg.com/@react-navigation/stack/-/stack-7.12.1.tgz#1c25116fbe21e54c843cb268629a3294927a4020"
+  integrity sha512-4KEoho3yVy58B1Myj5ZNiSVmA8U8YfVbJrZT23uyA5pUy2dqPANH3REQ/zx/nMw4I62EVvqPHYLLbfGzI9/wTQ==
   dependencies:
-    "@react-navigation/elements" "^2.9.3"
+    "@react-navigation/elements" "^2.9.45"
     color "^4.2.3"
     use-latest-callback "^0.2.4"
 
@@ -5146,11 +5146,6 @@ decimal.js@^10.5.0:
   resolved "https://registry.yarnpkg.com/decimal.js/-/decimal.js-10.6.0.tgz#e649a43e3ab953a72192ff5983865e509f37ed9a"
   integrity sha512-YpgQiITW3JXGntzdUmyUR1V812Hn8T1YVXhCu+wO3OpS4eU9l4YdD3qjyiKdV6mvV29zapkMeD390UVEf2lkUg==
 
-decode-uri-component@^0.2.2:
-  version "0.2.2"
-  resolved "https://registry.npmjs.org/decode-uri-component/-/decode-uri-component-0.2.2.tgz"
-  integrity sha512-FqUYQ+8o158GyGTrMFJms9qh3CqTKvAqgqsTnkLI8sKu0028orqBhxNMFkFen0zGyg6epACD32pjVk58ngIErQ==
-
 dedent@^0.7.0:
   version "0.7.0"
   resolved "https://registry.npmjs.org/dedent/-/dedent-0.7.0.tgz"
@@ -6457,11 +6452,6 @@ fill-range@^7.1.1:
   integrity sha512-YsGpe3WHLK8ZYi4tWDg2Jy3ebRz2rXowDxnld4bkQB00cc/1Zw9AWnC0i9ztDJitivtQvaI9KaLyKrc+hBW0yg==
   dependencies:
     to-regex-range "^5.0.1"
-
-filter-obj@^1.1.0:
-  version "1.1.0"
-  resolved "https://registry.npmjs.org/filter-obj/-/filter-obj-1.1.0.tgz"
-  integrity sha512-8rXg1ZnX7xzy2NGDVkBVaAy+lSlPNwad13BtgSlLuxfIslyt5Vg64U7tFcCt4WS1R0hvtnQybT/IyCkGZ3DpXQ==
 
 finalhandler@1.1.2:
   version "1.1.2"
@@ -9603,16 +9593,6 @@ qrcode.react@^4.2.0:
   resolved "https://registry.npmjs.org/qrcode.react/-/qrcode.react-4.2.0.tgz"
   integrity sha512-QpgqWi8rD9DsS9EP3z7BT+5lY5SFhsqGjpgW5DY/i3mK4M9DTBNz3ErMi8BWYEfI3L0d8GIbGmcdFAS1uIRGjA==
 
-query-string@^7.1.3:
-  version "7.1.3"
-  resolved "https://registry.npmjs.org/query-string/-/query-string-7.1.3.tgz"
-  integrity sha512-hh2WYhq4fi8+b+/2Kg9CEge4fDPvHS534aOOvOZeQ3+Vf2mCFsaFBYj0i+iXcAq6I9Vzp5fjMFBlONvayDC1qg==
-  dependencies:
-    decode-uri-component "^0.2.2"
-    filter-obj "^1.1.0"
-    split-on-first "^1.0.0"
-    strict-uri-encode "^2.0.0"
-
 ramda@^0.27.2:
   version "0.27.2"
   resolved "https://registry.npmjs.org/ramda/-/ramda-0.27.2.tgz"
@@ -9692,10 +9672,10 @@ react-native-device-info@^15.0.2:
   resolved "https://registry.yarnpkg.com/react-native-device-info/-/react-native-device-info-15.0.2.tgz#c7de1bb6baeb07e1bab70159ad540c5705cb8dc0"
   integrity sha512-dd71eXG2l3Cwp66IvKNadMTB8fhU3PEjyVddI97sYan+D4bgIAUmgGDhbSOFvHcGavksb2U17kiQYaDiK2WK2g==
 
-react-native-drawer-layout@^4.2.1:
-  version "4.2.1"
-  resolved "https://registry.npmjs.org/react-native-drawer-layout/-/react-native-drawer-layout-4.2.1.tgz"
-  integrity sha512-liwRJ7ynRU/ogRlUdiK1Yoi1VzUSq2Vu/RU+UgqlMB3XduslZ1DZg/mTX0f1uCEV2dJ4ec+1fRa3OlIierfyZg==
+react-native-drawer-layout@^4.2.12:
+  version "4.2.12"
+  resolved "https://registry.yarnpkg.com/react-native-drawer-layout/-/react-native-drawer-layout-4.2.12.tgz#dd863622d5b3dc09b8becfb6c5ce527f1dbaaad8"
+  integrity sha512-qYmntEctkMSodN7pnC2llV21nswImLFPHJeT3PJXSJqZdU4jzDATR8iVi66sXkrtoOLJ2+EvXxgd7sMMpV4ViA==
   dependencies:
     color "^4.2.3"
     use-latest-callback "^0.2.4"
@@ -9866,10 +9846,10 @@ react-native-tab-view@^3.1.1:
   dependencies:
     use-latest-callback "^0.1.5"
 
-react-native-tab-view@^4.2.2:
-  version "4.2.2"
-  resolved "https://registry.npmjs.org/react-native-tab-view/-/react-native-tab-view-4.2.2.tgz"
-  integrity sha512-NXtrG6OchvbGjsvbySJGVocXxo4Y2vA17ph4rAaWtA2jh+AasD8OyikKBRg2SmllEfeQ+GEhcKe8kulHv8BhTg==
+react-native-tab-view@^4.3.4:
+  version "4.3.4"
+  resolved "https://registry.yarnpkg.com/react-native-tab-view/-/react-native-tab-view-4.3.4.tgz#2e14d7d9d7ae0f496d3e0624eb35556092edb656"
+  integrity sha512-z8eXgVmfLx2aSMeppQkuZPbb2N00H76T7OwtGcZYua5g2h9AYBbkYrYN4rKY0wSl1g0YRQ+NS6LLVkxppGr68g==
   dependencies:
     use-latest-callback "^0.2.4"
 
@@ -10719,11 +10699,6 @@ source-map@^0.6.0, source-map@^0.6.1:
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.6.1.tgz"
   integrity sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==
 
-split-on-first@^1.0.0:
-  version "1.1.0"
-  resolved "https://registry.npmjs.org/split-on-first/-/split-on-first-1.1.0.tgz"
-  integrity sha512-43ZssAJaMusuKWL8sKUBQXHWOpq8d6CfN/u1p4gUzfJkM05C8rxTmYrkIPTXapZpORA6LkkzcUulJ8FqA7Uudw==
-
 sprintf-js@~1.0.2:
   version "1.0.3"
   resolved "https://registry.npmjs.org/sprintf-js/-/sprintf-js-1.0.3.tgz"
@@ -10782,6 +10757,11 @@ stacktrace-parser@^0.1.10:
   dependencies:
     type-fest "^0.7.1"
 
+standard-navigation@^0.0.8:
+  version "0.0.8"
+  resolved "https://registry.yarnpkg.com/standard-navigation/-/standard-navigation-0.0.8.tgz#aef79bef130ec8ba0a9c070d3a728d96d68df8a8"
+  integrity sha512-TyVbo7INUDWtsUWDFn8RR7kwR87U0S4xHfLfbbnyeC581TmmyqQ+eM+nPw8rQTSD8QitRVcYfPaSHr/QJiUy1g==
+
 statuses@~1.5.0:
   version "1.5.0"
   resolved "https://registry.npmjs.org/statuses/-/statuses-1.5.0.tgz"
@@ -10809,11 +10789,6 @@ stream-buffers@2.2.x:
   version "2.2.0"
   resolved "https://registry.npmjs.org/stream-buffers/-/stream-buffers-2.2.0.tgz"
   integrity sha512-uyQK/mx5QjHun80FLJTfaWE7JtwfRMKBLkMne6udYOmvH0CawotVa7TfgYHzAnpphn4+TweIx1QKMnRIbipmUg==
-
-strict-uri-encode@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.npmjs.org/strict-uri-encode/-/strict-uri-encode-2.0.0.tgz"
-  integrity sha512-QwiXZgpRcKkhTj2Scnn++4PKtWsH0kpzZ62L2R6c/LUVYv7hVnZqcg2+sMuT6R7Jusu1vviK/MFsu6kNJfWlEQ==
 
 string-argv@0.3.1:
   version "0.3.1"
