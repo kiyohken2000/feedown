@@ -2,7 +2,6 @@
   "expo": {
     "name": "FeedOwn",
     "slug": "feedown",
-    "privacy": "public",
     "platforms": [
       "ios",
       "android"
@@ -84,7 +83,8 @@
             "deploymentTarget": "17.0"
           }
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "extra": {
       "eas": {
