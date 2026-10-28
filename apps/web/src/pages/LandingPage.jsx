@@ -6,6 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
 import { getTokens } from '../styles/tokens';
 import PublicHeader from '../components/PublicHeader';
+import useMediaQuery from '../hooks/useMediaQuery';
 import Footer from '../components/Footer';
 import screenshotImage from '../assets/images/screenshot_1.png';
 // Store badges
@@ -35,6 +36,8 @@ export default function LandingPage() {
   const t = translations[language].landing;
   const [selectedImage, setSelectedImage] = useState(null);
   const { color, radius, shadow } = getTokens(isDarkMode);
+  const isMobile = useMediaQuery('(max-width: 640px)');
+  const sectionPadding = isMobile ? '56px 16px' : '80px 20px';
 
   const styles = {
     page: {
@@ -46,7 +49,7 @@ export default function LandingPage() {
     },
     // Hero Section
     hero: {
-      padding: '90px 20px',
+      padding: isMobile ? '64px 16px' : '90px 20px',
       textAlign: 'center',
       background: isDarkMode
         ? `radial-gradient(900px 420px at 50% -10%, ${color.accentSoft} 0%, transparent 65%), ${color.appBg}`
@@ -66,7 +69,7 @@ export default function LandingPage() {
       backgroundClip: 'text',
     },
     description: {
-      fontSize: '18px',
+      fontSize: isMobile ? '16px' : '18px',
       lineHeight: '1.6',
       color: color.textMuted,
       marginBottom: '40px',
@@ -80,7 +83,7 @@ export default function LandingPage() {
       flexWrap: 'wrap',
     },
     primaryButton: {
-      padding: '14px 32px',
+      padding: isMobile ? '12px 24px' : '14px 32px',
       borderRadius: radius.md,
       backgroundColor: color.accent,
       color: color.onAccent,
@@ -91,7 +94,7 @@ export default function LandingPage() {
       boxShadow: '0 4px 14px rgba(255, 107, 53, 0.3)',
     },
     secondaryButton: {
-      padding: '14px 32px',
+      padding: isMobile ? '12px 24px' : '14px 32px',
       borderRadius: radius.md,
       backgroundColor: color.surface,
       color: color.text,
@@ -103,11 +106,11 @@ export default function LandingPage() {
     },
     // Features Section
     features: {
-      padding: '80px 20px',
+      padding: sectionPadding,
       backgroundColor: color.surface2,
     },
     sectionTitle: {
-      fontSize: '32px',
+      fontSize: isMobile ? '26px' : '32px',
       fontWeight: 800,
       letterSpacing: '-0.02em',
       textAlign: 'center',
@@ -118,7 +121,7 @@ export default function LandingPage() {
       fontSize: '16px',
       textAlign: 'center',
       color: color.textMuted,
-      marginBottom: '60px',
+      marginBottom: isMobile ? '36px' : '60px',
     },
     featuresGrid: {
       maxWidth: '1000px',
@@ -128,7 +131,7 @@ export default function LandingPage() {
       gap: '24px',
     },
     featureCard: {
-      padding: '30px',
+      padding: isMobile ? '22px' : '30px',
       borderRadius: radius.lg,
       backgroundColor: color.surface,
       border: `1px solid ${color.border}`,
@@ -156,7 +159,7 @@ export default function LandingPage() {
     },
     // Screenshot Section
     screenshot: {
-      padding: '80px 20px',
+      padding: sectionPadding,
       textAlign: 'center',
     },
     screenshotContainer: {
@@ -179,7 +182,7 @@ export default function LandingPage() {
     },
     // Mobile App Section
     mobileApp: {
-      padding: '80px 20px',
+      padding: sectionPadding,
       backgroundColor: color.surface2,
     },
     mobileContent: {
@@ -188,8 +191,8 @@ export default function LandingPage() {
     },
     mobileGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-      gap: '24px',
+      gridTemplateColumns: `repeat(auto-fit, minmax(${isMobile ? 130 : 180}px, 1fr))`,
+      gap: isMobile ? '16px' : '24px',
       marginBottom: '40px',
       justifyItems: 'center',
     },
@@ -282,7 +285,7 @@ export default function LandingPage() {
     },
     // On-Device AI Section
     aiSection: {
-      padding: '80px 20px',
+      padding: sectionPadding,
       backgroundColor: color.appBg,
     },
     aiContent: {
@@ -296,7 +299,7 @@ export default function LandingPage() {
       marginBottom: '60px',
     },
     aiFeatureCard: {
-      padding: '28px',
+      padding: isMobile ? '22px' : '28px',
       borderRadius: radius.lg,
       backgroundColor: color.surface,
       border: `1px solid ${color.border}`,
@@ -310,8 +313,8 @@ export default function LandingPage() {
     },
     aiScreenshotGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-      gap: '20px',
+      gridTemplateColumns: `repeat(auto-fit, minmax(${isMobile ? 130 : 140}px, 1fr))`,
+      gap: isMobile ? '16px' : '20px',
       marginBottom: '32px',
       justifyItems: 'center',
     },
@@ -337,7 +340,7 @@ export default function LandingPage() {
     },
     // Self-host Section
     selfHost: {
-      padding: '80px 20px',
+      padding: sectionPadding,
       backgroundColor: color.surface2,
       textAlign: 'center',
     },
@@ -347,18 +350,18 @@ export default function LandingPage() {
     },
     // CTA Section
     cta: {
-      padding: '80px 20px',
+      padding: sectionPadding,
       textAlign: 'center',
       background: 'linear-gradient(135deg, #FF6B35 0%, #f7931e 100%)',
       color: '#fff',
     },
     ctaTitle: {
-      fontSize: '32px',
+      fontSize: isMobile ? '26px' : '32px',
       fontWeight: '700',
       marginBottom: '16px',
     },
     ctaDesc: {
-      fontSize: '18px',
+      fontSize: isMobile ? '16px' : '18px',
       marginBottom: '30px',
       opacity: 0.9,
     },

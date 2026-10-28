@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
 import PublicHeader from '../components/PublicHeader';
+import useMediaQuery from '../hooks/useMediaQuery';
 import Footer from '../components/Footer';
 import ImageZoom from '../components/ImageZoom';
 import { getTokens } from '../styles/tokens';
@@ -33,6 +34,7 @@ export default function SetupGuidePage() {
   const t = translations[language].setup;
   const [activeSection, setActiveSection] = useState('prerequisites');
   const { color, radius, shadow } = getTokens(isDarkMode);
+  const isMobile = useMediaQuery('(max-width: 640px)');
 
   const styles = {
     page: {
@@ -46,12 +48,13 @@ export default function SetupGuidePage() {
       flex: 1,
       maxWidth: '1200px',
       margin: '0 auto',
-      padding: '40px 20px',
+      padding: isMobile ? '24px 16px' : '40px 20px',
       display: 'grid',
-      gridTemplateColumns: '250px 1fr',
+      gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '250px minmax(0, 1fr)',
       gap: '40px',
     },
     sidebar: {
+      display: isMobile ? 'none' : 'block',
       position: 'sticky',
       top: '100px',
       height: 'fit-content',
@@ -89,15 +92,15 @@ export default function SetupGuidePage() {
       textAlign: 'left',
     },
     title: {
-      fontSize: '36px',
+      fontSize: isMobile ? '28px' : '36px',
       fontWeight: 800,
       letterSpacing: '-0.02em',
       marginBottom: '8px',
     },
     subtitle: {
-      fontSize: '18px',
+      fontSize: isMobile ? '16px' : '18px',
       color: color.textMuted,
-      marginBottom: '40px',
+      marginBottom: isMobile ? '28px' : '40px',
     },
     section: {
       marginBottom: '48px',
@@ -173,6 +176,9 @@ export default function SetupGuidePage() {
     },
     table: {
       width: '100%',
+      // Let wide tables scroll sideways on phones instead of stretching the page
+      display: isMobile ? 'block' : 'table',
+      overflowX: 'auto',
       borderCollapse: 'collapse',
       marginBottom: '16px',
       fontSize: '14px',
@@ -831,7 +837,7 @@ npx expo start --clear`}
                 ? 'Here\'s what your self-hosted FeedOwn will look like:'
                 : 'セルフホストしたFeedOwnの見た目:'}
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: '16px', marginBottom: '24px' }}>
               <div>
                 <ImageZoom src={webApp7} alt="Login" style={styles.screenshot} />
                 <p style={styles.screenshotCaption}>{language === 'en' ? 'Login Screen' : 'ログイン画面'}</p>
@@ -852,7 +858,7 @@ npx expo start --clear`}
           </section>
 
           {/* GitHub Link */}
-          <section style={{ ...styles.section, textAlign: 'center', padding: '40px', backgroundColor: color.surface2, border: `1px solid ${color.border}`, borderRadius: radius.lg }}>
+          <section style={{ ...styles.section, textAlign: 'center', padding: isMobile ? '24px 16px' : '40px', backgroundColor: color.surface2, border: `1px solid ${color.border}`, borderRadius: radius.lg }}>
             <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '12px' }}>
               {t.viewFullGuide}
             </h3>

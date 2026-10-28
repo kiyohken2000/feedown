@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
 import PublicHeader from '../components/PublicHeader';
+import useMediaQuery from '../hooks/useMediaQuery';
 import Footer from '../components/Footer';
 import ImageZoom from '../components/ImageZoom';
 import { getTokens } from '../styles/tokens';
@@ -31,6 +32,7 @@ export default function DocsPage() {
   const t = translations[language].docs;
   const [activeSection, setActiveSection] = useState('what-is');
   const { color, radius, shadow } = getTokens(isDarkMode);
+  const isMobile = useMediaQuery('(max-width: 640px)');
 
   const styles = {
     page: {
@@ -44,12 +46,13 @@ export default function DocsPage() {
       flex: 1,
       maxWidth: '1200px',
       margin: '0 auto',
-      padding: '40px 20px',
+      padding: isMobile ? '24px 16px' : '40px 20px',
       display: 'grid',
-      gridTemplateColumns: '250px 1fr',
+      gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '250px minmax(0, 1fr)',
       gap: '40px',
     },
     sidebar: {
+      display: isMobile ? 'none' : 'block',
       position: 'sticky',
       top: '100px',
       height: 'fit-content',
@@ -87,15 +90,15 @@ export default function DocsPage() {
       textAlign: 'left',
     },
     title: {
-      fontSize: '36px',
+      fontSize: isMobile ? '28px' : '36px',
       fontWeight: 800,
       letterSpacing: '-0.02em',
       marginBottom: '8px',
     },
     subtitle: {
-      fontSize: '18px',
+      fontSize: isMobile ? '16px' : '18px',
       color: color.textMuted,
-      marginBottom: '40px',
+      marginBottom: isMobile ? '28px' : '40px',
     },
     section: {
       marginBottom: '48px',
@@ -145,7 +148,7 @@ export default function DocsPage() {
     },
     screenshotGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))',
       gap: '16px',
       marginTop: '16px',
       marginBottom: '16px',

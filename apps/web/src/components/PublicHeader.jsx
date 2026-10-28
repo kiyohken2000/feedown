@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LuSun, LuMoon } from 'react-icons/lu';
+import { LuSun, LuMoon, LuMenu, LuX } from 'react-icons/lu';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
 import { getTokens } from '../styles/tokens';
+import useMediaQuery from '../hooks/useMediaQuery';
 import logoIcon from '../assets/images/icon.png';
 
 export default function PublicHeader() {
@@ -12,6 +14,11 @@ export default function PublicHeader() {
   const { language, setLanguage } = useLanguage();
   const t = translations[language].header;
   const { color, radius, shadow } = getTokens(isDarkMode);
+
+  const isMobile = useMediaQuery('(max-width: 640px)');
+  // Remember which page the menu was opened on so navigating closes it
+  const [menuOpenPath, setMenuOpenPath] = useState(null);
+  const menuOpen = isMobile && menuOpenPath === location.pathname;
 
   const isActive = (path) => location.pathname === path;
 
@@ -28,7 +35,7 @@ export default function PublicHeader() {
     container: {
       maxWidth: '1200px',
       margin: '0 auto',
-      padding: '0 20px',
+      padding: isMobile ? '0 16px' : '0 20px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -120,10 +127,76 @@ export default function PublicHeader() {
       transition: 'all 0.2s',
       boxShadow: shadow.sm,
     },
-    mobileNav: {
-      display: 'none',
+    mobileMenu: {
+      position: 'absolute',
+      top: '100%',
+      left: 0,
+      right: 0,
+      backgroundColor: color.surface,
+      borderBottom: `1px solid ${color.border}`,
+      boxShadow: shadow.sm,
+      padding: '8px 16px 16px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '4px',
+    },
+    mobileMenuRow: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      marginTop: '8px',
     },
   };
+
+  const navLinks = [
+    { to: '/', label: t.home },
+    { to: '/docs', label: t.docs },
+    { to: '/docs/setup', label: t.setup },
+  ].map(({ to, label }) => (
+    <Link
+      key={to}
+      to={to}
+      style={{
+        ...styles.navLink,
+        ...(isActive(to) ? styles.navLinkActive : {}),
+      }}
+    >
+      {label}
+    </Link>
+  ));
+
+  const langAndTheme = (
+    <>
+      <div style={styles.langGroup}>
+        <button
+          style={{
+            ...styles.langButton,
+            ...(language === 'en' ? styles.langButtonActive : {}),
+          }}
+          onClick={() => setLanguage('en')}
+        >
+          EN
+        </button>
+        <button
+          style={{
+            ...styles.langButton,
+            ...(language === 'ja' ? styles.langButtonActive : {}),
+          }}
+          onClick={() => setLanguage('ja')}
+        >
+          JA
+        </button>
+      </div>
+      <button
+        style={styles.themeButton}
+        onClick={toggleDarkMode}
+        title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
+        aria-label={isDarkMode ? 'Light Mode' : 'Dark Mode'}
+      >
+        {isDarkMode ? <LuSun /> : <LuMoon />}
+      </button>
+    </>
+  );
 
   return (
     <header style={styles.header}>
@@ -133,70 +206,32 @@ export default function PublicHeader() {
           <span style={styles.logoText}>FeedOwn</span>
         </Link>
 
-        <nav style={styles.nav}>
-          <Link
-            to="/"
-            style={{
-              ...styles.navLink,
-              ...(isActive('/') ? styles.navLinkActive : {}),
-            }}
-          >
-            {t.home}
-          </Link>
-          <Link
-            to="/docs"
-            style={{
-              ...styles.navLink,
-              ...(isActive('/docs') ? styles.navLinkActive : {}),
-            }}
-          >
-            {t.docs}
-          </Link>
-          <Link
-            to="/docs/setup"
-            style={{
-              ...styles.navLink,
-              ...(isActive('/docs/setup') ? styles.navLinkActive : {}),
-            }}
-          >
-            {t.setup}
-          </Link>
-        </nav>
+        {!isMobile && <nav style={styles.nav}>{navLinks}</nav>}
 
         <div style={styles.controls}>
-          <div style={styles.langGroup}>
-            <button
-              style={{
-                ...styles.langButton,
-                ...(language === 'en' ? styles.langButtonActive : {}),
-              }}
-              onClick={() => setLanguage('en')}
-            >
-              EN
-            </button>
-            <button
-              style={{
-                ...styles.langButton,
-                ...(language === 'ja' ? styles.langButtonActive : {}),
-              }}
-              onClick={() => setLanguage('ja')}
-            >
-              JA
-            </button>
-          </div>
-          <button
-            style={styles.themeButton}
-            onClick={toggleDarkMode}
-            title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
-            aria-label={isDarkMode ? 'Light Mode' : 'Dark Mode'}
-          >
-            {isDarkMode ? <LuSun /> : <LuMoon />}
-          </button>
+          {!isMobile && langAndTheme}
           <Link to="/login" style={styles.loginButton}>
             {t.login}
           </Link>
+          {isMobile && (
+            <button
+              style={styles.themeButton}
+              onClick={() => setMenuOpenPath(menuOpen ? null : location.pathname)}
+              aria-label="Menu"
+              aria-expanded={menuOpen}
+            >
+              {menuOpen ? <LuX /> : <LuMenu />}
+            </button>
+          )}
         </div>
       </div>
+
+      {isMobile && menuOpen && (
+        <div style={styles.mobileMenu}>
+          {navLinks}
+          <div style={styles.mobileMenuRow}>{langAndTheme}</div>
+        </div>
+      )}
     </header>
   );
 }
