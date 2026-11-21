@@ -223,6 +223,7 @@ class ApiClient {
       if (!response.ok) {
         return {
           success: false,
+          status: response.status,
           error: data?.error || parsed?.error || `HTTP ${response.status}: ${response.statusText}`,
         }
       }

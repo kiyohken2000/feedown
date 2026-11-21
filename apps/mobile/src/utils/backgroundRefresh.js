@@ -1,6 +1,6 @@
 /**
- * Background refresh: a periodic OS task that runs POST /api/refresh while the
- * app is in the background and optionally posts a local "N new articles"
+ * Background refresh: a periodic OS task that runs one POST /api/refresh batch
+ * while the app is in the background and optionally posts a local "N new articles"
  * notification.
  *
  * This module must be imported at app startup (src/index.js):
@@ -34,8 +34,6 @@ export const DEFAULT_BG_SETTINGS = {
 
 /** Shortest interval we ask the OS for (minutes). The OS decides the real one. */
 const MIN_INTERVAL_MINUTES = 15
-/** Stop starting new refresh batches after this. iOS gives a task about 30s. */
-const TIME_BUDGET_MS = Platform.OS === 'ios' ? 20 * 1000 : 60 * 1000
 const ANDROID_CHANNEL = 'new-articles'
 /** One notification that is replaced on every update instead of stacking up. */
 const NOTIFICATION_ID = 'feedown-new-articles'
@@ -276,27 +274,19 @@ async function recordRun(entry) {
 
 // ---- the refresh run -------------------------------------------------------------
 
-/** Run refresh batches until done or out of time. Never throws. */
-async function refreshBatches() {
-  const api = createApiClient()
-  const started = Date.now()
-  let offset = 0
-  let newArticles = 0
-  let batches = 0
-  let error = null
-  while (Date.now() - started < TIME_BUDGET_MS) {
-    const res = await api.refresh.refreshAll(offset || undefined)
-    if (!res.success) {
-      error = res.error || 'refresh failed'
-      break
-    }
-    batches += 1
-    const { stats, remaining, nextOffset } = res.data || {}
-    newArticles += stats?.newArticles || 0
-    if (!remaining || remaining <= 0 || !nextOffset) break
-    offset = nextOffset
+/**
+ * One refresh batch. The server allows one POST /api/refresh per 30 s per
+ * token (functions/_middleware.ts), so a second batch in the same run would
+ * always be rejected. The server picks the least recently fetched feeds
+ * first, so successive runs rotate through all feeds. Never throws.
+ */
+async function refreshOnce() {
+  const res = await createApiClient().refresh.refreshAll()
+  if (!res.success) {
+    if (res.status === 429) return { newArticles: 0, rateLimited: true }
+    return { newArticles: 0, error: res.error || 'refresh failed' }
   }
-  return { newArticles, batches, error }
+  return { newArticles: res.data?.stats?.newArticles || 0 }
 }
 
 let running = null
@@ -338,7 +328,9 @@ async function check({ foreground = false } = {}) {
   }
   if (!(await getAuthToken())) return done({ skipped: 'signed-out' })
 
-  const { newArticles, batches, error } = await refreshBatches()
+  const { newArticles, rateLimited, error } = await refreshOnce()
+  // Refreshed by the app (or another run) within the last 30 s: nothing to add
+  if (rateLimited) return done({ skipped: 'rate-limited' })
   const canNotify =
     settings.notify && (await getNotificationPermission()) === 'granted'
 
@@ -352,12 +344,12 @@ async function check({ foreground = false } = {}) {
         warn('failed to post notification', e)
       }
     }
-    return done({ newArticles, batches, notified, ...(error ? { error } : {}) })
+    return done({ newArticles, notified, ...(error ? { error } : {}) })
   }
 
   // The app was opened during the run: it shows the articles itself
   if (AppState.currentState === 'active') {
-    return done({ newArticles, batches, skipped: 'active', ...(error ? { error } : {}) })
+    return done({ newArticles, skipped: 'active', ...(error ? { error } : {}) })
   }
 
   const state = await loadState()
@@ -377,5 +369,5 @@ async function check({ foreground = false } = {}) {
     }
   }
   await saveJson(STATE_KEY, state)
-  return done({ newArticles, batches, notified, ...(error ? { error } : {}) })
+  return done({ newArticles, notified, ...(error ? { error } : {}) })
 }

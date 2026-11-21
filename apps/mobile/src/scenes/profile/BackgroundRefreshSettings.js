@@ -34,6 +34,7 @@ const SKIP_LABELS = {
   off: 'skipped (off)',
   active: 'skipped (app open)',
   'signed-out': 'skipped (signed out)',
+  'rate-limited': 'skipped (refreshed in the last 30s)',
 }
 
 function formatTime(ms) {

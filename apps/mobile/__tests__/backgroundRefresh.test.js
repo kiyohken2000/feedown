@@ -119,15 +119,24 @@ test('accumulates until the threshold, then notifies the total since last open',
   expect(dismissed).toContain('feedown-new-articles')
 })
 
-test('runs several batches within one run', async () => {
+test('calls refresh once per run (the server allows 1 per 30 s)', async () => {
   await bg.updateBgSettings({ enabled: true, notify: true, threshold: 1 })
   refreshResponses = [
     batch(1, { remaining: 5, nextOffset: 5 }),
     batch(2, { remaining: 0 }),
   ]
   const result = await bg.runBackgroundRefresh()
-  expect(result).toMatchObject({ newArticles: 3, batches: 2, notified: true })
-  expect(scheduled[0].content.body).toBe('3 new articles')
+  expect(result).toMatchObject({ newArticles: 1, notified: true })
+  expect(refreshResponses).toHaveLength(1)
+})
+
+test('treats the server rate limit as a skip, not an error', async () => {
+  await bg.updateBgSettings({ enabled: true, notify: true, threshold: 1 })
+  refreshResponses = [{ success: false, status: 429, error: 'Too many refresh requests.' }]
+  const result = await bg.runBackgroundRefresh()
+  expect(result.skipped).toBe('rate-limited')
+  expect(result.error).toBeUndefined()
+  expect(scheduled).toHaveLength(0)
 })
 
 test('fetches without notifying when notifications are off, and builds no backlog', async () => {

@@ -121,7 +121,14 @@ export const FeedsContextProvider = ({ children }) => {
       while (true) {
         const refreshResponse = await api.refresh.refreshAll(offset || undefined)
         if (!refreshResponse.success) {
-          console.error('Refresh batch failed at offset', offset)
+          if (refreshResponse.status === 429) {
+            // The server allows one refresh per 30 s per token. Hitting it
+            // (e.g. right after a background run) is not an error: the
+            // articles stored so far are still loaded below.
+            console.log(`Refresh rate-limited at offset ${offset}; showing stored articles`)
+          } else {
+            console.error('Refresh batch failed at offset', offset, refreshResponse.error)
+          }
           break
         }
 
