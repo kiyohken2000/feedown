@@ -8,6 +8,8 @@ import { UserContextProvider } from './contexts/UserContext'
 import { FeedsContextProvider } from './contexts/FeedsContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AiProvider } from './contexts/AiContext'
+// Defines the background refresh task at module load (must run at startup)
+import { syncBackgroundTaskFromSettings } from './utils/backgroundRefresh'
 
 // assets
 import { imageAssets } from 'theme/images'
@@ -28,6 +30,8 @@ export default function App() {
   // lifecycle
   useEffect(() => {
     handleLoadAssets()
+    // Keep the OS task registration in line with the saved setting
+    syncBackgroundTaskFromSettings()
   }, [])
 
   // rendering

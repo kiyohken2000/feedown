@@ -90,7 +90,8 @@
           }
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "expo-background-task"
     ],
     "extra": {
       "eas": {

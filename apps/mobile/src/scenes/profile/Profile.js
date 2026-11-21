@@ -215,6 +215,23 @@ export default function Profile() {
           </View>
         </View>
 
+        {/* Background Refresh (navigates to BackgroundRefreshSettings screen) */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Background</Text>
+          <TouchableOpacity
+            style={[styles.card, styles.navRow, { backgroundColor: theme.card }]}
+            onPress={() => navigation.navigate('BackgroundRefreshSettings')}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.toggleLabel, { color: theme.text }]}>Background Refresh</Text>
+              <Text style={[styles.toggleDescription, { color: theme.textMuted }]}>
+                Periodic checks and new article notifications
+              </Text>
+            </View>
+            <Text style={[styles.navChevron, { color: theme.textMuted }]}>›</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* On-Device AI (navigates to AiSettings screen) */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>On-Device AI</Text>

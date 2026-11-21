@@ -6061,6 +6061,13 @@ expo-audio@~58.0.10:
   resolved "https://registry.yarnpkg.com/expo-audio/-/expo-audio-58.0.10.tgz#2131be2aaefcf64a6f554084725580c33b29536b"
   integrity sha512-GoOyd1JAb7l/bJ/UNc5QIrXqSK9QrEFF3ahjdONGt8V6PN3RXRsTcOJDMN6RmDc9kb0XPP34DJIxEd/ushH1RQ==
 
+expo-background-task@~58.0.13:
+  version "58.0.13"
+  resolved "https://registry.yarnpkg.com/expo-background-task/-/expo-background-task-58.0.13.tgz#0cb8a2de535899f876f108ecffd7072a0bbf00a1"
+  integrity sha512-1AbMsRPgD9eHgvWWhNCdPwR7u4J2c1pCZDWjZ0NiNVkbaVof5Jqaqk8I6vWN+Z9taFD+C9ACE61PsK3NIJqSzg==
+  dependencies:
+    expo-task-manager "~58.0.14"
+
 expo-build-properties@~58.0.11:
   version "58.0.11"
   resolved "https://registry.yarnpkg.com/expo-build-properties/-/expo-build-properties-58.0.11.tgz#8a0ee43b7732fe4c70f610def1ae38e110b50812"
@@ -6261,6 +6268,13 @@ expo-structured-headers@~58.0.1:
   version "58.0.1"
   resolved "https://registry.yarnpkg.com/expo-structured-headers/-/expo-structured-headers-58.0.1.tgz#fdb0d7aee13cf133da6e423bc2137d69b5b5ac63"
   integrity sha512-wIduvAIUdGQk82osLjFiYYq3TFHUdG4RgmN+C//EySxn/2PTu0RsJsdgBtXrp/OT3YGeesNgfzb1mFxq5Zhp0g==
+
+expo-task-manager@~58.0.14:
+  version "58.0.14"
+  resolved "https://registry.yarnpkg.com/expo-task-manager/-/expo-task-manager-58.0.14.tgz#7f062e77bd5e7a1a751d45c2d49e509912613065"
+  integrity sha512-a8GFlS0pcL7P7FFY9nukmeQz9gBpRFftXDEdA08NkWZDjVn2VNjdJw2nSbElEnLQCLYzKMkITJLbnixXqVoQdQ==
+  dependencies:
+    unimodules-app-loader "~58.0.2"
 
 expo-updates-interface@~58.0.1:
   version "58.0.1"
@@ -11423,6 +11437,11 @@ unicode-property-aliases-ecmascript@^2.0.0:
   version "2.2.0"
   resolved "https://registry.npmjs.org/unicode-property-aliases-ecmascript/-/unicode-property-aliases-ecmascript-2.2.0.tgz"
   integrity sha512-hpbDzxUY9BFwX+UeBnxv3Sh1q7HFxj48DTmXchNgRa46lO8uj3/1iEn3MiNUYTg1g9ctIqXCCERn8gYZhHC5lQ==
+
+unimodules-app-loader@~58.0.2:
+  version "58.0.2"
+  resolved "https://registry.yarnpkg.com/unimodules-app-loader/-/unimodules-app-loader-58.0.2.tgz#c644971346f1c791098fa6d6ffd8940c30ed4279"
+  integrity sha512-d7vZN9/awIwPCqzfw1qR/geJEzv3ElW0VdwXFnPw29QZYoAZI0jqXGKPZVG1vQCfhEiWJtBX/nVm1XI8wshrDg==
 
 unpipe@~1.0.0:
   version "1.0.0"

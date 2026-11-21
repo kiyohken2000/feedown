@@ -1,11 +1,13 @@
-import React, { createContext, useState, useContext, useCallback } from 'react'
+import React, { createContext, useState, useContext, useCallback, useEffect, useRef } from 'react'
+import { AppState } from 'react-native'
 import { UserContext } from './UserContext'
 import { createApiClient } from '../utils/api'
+import { consumeBackgroundNewArticles } from '../utils/backgroundRefresh'
 
 export const FeedsContext = createContext()
 
 export const FeedsContextProvider = ({ children }) => {
-  const { getAccessToken } = useContext(UserContext)
+  const { getAccessToken, user } = useContext(UserContext)
 
   // State
   const [feeds, setFeeds] = useState([])
@@ -342,6 +344,29 @@ export const FeedsContextProvider = ({ children }) => {
     setFavorites([])
     setHasMore(true)
     setError(null)
+  }, [])
+
+  // Background refresh stores new articles on the server while the app is in
+  // the background. On returning to the foreground, clear its counters and
+  // notification, and reload the list if it fetched anything. At startup the
+  // counters are just cleared: Home runs a full refresh on its first load.
+  const fetchArticlesRef = useRef(fetchArticles)
+  const userRef = useRef(user)
+  useEffect(() => {
+    fetchArticlesRef.current = fetchArticles
+    userRef.current = user
+  }, [fetchArticles, user])
+
+  useEffect(() => {
+    consumeBackgroundNewArticles()
+    const sub = AppState.addEventListener('change', async (next) => {
+      if (next !== 'active') return
+      const fetched = await consumeBackgroundNewArticles()
+      if (fetched > 0 && userRef.current) {
+        fetchArticlesRef.current(true)
+      }
+    })
+    return () => sub.remove()
   }, [])
 
   return (

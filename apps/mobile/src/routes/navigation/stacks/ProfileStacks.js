@@ -5,6 +5,7 @@ import { navigationProps } from './navigationProps/navigationProps'
 import Profile from '../../../scenes/profile/Profile'
 import AiSettings from '../../../scenes/profile/AiSettings'
 import Benchmark from '../../../scenes/profile/Benchmark'
+import BackgroundRefreshSettings from '../../../scenes/profile/BackgroundRefreshSettings'
 
 const Stack = createStackNavigator()
 
@@ -29,6 +30,13 @@ export const ProfileStacks = () => {
         component={AiSettings}
         options={{
           title: 'On-Device AI',
+        }}
+      />
+      <Stack.Screen
+        name="BackgroundRefreshSettings"
+        component={BackgroundRefreshSettings}
+        options={{
+          title: 'Background Refresh',
         }}
       />
       <Stack.Screen
