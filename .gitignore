@@ -42,3 +42,5 @@ service-account.json
 zzz_memo.txt
 docs/PROMOTION_DRAFT.md
 _temp/
+# Local mobile build artifacts
+out_mobile/
