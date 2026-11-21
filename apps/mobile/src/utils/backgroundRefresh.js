@@ -260,6 +260,29 @@ export async function consumeBackgroundNewArticles() {
   return unseen
 }
 
+/**
+ * Listeners in the running app for articles a run fetched after the app came
+ * to the foreground mid-run. By then the foreground handler has already
+ * consumed the counters, so the app is told directly instead.
+ */
+const foregroundListeners = new Set()
+
+/** @returns {() => void} unsubscribe */
+export function onBackgroundArticles(listener) {
+  foregroundListeners.add(listener)
+  return () => foregroundListeners.delete(listener)
+}
+
+function emitBackgroundArticles(count) {
+  foregroundListeners.forEach((listener) => {
+    try {
+      listener(count)
+    } catch (e) {
+      warn('background articles listener failed', e)
+    }
+  })
+}
+
 // ---- run log -------------------------------------------------------------------
 
 export async function loadRunLog() {
@@ -347,8 +370,10 @@ async function check({ foreground = false } = {}) {
     return done({ newArticles, notified, ...(error ? { error } : {}) })
   }
 
-  // The app was opened during the run: it shows the articles itself
+  // The app was opened during the run: no notification, but have it reload
+  // the list since its foreground check ran before these articles existed
   if (AppState.currentState === 'active') {
+    if (newArticles > 0) emitBackgroundArticles(newArticles)
     return done({ newArticles, skipped: 'active', ...(error ? { error } : {}) })
   }
 

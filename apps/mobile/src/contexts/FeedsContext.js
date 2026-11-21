@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useCallback, useEffect, use
 import { AppState } from 'react-native'
 import { UserContext } from './UserContext'
 import { createApiClient } from '../utils/api'
-import { consumeBackgroundNewArticles } from '../utils/backgroundRefresh'
+import { consumeBackgroundNewArticles, onBackgroundArticles } from '../utils/backgroundRefresh'
 
 export const FeedsContext = createContext()
 
@@ -373,7 +373,14 @@ export const FeedsContextProvider = ({ children }) => {
         fetchArticlesRef.current(true)
       }
     })
-    return () => sub.remove()
+    // A run that was already going when the app came back finishes later
+    const unsubscribe = onBackgroundArticles(() => {
+      if (userRef.current) fetchArticlesRef.current(true)
+    })
+    return () => {
+      sub.remove()
+      unsubscribe()
+    }
   }, [])
 
   return (

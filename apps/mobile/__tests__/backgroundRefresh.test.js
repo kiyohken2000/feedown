@@ -166,6 +166,30 @@ test('opening the app clears the counters', async () => {
   expect((await bg.runBackgroundRefresh()).notified).toBe(false)
 })
 
+test('tells the running app when it was opened mid-run', async () => {
+  await bg.updateBgSettings({ enabled: true, notify: true, threshold: 1 })
+  const got = []
+  const unsubscribe = bg.onBackgroundArticles((n) => got.push(n))
+  const api = require('../src/utils/api')
+  // Become active while the refresh request is in flight
+  refreshResponses = []
+  const original = api.createApiClient
+  api.createApiClient = () => ({
+    refresh: {
+      refreshAll: async () => {
+        appState = 'active'
+        return batch(2)
+      },
+    },
+  })
+  const result = await bg.runBackgroundRefresh()
+  api.createApiClient = original
+  unsubscribe()
+  expect(result.skipped).toBe('active')
+  expect(got).toEqual([2])
+  expect(scheduled).toHaveLength(0)
+})
+
 test('does not notify without permission', async () => {
   await bg.updateBgSettings({ enabled: true, notify: true, threshold: 1 })
   permissionGranted = false
