@@ -10,7 +10,8 @@ Windows セッションから Mac に移り、モバイルアプリをローカ�
 
 - **バージョン**: `apps/mobile/app.json` → version `1.0.14`, iOS `buildNumber` `20`, Android `versionCode` `15`
 - **主要依存**: Expo SDK 58 (`expo ^58.0.20`) / RN 0.88.0 / `react-native-executorch 0.11.1` / `llama.rn 0.13.0-rc.8`
-- `apps/mobile/ios`・`android` は git 管理外（CNG）。ローカルビルドは `npx expo prebuild` から
+- `apps/mobile/ios`・`android` は git 管理外（CNG）。ビルドは `eas build --local` で行う（一時ディレクトリで prebuild まで自動で走るので手動 prebuild は不要）
+- `eas.json` は `appVersionSource: "remote"` + production で `autoIncrement` → production の buildNumber / versionCode は EAS 側で採番され、`app.json` の値は使われない
 
 ### 最近のコミット（1.0.14 に関係するもの）
 
@@ -26,16 +27,25 @@ Web（`24c0828` ロゴ → `/`、`e32b4c5` 公開ページのスマホ対応）�
 
 ## Mac でやること
 
+すべて `apps/mobile` で実行。コマンドは `docs/commands.txt` の `eas build` に `--local` を付けたもの。
+
+0. 前提: Xcode / CocoaPods / fastlane（iOS）、JDK / Android SDK（Android）、`eas login` 済み、Node は `eas.json` の `22.19.0` に合わせる
 1. `git pull` → ルートで `yarn install`
-2. `cd apps/mobile && npx expo prebuild --clean`
-3. iOS: `npx expo run:ios --device`（iPhone 13 mini 実機）/ Release 確認は `--configuration Release`
-4. Android: `npx expo run:android --variant release`（R8 修正と FGS 権限ブロックの確認）
-5. 確認ポイント
+2. dev client で動作確認
+   - `eas build --profile development --platform ios --local`（iPhone 13 mini は ad hoc 登録済みであること。未登録なら `eas device:create`）
+   - `eas build --profile development --platform android --local`
+   - 生成物を実機に入れて `npx expo start --dev-client`
+3. release 相当の確認は preview（internal 配布 = iOS ad hoc / Android APK）
+   - `eas build --profile preview --platform ios --local`
+   - `eas build --profile preview --platform android --local`（R8 修正と FGS 権限ブロックの確認。APK なので `adb install` で入る）
+4. 確認ポイント
    - executorch 0.11.1: 要約・翻訳（LFM2.5 / Qwen3）が動くか、初回のモデル再 DL
-   - iOS: ビルド成果物に executorch の `PrivacyInfo.xcprivacy` が入っているか
-   - Android release: 起動・モデル DL（MMKV 経路）でクラッシュしないか、マージ後の Manifest に `FOREGROUND_SERVICE_DATA_SYNC` が無いか
+   - iOS: `.ipa` を展開して executorch の `PrivacyInfo.xcprivacy` が入っているか
+   - Android release: 起動・モデル DL（MMKV 経路）でクラッシュしないか、APK の Manifest に `FOREGROUND_SERVICE_DATA_SYNC` が無いか
    - BRUSHUP #26 手順 4 の残り: 翻訳 LFM フォールバック / 信号分離 / ベンチマーク、iPhone Duo シミュレーター（iOS 27.1 SDK）
-6. 通ったら production build → 1.0.14 提出。**EAS ビルド・提出はユーザー確認を取ってから**
+5. 通ったら production を作って 1.0.14 提出。**ビルド番号の採番と提出は外向きの操作なのでユーザー確認を取ってから**
+   - `eas build --profile production --platform ios --local` / `--platform android --local`
+   - 提出は `eas submit --platform <ios|android> --path <成果物>`（`--local` の成果物はアップロードされないため）
    - Android は古い AAB を Play のリリースから外して作り直したものを上げる
 
 ### リリースノートに入れる内容
