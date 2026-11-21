@@ -97,7 +97,7 @@ const Navigation = ({ unreadCount = 0 }) => {
   return (
     <nav style={styles.nav}>
       <div style={styles.navContainer}>
-        <Link to="/dashboard" style={styles.brand}>
+        <Link to="/" style={styles.brand}>
           <img src={logoIcon} alt="FeedOwn" style={styles.brandLogo} />
           FeedOwn
         </Link>
