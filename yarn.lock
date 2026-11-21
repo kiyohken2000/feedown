@@ -9697,15 +9697,16 @@ react-native-enriched-markdown@^0.5.0:
   resolved "https://registry.yarnpkg.com/react-native-enriched-markdown/-/react-native-enriched-markdown-0.5.0.tgz#0d2e9a965963ca253c592136741d8329734d434f"
   integrity sha512-CYihNlcg8IjsrVbmypDjFHsDF6Z6vYO0yraw6CkR30SDsg99J6fcBrOkyWOItO8PIDD21jw8yD1eYP/0LBOCdA==
 
-react-native-executorch@0.11.0:
-  version "0.11.0"
-  resolved "https://registry.yarnpkg.com/react-native-executorch/-/react-native-executorch-0.11.0.tgz#7e373fb662f01ca5699fa71c295ade800a7e476b"
-  integrity sha512-0QX1eKmJRj+w+Xk1vEdyW2X0HvQFhJlazsrv+V2Q/5BYWWwfJUPD7ex0o1jS0Qocg0ONIfz6Erzh0prtIHe6yg==
+react-native-executorch@0.11.1:
+  version "0.11.1"
+  resolved "https://registry.yarnpkg.com/react-native-executorch/-/react-native-executorch-0.11.1.tgz#43ca7d4e50dc239ca60630672b3823e2a5b2e3a9"
+  integrity sha512-6pad5CafcT7AmgHfsVDuFRYbAeHl02xB5dJlHiKTFu4td1oFHLunuBOsGopKX3YxidEn9W8wy6b9yPWTTzRP9w==
   dependencies:
     "@huggingface/jinja" "^0.5.9"
     jsonrepair "^3.12.0"
     jsonschema "^1.5.0"
     react-native-device-info "^15.0.2"
+    verbalis "^0.1.1"
     zod "^4.3.6"
 
 react-native-gesture-handler@~3.3.0:
@@ -11453,15 +11454,10 @@ urijs@^1.19.6:
   resolved "https://registry.npmjs.org/urijs/-/urijs-1.19.11.tgz"
   integrity sha512-HXgFDgDommxn5/bIv0cnQZsPhHDA90NPHD6+c/v21U5+Sx5hoP8+dP9IZXBU1gIfvdRfhG8cel9QNPeionfcCQ==
 
-use-latest-callback@^0.1.5:
+use-latest-callback@0.1.9, use-latest-callback@^0.1.5, use-latest-callback@^0.2.4:
   version "0.1.9"
   resolved "https://registry.yarnpkg.com/use-latest-callback/-/use-latest-callback-0.1.9.tgz#10191dc54257e65a8e52322127643a8940271e2a"
   integrity sha512-CL/29uS74AwreI/f2oz2hLTW7ZqVeV5+gxFeGudzQrgkCytrHw33G4KbnQOrRlAEzzAFXi7dDLMC9zhWcVpzmw==
-
-use-latest-callback@^0.2.4:
-  version "0.2.6"
-  resolved "https://registry.yarnpkg.com/use-latest-callback/-/use-latest-callback-0.2.6.tgz#e5ea752808c86219acc179ace0ae3c1203255e77"
-  integrity sha512-FvRG9i1HSo0wagmX63Vrm8SnlUU3LMM3WyZkQ76RnslpBrX694AdG4A0zQBx2B3ZifFA0yv/BaEHGBnEax5rZg==
 
 use-sync-external-store@^1.5.0:
   version "1.6.0"
@@ -11497,6 +11493,11 @@ vary@~1.1.2:
   version "1.1.2"
   resolved "https://registry.npmjs.org/vary/-/vary-1.1.2.tgz"
   integrity sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==
+
+verbalis@^0.1.1:
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/verbalis/-/verbalis-0.1.1.tgz#91a0a88986e98c9b9a9d3c4b9931f178f9b98d7b"
+  integrity sha512-dWkTMpHMFHTTJRIF43CrMYcwEo0fA0oBo78fLPXYJr2rE/L1ehseRNBjiP4WdyhXVnjojWma44ymTzt/+BaDQQ==
 
 "vite@^6.0.0 || ^7.0.0", vite@^7.2.4:
   version "7.3.1"
