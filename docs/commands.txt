@@ -22,3 +22,14 @@ eas device:list
 // Expo Settings
 eas build:configure
 eas update:configure
+// local build (run in apps/mobile; prebuild runs automatically, artifact is not uploaded)
+eas build --profile development --platform ios --local
+eas build --profile development --platform android --local
+eas build --profile preview --platform ios --local
+eas build --profile preview --platform android --local
+eas build --profile production --platform ios --local
+eas build --profile production --platform android --local
+
+// submit a locally built artifact
+eas submit --platform ios --path <path/to/app.ipa>
+eas submit --platform android --path <path/to/app.aab>
