@@ -3,6 +3,8 @@
 **最終更新**: 2026-01-24
 **ステータス**: Phase 13進行中、App Store / Google Play 公開済み
 
+> **このドキュメントは 2026-01-24 時点で凍結しています（記載の Expo 54 などは当時のもの）。** 2026-11-22 現在、モバイルは 1.0.15（Expo SDK 58 / RN 0.88）。以降の進捗は `docs/PROGRESS.md` 冒頭のリリース記録、`docs/BRUSHUP_PLAN.md`、`docs/MOBILE_ON_DEVICE_AI_PLAN.md` を参照。
+
 ---
 
 ## 現在の状態

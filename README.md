@@ -14,6 +14,7 @@ English | [日本語](README.ja.md)
 - 🔄 **Real-time**: Instant updates via Supabase Realtime
 - 🌐 **Offline-first**: Read articles without internet
 - 🤖 **On-device AI** (Mobile): Article summaries, multi-perspective takes, signal separation, chat, summary read-aloud (TTS), and translation — all run locally on your phone via llama.rn / ExecuTorch. Nothing is sent to a cloud AI service.
+- 🔔 **Background refresh** (Mobile): Feeds refresh in the background, with an optional local notification when new articles reach a threshold you set.
 - 🎨 **Modern UI**: Clean and responsive design with dark mode
 
 ## Tech Stack

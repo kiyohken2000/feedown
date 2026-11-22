@@ -1,11 +1,13 @@
 # llama.rn 移行 — リリース後の実行計画
 
+> **完了済み（2026-05-30）**: #349 は npm 0.12.4 で公開され、本計画のフェーズ A〜F は実行済み。最終判断は末尾の「修正された最終判断: 部分採用（翻訳のみ llama.rn + Hy-MT2）」。実装は `docs/ai-translation-rework-plan.md` で行い、モバイル 1.0.13 で出荷。現在の llama.rn は 0.13.0-rc.8（`docs/BRUSHUP_PLAN.md` #25 / #26 参照）。以下は当時の記録。
+
 PR [#349](https://github.com/mybigday/llama.rn/pull/349) (iOS Metal embed fix) は **2026-05-25 に upstream `mybigday/llama.rn` へ merge 済み**。
 ただし merge 時点の最新リリースは **v0.12.3 (2026-05-21)** で、#349 はまだ npm に出ていない。
 
 このドキュメントは「#349 を含む npm リリースが出た後」に実行する作業計画。リリースが出るまでは着手しない (git 参照での前倒しはしない方針)。
 
-関連: `docs/MOBILE_ON_DEVICE_AI_PLAN.md` (executorch ベースの本体計画 / 現行 production)、`docs/llama-rn-pr-drafts/` (#349 の draft 一式)。
+関連: `docs/MOBILE_ON_DEVICE_AI_PLAN.md` (executorch ベースの本体計画 / 現行 production)。#349 の draft 一式（旧 `docs/llama-rn-pr-drafts/`）はマージ済みのため削除した（git 履歴に残っている）。
 
 ---
 
