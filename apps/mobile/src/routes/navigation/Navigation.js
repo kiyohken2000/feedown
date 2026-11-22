@@ -59,14 +59,25 @@ function ToastWrapper() {
   return <Toast config={toastConfig} />
 }
 
-// Tapping a "new articles" notification opens the article list. The list
-// itself is reloaded by FeedsContext when the app comes to the foreground.
+// Tapping a "new articles" notification opens the article list, or the
+// article itself when the notification carries one (a single new article or
+// a keyword match). The list is reloaded by FeedsContext when the app comes
+// to the foreground.
 function useNewArticlesNotificationTap(navRef, navReady, signedIn) {
   useEffect(() => {
     if (!navReady || !signedIn) return undefined
     const handle = (response) => {
-      const type = response?.notification?.request?.content?.data?.type
-      if (type !== NEW_ARTICLES_NOTIFICATION_TYPE || !navRef.isReady()) return
+      const data = response?.notification?.request?.content?.data
+      if (data?.type !== NEW_ARTICLES_NOTIFICATION_TYPE || !navRef.isReady()) return
+      if (data.article?.id) {
+        // `initial: false` keeps Home under the article so Back works even
+        // when the app was launched from the notification
+        navRef.navigate('HomeRoot', {
+          screen: 'HomeTab',
+          params: { screen: 'ArticleDetail', params: { article: data.article }, initial: false },
+        })
+        return
+      }
       navRef.navigate('HomeRoot', { screen: 'HomeTab', params: { screen: 'Home' } })
     }
     const sub = Notifications.addNotificationResponseReceivedListener(handle)

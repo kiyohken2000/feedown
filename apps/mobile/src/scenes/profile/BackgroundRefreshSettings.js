@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useContext, useEffect } from 'react'
 import {
   StatusBar,
   StyleSheet,
@@ -8,17 +8,20 @@ import {
   Alert,
   ScrollView,
   Switch,
+  TextInput,
   Linking,
   AppState,
   Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { colors, fontSize, getThemeColors } from '../../theme'
 import { useTheme } from '../../contexts/ThemeContext'
+import { FeedsContext } from '../../contexts/FeedsContext'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import {
   DEFAULT_BG_SETTINGS,
+  TEST_NOTIFICATION_KINDS,
   THRESHOLD_OPTIONS,
   getBackgroundTaskStatus,
   getNotificationPermission,
@@ -43,10 +46,19 @@ function formatTime(ms) {
   return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+const TEST_LABELS = { summary: 'Summary', single: 'Single', keyword: 'Keyword' }
+
 function describeRun(run) {
   const parts = []
   if (typeof run.newArticles === 'number') parts.push(`${run.newArticles} new`)
+  // How many of them the article list identified (#27), and why not all
+  if (typeof run.identified === 'number') parts.push(`${run.identified} identified`)
+  if (run.listError) parts.push(`list error: ${run.listError}`)
+  if (run.listSkipped) parts.push('list skipped (slow)')
+  if (run.muted) parts.push(`${run.muted} muted`)
+  if (run.keywordMatches) parts.push(`${run.keywordMatches} keyword`)
   if (run.notified) parts.push('notified')
+  if (run.keywordNotified) parts.push('keyword notified')
   if (run.skipped) parts.push(SKIP_LABELS[run.skipped] || `skipped (${run.skipped})`)
   if (run.error) parts.push(`error: ${run.error}`)
   return parts.join(', ') || 'done'
@@ -56,12 +68,14 @@ export default function BackgroundRefreshSettings() {
   const navigation = useNavigation()
   const { isDarkMode } = useTheme()
   const theme = getThemeColors(isDarkMode)
+  const { feeds } = useContext(FeedsContext)
 
   const [settings, setSettings] = useState(DEFAULT_BG_SETTINGS)
   const [permission, setPermission] = useState(null)
   const [taskStatus, setTaskStatus] = useState(null)
   const [runs, setRuns] = useState([])
   const [isChecking, setIsChecking] = useState(false)
+  const [keywordDraft, setKeywordDraft] = useState('')
 
   const reload = useCallback(async () => {
     const [s, p, t, r] = await Promise.all([
@@ -84,6 +98,13 @@ export default function BackgroundRefreshSettings() {
     })
     return () => sub.remove()
   }, [reload])
+
+  // The home screen bell changes the same settings
+  useFocusEffect(
+    useCallback(() => {
+      reload()
+    }, [reload])
+  )
 
   const update = useCallback(async (patch) => {
     setSettings(await updateBgSettings(patch))
@@ -115,13 +136,31 @@ export default function BackgroundRefreshSettings() {
     await update({ notify: on })
   }, [update, openOsSettings])
 
-  const handleTestNotification = useCallback(async () => {
+  const toggleFeedNotify = useCallback((feedId, on) => {
+    const muted = new Set(settings.mutedFeedIds)
+    if (on) muted.delete(feedId)
+    else muted.add(feedId)
+    update({ mutedFeedIds: [...muted] })
+  }, [settings.mutedFeedIds, update])
+
+  const addKeyword = useCallback(async () => {
+    const keyword = keywordDraft.trim()
+    if (!keyword) return
+    await update({ keywords: [...settings.keywords, keyword] })
+    setKeywordDraft('')
+  }, [keywordDraft, settings.keywords, update])
+
+  const removeKeyword = useCallback((keyword) => {
+    update({ keywords: settings.keywords.filter((k) => k !== keyword) })
+  }, [settings.keywords, update])
+
+  const handleTestNotification = useCallback(async (kind) => {
     if ((await getNotificationPermission()) !== 'granted') {
       showErrorToast({ title: 'Notifications are off', body: 'Allow notifications first' })
       return
     }
     try {
-      await sendTestNotification()
+      await sendTestNotification(kind)
     } catch (err) {
       showErrorToast({ title: 'Error', body: err?.message ?? 'Failed to send' })
     }
@@ -272,18 +311,110 @@ export default function BackgroundRefreshSettings() {
           </View>
         </View>
 
+        {settings.notify && (
+          <>
+            {/* Keywords (27d) */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Keywords</Text>
+              <View style={[styles.card, { backgroundColor: theme.card }, !settings.enabled && styles.disabled]}>
+                <Text style={[styles.toggleDescription, { color: theme.textMuted, marginTop: 0 }]}>
+                  Get notified right away when a new article title contains one of these, regardless of the number above
+                </Text>
+                <View style={styles.keywordInputRow}>
+                  <TextInput
+                    testID="bg-keyword-input"
+                    style={[
+                      styles.keywordInput,
+                      { color: theme.text, backgroundColor: theme.inputBackground, borderColor: theme.inputBorder },
+                    ]}
+                    value={keywordDraft}
+                    onChangeText={setKeywordDraft}
+                    onSubmitEditing={addKeyword}
+                    placeholder="Add a keyword"
+                    placeholderTextColor={theme.textMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    editable={settings.enabled}
+                  />
+                  <TouchableOpacity
+                    testID="bg-keyword-add"
+                    style={[styles.addButton, !keywordDraft.trim() && styles.disabled]}
+                    onPress={addKeyword}
+                    disabled={!keywordDraft.trim() || !settings.enabled}
+                  >
+                    <Text style={styles.addButtonText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+                {settings.keywords.length > 0 && (
+                  <View style={styles.options}>
+                    {settings.keywords.map((k) => (
+                      <TouchableOpacity
+                        key={k}
+                        testID={`bg-keyword-${k}`}
+                        style={[styles.chip, { borderColor: theme.border }]}
+                        onPress={() => removeKeyword(k)}
+                        disabled={!settings.enabled}
+                      >
+                        <Text style={[styles.optionButtonText, { color: theme.text }]}>{k}  ✕</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Per-feed notifications (27c) */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Notify For These Feeds</Text>
+              <View style={[styles.card, { backgroundColor: theme.card }, !settings.enabled && styles.disabled]}>
+                <Text style={[styles.toggleDescription, { color: theme.textMuted, marginTop: 0 }]}>
+                  Articles from feeds turned off here are still fetched, but never notify
+                </Text>
+                {feeds.length === 0 ? (
+                  <Text style={[styles.toggleDescription, { color: theme.textMuted }]}>No feeds yet</Text>
+                ) : (
+                  feeds.map((feed) => {
+                    const on = !settings.mutedFeedIds.includes(feed.id)
+                    return (
+                      <View key={feed.id} style={[styles.feedRow, { borderTopColor: theme.border }]}>
+                        <Text style={[styles.feedTitle, { color: theme.text }]} numberOfLines={1}>
+                          {feed.title || 'Untitled Feed'}
+                        </Text>
+                        <Switch
+                          testID={`bg-feed-${feed.id}`}
+                          value={on}
+                          onValueChange={(v) => toggleFeedNotify(feed.id, v)}
+                          disabled={!settings.enabled}
+                          {...switchProps(on)}
+                        />
+                      </View>
+                    )
+                  })
+                )}
+              </View>
+            </View>
+          </>
+        )}
+
         {/* Diagnostics */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Diagnostics</Text>
           <View style={[styles.card, { backgroundColor: theme.card }]}>
+            <Text style={[styles.toggleLabel, { color: theme.text, marginBottom: 8 }]}>Test Notification</Text>
+            <View style={[styles.buttonRow, { marginBottom: 8 }]}>
+              {TEST_NOTIFICATION_KINDS.map((kind) => (
+                <TouchableOpacity
+                  key={kind}
+                  testID={kind === 'summary' ? 'bg-test-notification' : `bg-test-notification-${kind}`}
+                  style={[styles.actionButton, { borderColor: theme.border }]}
+                  onPress={() => handleTestNotification(kind)}
+                >
+                  <Text style={[styles.actionButtonText, { color: theme.text }]}>{TEST_LABELS[kind]}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <View style={styles.buttonRow}>
-              <TouchableOpacity
-                testID="bg-test-notification"
-                style={[styles.actionButton, { borderColor: theme.border }]}
-                onPress={handleTestNotification}
-              >
-                <Text style={[styles.actionButtonText, { color: theme.text }]}>Test Notification</Text>
-              </TouchableOpacity>
               <TouchableOpacity
                 testID="bg-check-now"
                 style={[styles.actionButton, { borderColor: theme.border }, isChecking && styles.disabled]}
@@ -403,6 +534,37 @@ const styles = StyleSheet.create({
   actionButtonText: { fontSize: fontSize.small, fontWeight: '600' },
   statusLine: { fontSize: fontSize.small, marginTop: 12 },
   runsLabel: { marginTop: 16, marginBottom: 4 },
+  keywordInputRow: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 12 },
+  keywordInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: fontSize.normal,
+  },
+  addButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  addButtonText: { color: colors.white, fontSize: fontSize.small, fontWeight: '600' },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  feedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  feedTitle: { flex: 1, marginRight: 12, fontSize: fontSize.normal },
   runRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 8 },
   runTime: { fontSize: fontSize.small, fontWeight: '600' },
   runDetail: { fontSize: fontSize.small, marginTop: 2 },

@@ -17,6 +17,7 @@ import { UserContext } from '../../contexts/UserContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
+import NotificationBell from './NotificationBell'
 
 export default function Home() {
   const navigation = useNavigation()
@@ -323,11 +324,16 @@ export default function Home() {
             value={selectedFeedId}
             onChange={item => setSelectedFeedId(item.value)}
           />
-          <View style={[styles.unreadBadge, unreadCount === 0 && styles.allReadBadge]}>
+          {/* Number only, to leave room for the bell on narrow phones (13 mini) */}
+          <View
+            style={[styles.unreadBadge, unreadCount === 0 && styles.allReadBadge]}
+            accessibilityLabel={unreadCount > 0 ? `${unreadCount} unread` : 'All read'}
+          >
             <Text style={styles.unreadText}>
-              {unreadCount > 0 ? `${unreadCount} unread` : 'All read'}
+              {unreadCount > 0 ? unreadCount : '✓'}
             </Text>
           </View>
+          <NotificationBell color={theme.textMuted} />
         </View>
       </View>
 
