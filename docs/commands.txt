@@ -34,13 +34,13 @@ eas build --profile production --platform android --local
 eas submit --platform ios --path <path/to/app.ipa>
 eas submit --platform android --path <path/to/app.aab>
 
-// local build scripts (run in apps/mobile; profile defaults to production, extra args go to eas build)
+// local build scripts (run from the repo root; profile defaults to production, extra args go to eas build)
 // output: <repo>/out_mobile/feedown-<version>-<profile>-<date>.(ipa|aab|apk) unless --output is given
 // iOS: swaps the keychain search list during the build so only the EAS distribution certificate is used
-./scripts/build-ios-local.sh
-./scripts/build-ios-local.sh preview
-./scripts/build-ios-local.sh development
+./apps/mobile/scripts/build-ios-local.sh
+./apps/mobile/scripts/build-ios-local.sh preview
+./apps/mobile/scripts/build-ios-local.sh development
 // Android: uses Android Studio's bundled JDK when JAVA_HOME is unset (production = AAB, others = APK)
-./scripts/build-android-local.sh
-./scripts/build-android-local.sh preview
-./scripts/build-android-local.sh development
+./apps/mobile/scripts/build-android-local.sh
+./apps/mobile/scripts/build-android-local.sh preview
+./apps/mobile/scripts/build-android-local.sh development
