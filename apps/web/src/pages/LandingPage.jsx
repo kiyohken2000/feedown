@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LuNewspaper, LuStar, LuMoon, LuLock, LuArrowRight, LuBookOpen, LuServer, LuRocket, LuBrain, LuShieldCheck, LuMessagesSquare, LuLanguages, LuList } from 'react-icons/lu';
+import { LuNewspaper, LuStar, LuMoon, LuLock, LuArrowRight, LuBookOpen, LuServer, LuRocket, LuBrain, LuShieldCheck, LuMessagesSquare, LuLanguages, LuList, LuBell, LuRefreshCw, LuSlidersHorizontal } from 'react-icons/lu';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
@@ -29,6 +29,9 @@ import aiSummarize3 from '../assets/images/on_device_ai/02_summarize02_english_a
 import aiSignals from '../assets/images/on_device_ai/03_signals.png';
 import aiChat from '../assets/images/on_device_ai/04_chat.png';
 import aiTranslation from '../assets/images/on_device_ai/05_translation.png';
+// Background refresh screenshots
+import bgNotification from '../assets/images/background_refresh/notification.jpg';
+import bgSettings from '../assets/images/background_refresh/settings.jpg';
 
 export default function LandingPage() {
   const { isDarkMode } = useTheme();
@@ -283,10 +286,55 @@ export default function LandingPage() {
       justifyContent: 'center',
       transition: 'background 0.2s',
     },
+    // Background Refresh Section
+    bgSection: {
+      padding: sectionPadding,
+      backgroundColor: color.appBg,
+    },
+    bgContent: {
+      maxWidth: '1000px',
+      margin: '0 auto',
+      display: 'grid',
+      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+      gap: isMobile ? '36px' : '56px',
+      alignItems: 'center',
+    },
+    bgPoints: {
+      listStyle: 'none',
+      margin: 0,
+      padding: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '22px',
+    },
+    bgPoint: {
+      display: 'flex',
+      gap: '14px',
+      alignItems: 'flex-start',
+    },
+    bgPointIcon: {
+      flexShrink: 0,
+      width: '40px',
+      height: '40px',
+      borderRadius: radius.md,
+      backgroundColor: color.accentSoft,
+      color: color.accent,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '20px',
+    },
+    bgScreens: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: isMobile ? '14px' : '20px',
+      alignItems: 'start',
+      justifyItems: 'center',
+    },
     // On-Device AI Section
     aiSection: {
       padding: sectionPadding,
-      backgroundColor: color.appBg,
+      backgroundColor: color.surface2,
     },
     aiContent: {
       maxWidth: '1100px',
@@ -341,7 +389,7 @@ export default function LandingPage() {
     // Self-host Section
     selfHost: {
       padding: sectionPadding,
-      backgroundColor: color.surface2,
+      backgroundColor: color.appBg,
       textAlign: 'center',
     },
     selfHostContent: {
@@ -592,6 +640,47 @@ export default function LandingPage() {
             >
               <img src={googlePlayBadge} alt="Get it on Google Play" style={styles.storeBadge} />
             </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Background Refresh Section */}
+      <section style={styles.bgSection}>
+        <h2 style={styles.sectionTitle}>{t.bgTitle}</h2>
+        <p style={styles.sectionSubtitle}>{t.bgSubtitle}</p>
+        <div style={styles.bgContent}>
+          <ul style={styles.bgPoints}>
+            {[
+              { Icon: LuRefreshCw, title: t.bgPoint1Title, desc: t.bgPoint1Desc },
+              { Icon: LuBell, title: t.bgPoint2Title, desc: t.bgPoint2Desc },
+              { Icon: LuSlidersHorizontal, title: t.bgPoint3Title, desc: t.bgPoint3Desc },
+            ].map(({ Icon, title, desc }) => (
+              <li key={title} style={styles.bgPoint}>
+                <span style={styles.bgPointIcon}><Icon /></span>
+                <div>
+                  <h3 style={{ ...styles.featureTitle, marginTop: 0 }}>{title}</h3>
+                  <p style={{ ...styles.featureDesc, margin: 0 }}>{desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div style={styles.bgScreens}>
+            {[
+              { src: bgNotification, label: t.bgShotNotification },
+              { src: bgSettings, label: t.bgShotSettings },
+            ].map(({ src, label }) => (
+              <div key={label} style={styles.mobileScreenshot}>
+                <img
+                  src={src}
+                  alt={label}
+                  style={styles.mobileImage}
+                  onClick={() => setSelectedImage({ src, alt: label })}
+                  onMouseOver={(e) => { e.target.style.transform = 'scale(1.03)'; }}
+                  onMouseOut={(e) => { e.target.style.transform = 'scale(1)'; }}
+                />
+                <p style={styles.mobileLabel}>{label}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
