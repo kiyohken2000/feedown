@@ -278,7 +278,6 @@ export default function Home() {
         style={[
           styles.articleCard,
           { backgroundColor: theme.card },
-          keyword && styles.articleCardKeyword,
           isRead && styles.articleCardRead,
         ]}
         onPress={() => handleArticlePress(article)}
@@ -636,13 +635,6 @@ const styles = StyleSheet.create({
   },
   articleCardRead: {
     opacity: 0.6,
-  },
-  // Keyword match: a primary-colored strip on the left edge (the padding is
-  // reduced by the same width so the content does not move)
-  articleCardKeyword: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
-    paddingLeft: 9,
   },
   // Highlighter-pen marker on the keyword in the title
   keywordMarker: {
