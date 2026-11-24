@@ -145,6 +145,16 @@
 
 ---
 
+## 進捗（2026-11-24, Windows）
+
+- **E のサーバー・Web・docs は実装済み。**
+  - 取得・検証・発見の処理は `functions/lib/feedDiscovery.ts` に置いた（ルートファイルからの余計な export を避けるため）。
+  - 単体テストは `functions/test/feedDiscovery.spec.ts`。`yarn workspace functions vitest run test/feedDiscovery.spec.ts` で流す。
+  - 統合テストは `api.spec.ts` に 2 件足した（github.blog の発見、example.com の拒否）。
+  - 成功レスポンスは `{ feed, discoveredFrom }`。`discoveredFrom` は発見したときだけ付く。
+- **B の Web 部分は実装済み。** 閾値は `FeedsPage.jsx` に `FEED_ERROR_THRESHOLD = 3` で直書きしてある。コメントでモバイル側の置き場所を `apps/mobile/src/utils/feedHealth.js` としたので、モバイルはその名前で作る。
+- **Mac で残っているもの**: A、B のモバイル部分、C、D、E のモバイル部分（`addFeed` に `discoveredFrom` を足してトーストを出し分ける）、1.0.17 のリリース。
+
 ## 実装順とリリース
 
 **実装順**: E → B → A → D → C

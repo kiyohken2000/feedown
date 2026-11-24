@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LuPlus, LuTrash2, LuUpload, LuDownload, LuCheck, LuGripVertical } from 'react-icons/lu';
+import { LuPlus, LuTrash2, LuUpload, LuDownload, LuCheck, LuGripVertical, LuTriangleAlert } from 'react-icons/lu';
 import { supabase, getAccessToken } from '../lib/supabase';
 import { createApiClient, FeedOwnAPI } from '@feedown/shared';
 import Navigation from '../components/Navigation';
@@ -17,6 +17,20 @@ const escapeXml = (str) => {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
+};
+
+// A feed that failed this many refreshes in a row is shown as not updating.
+// Mobile uses the same value (apps/mobile/src/utils/feedHealth.js).
+const FEED_ERROR_THRESHOLD = 3;
+
+const isFeedFailing = (feed) => (feed.errorCount || 0) >= FEED_ERROR_THRESHOLD;
+
+const describeLastSuccess = (lastSuccessAt) => {
+  if (!lastSuccessAt) return 'Never fetched successfully';
+  const days = Math.floor((Date.now() - new Date(lastSuccessAt).getTime()) / 86400000);
+  if (days <= 0) return 'Last success: today';
+  if (days === 1) return 'Last success: 1 day ago';
+  return `Last success: ${days} days ago`;
 };
 
 const FeedsPage = () => {
@@ -118,7 +132,12 @@ const FeedsPage = () => {
       if (response.success) {
         setNewFeedUrl('');
         fetchFeeds();
-        showToast('Feed added successfully', 'success');
+        showToast(
+          response.data?.discoveredFrom
+            ? `Found a feed on this site and added it: ${response.data.feed?.url}`
+            : 'Feed added successfully',
+          'success'
+        );
       } else {
         throw new Error(response.error);
       }
@@ -424,10 +443,34 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
       flex: 1,
       minWidth: 0,
     },
+    feedTitleRow: {
+      display: 'flex',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: '0.5rem',
+      marginBottom: '0.2rem',
+    },
     feedTitle: {
       fontWeight: 600,
       color: color.text,
-      marginBottom: '0.2rem',
+    },
+    errorBadge: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.25rem',
+      padding: '0.1rem 0.5rem',
+      borderRadius: radius.pill,
+      border: `1px solid ${color.danger}`,
+      color: color.danger,
+      fontSize: '0.72rem',
+      fontWeight: 600,
+      whiteSpace: 'nowrap',
+      cursor: 'help',
+    },
+    feedErrorNote: {
+      fontSize: '0.78rem',
+      color: color.danger,
+      marginTop: '0.15rem',
     },
     feedUrl: {
       fontSize: '0.82rem',
@@ -564,7 +607,7 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
               type="url"
               value={newFeedUrl}
               onChange={(e) => setNewFeedUrl(e.target.value)}
-              placeholder="Enter RSS feed URL (e.g., https://example.com/feed.xml)"
+              placeholder="Feed URL or site URL (e.g., https://example.com/)"
               style={styles.input}
               required
               disabled={addingFeed}
@@ -658,8 +701,19 @@ ${feeds.map(feed => `    <outline text="${escapeXml(feed.title || feed.url)}" ti
                         />
                       )}
                       <div style={styles.feedContent}>
-                        <div style={styles.feedTitle}>{feed.title || 'Untitled Feed'}</div>
+                        <div style={styles.feedTitleRow}>
+                          <span style={styles.feedTitle}>{feed.title || 'Untitled Feed'}</span>
+                          {isFeedFailing(feed) && (
+                            <span style={styles.errorBadge} title={describeLastSuccess(feed.lastSuccessAt)}>
+                              <LuTriangleAlert style={{ fontSize: '0.75rem' }} />
+                              Not updating
+                            </span>
+                          )}
+                        </div>
                         <div style={styles.feedUrl}>{feed.url}</div>
+                        {isFeedFailing(feed) && (
+                          <div style={styles.feedErrorNote}>{describeLastSuccess(feed.lastSuccessAt)}</div>
+                        )}
                       </div>
                     </div>
                     <button
