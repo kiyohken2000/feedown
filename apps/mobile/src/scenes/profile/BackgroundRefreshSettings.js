@@ -318,7 +318,7 @@ export default function BackgroundRefreshSettings() {
               <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Keywords</Text>
               <View style={[styles.card, { backgroundColor: theme.card }, !settings.enabled && styles.disabled]}>
                 <Text style={[styles.toggleDescription, { color: theme.textMuted, marginTop: 0 }]}>
-                  Get notified right away when a new article title contains one of these, regardless of the number above
+                  Get notified right away when a new article title contains one of these, regardless of the number above. Matching articles are also highlighted in the article list.
                 </Text>
                 <View style={styles.keywordInputRow}>
                   <TextInput

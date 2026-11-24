@@ -18,6 +18,8 @@ import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import NotificationBell from './NotificationBell'
+import { loadBgSettings } from '../../utils/backgroundRefresh'
+import { matchKeyword } from '../../utils/newArticleNotifications'
 
 export default function Home() {
   const navigation = useNavigation()
@@ -41,6 +43,8 @@ export default function Home() {
   const [filter, setFilter] = useState('all') // 'all', 'unread', 'read'
   const [selectedFeedId, setSelectedFeedId] = useState(null) // null = All Feeds
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false)
+  // Notification keywords (27d), also used to highlight matching articles
+  const [keywords, setKeywords] = useState([])
   const isFirstFocus = useRef(true)
   const fetchArticlesRef = useRef(fetchArticles)
   const flatListRef = useRef(null)
@@ -81,6 +85,32 @@ export default function Home() {
       }
     }, [user])
   )
+
+  // Re-read the keywords on every focus: they are edited on the settings screen
+  useFocusEffect(
+    useCallback(() => {
+      let active = true
+      loadBgSettings().then((settings) => {
+        if (active) setKeywords(settings.keywords)
+      })
+      return () => {
+        active = false
+      }
+    }, [])
+  )
+
+  // Article id → the keyword its title matches. Same matching as the keyword
+  // notification, so the highlight and the alert agree. Muted feeds are still
+  // highlighted: muting only turns off their notifications.
+  const keywordMatches = useMemo(() => {
+    const map = new Map()
+    if (keywords.length === 0) return map
+    articles.forEach((article) => {
+      const keyword = matchKeyword(article.title, keywords)
+      if (keyword) map.set(article.id, keyword)
+    })
+    return map
+  }, [articles, keywords])
 
   // Show error toast
   useEffect(() => {
@@ -202,10 +232,16 @@ export default function Home() {
   const renderArticle = ({ item: article }) => {
     const isRead = readArticles.has(article.id)
     const feed = getFeed(article.feedId)
+    const keyword = keywordMatches.get(article.id)
 
     return (
       <TouchableOpacity
-        style={[styles.articleCard, { backgroundColor: theme.card }, isRead && styles.articleCardRead]}
+        style={[
+          styles.articleCard,
+          { backgroundColor: theme.card },
+          keyword && styles.articleCardKeyword,
+          isRead && styles.articleCardRead,
+        ]}
         onPress={() => handleArticlePress(article)}
         onLongPress={() => handleLongPress(article)}
         activeOpacity={0.7}
@@ -234,6 +270,11 @@ export default function Home() {
             </Text>
             <Text style={[styles.dot, { color: theme.textMuted }]}>-</Text>
             <Text style={[styles.time, { color: theme.textMuted }]}>{getRelativeTime(article.publishedAt)}</Text>
+            {keyword && (
+              <View style={styles.keywordChip} accessibilityLabel={`Matches keyword ${keyword}`}>
+                <Text style={styles.keywordChipText} numberOfLines={1}>{keyword}</Text>
+              </View>
+            )}
           </View>
           <Text style={[styles.articleTitle, { color: theme.text }]} numberOfLines={2}>
             {article.title}
@@ -533,6 +574,26 @@ const styles = StyleSheet.create({
   },
   articleCardRead: {
     opacity: 0.6,
+  },
+  // Keyword match: a primary-colored strip on the left edge (the padding is
+  // reduced by the same width so the content does not move)
+  articleCardKeyword: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+    paddingLeft: 9,
+  },
+  keywordChip: {
+    marginLeft: 6,
+    maxWidth: 90,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+  },
+  keywordChipText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '600',
   },
   thumbnail: {
     width: 90,
