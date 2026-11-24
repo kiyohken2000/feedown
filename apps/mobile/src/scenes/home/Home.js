@@ -34,6 +34,7 @@ export default function Home() {
     isRefreshing,
     error,
     hasMore,
+    cacheFallback,
     refreshAll,
     fetchArticles,
     markAsRead,
@@ -221,6 +222,17 @@ export default function Home() {
     } else {
       return date.toLocaleDateString()
     }
+  }
+
+  // "2h ago" for the offline banner
+  const describeAge = (time) => {
+    const minutes = Math.floor((Date.now() - time) / 60000)
+    if (!time || minutes < 0) return 'earlier'
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    return `${Math.floor(hours / 24)}d ago`
   }
 
   // Get feed by ID
@@ -420,6 +432,20 @@ export default function Home() {
         </TouchableOpacity>
       </View>
 
+      {/* Fetching failed: the list is the offline copy (#8) */}
+      {cacheFallback && (
+        <View
+          testID="home-offline-banner"
+          style={[styles.offlineBanner, { backgroundColor: theme.card, borderBottomColor: theme.border }]}
+        >
+          <Text style={[styles.offlineBannerText, { color: theme.textSecondary }]} numberOfLines={1}>
+            {cacheFallback.offline ? 'Offline' : "Can't reach the server"}
+            {' — showing articles from '}
+            {describeAge(cacheFallback.syncedAt)}
+          </Text>
+        </View>
+      )}
+
       <FlatList
         ref={flatListRef}
         data={filteredArticles}
@@ -552,6 +578,15 @@ const styles = StyleSheet.create({
     fontSize: fontSize.small,
     fontWeight: '600',
     color: colors.white,
+  },
+  offlineBanner: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    alignItems: 'center',
+  },
+  offlineBannerText: {
+    fontSize: fontSize.small,
   },
   // List
   listContent: {

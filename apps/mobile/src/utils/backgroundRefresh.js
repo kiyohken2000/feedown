@@ -22,6 +22,7 @@ import * as Notifications from 'expo-notifications'
 import * as TaskManager from 'expo-task-manager'
 import { AppState, Platform } from 'react-native'
 import { createApiClient } from './api'
+import { mergeIntoArticleCache } from './articleCache'
 import { getAuthToken } from './supabase'
 import {
   buildKeywordContent,
@@ -434,11 +435,10 @@ async function refreshOnce() {
 }
 
 /**
- * The articles this run added, from the first page of unread articles.
- * Never throws: on failure or when short on time, returns no articles and the
- * notification falls back to the plain count.
- *
- * #8 (offline cache) can save `articles` here to prefetch the list.
+ * The articles this run added (`found`), from the first page of unread
+ * articles (`articles`, for the offline cache). Never throws: on failure or
+ * when short on time, returns no articles and the notification falls back to
+ * the plain count.
  */
 async function fetchNewArticles(startedAt, newArticles) {
   if (Date.now() - startedAt > LIST_DEADLINE_MS) {
@@ -450,7 +450,8 @@ async function fetchNewArticles(startedAt, newArticles) {
       limit: LIST_LIMIT,
     })
     if (!res.success) return { found: [], listError: res.error || 'list failed' }
-    return { found: extractNewArticles(res.data?.articles, startedAt, newArticles) }
+    const articles = Array.isArray(res.data?.articles) ? res.data.articles : []
+    return { found: extractNewArticles(articles, startedAt, newArticles), articles }
   } catch (e) {
     return { found: [], listError: e?.message || String(e) }
   }
@@ -511,6 +512,9 @@ async function check({ foreground = false } = {}) {
   if (rateLimited) return done({ skipped: 'rate-limited' })
 
   const list = newArticles > 0 ? await fetchNewArticles(started, newArticles) : { found: [] }
+  // Prefetch (#8): add them to the offline copy of the home list, so opening
+  // the app offline after this run still shows them
+  const prefetched = list.articles ? await mergeIntoArticleCache(list.articles) : 0
   // Muted feeds never notify (27c): drop their articles from the text, the
   // threshold count and the keyword check. Only identified ones can be dropped.
   const muted = new Set(settings.mutedFeedIds)
@@ -526,6 +530,7 @@ async function check({ foreground = false } = {}) {
     ...(newArticles > 0 ? { identified: list.found.length } : {}),
     ...(mutedCount ? { muted: mutedCount } : {}),
     ...(keywordMatches.length ? { keywordMatches: keywordMatches.length } : {}),
+    ...(prefetched ? { prefetched } : {}),
     ...(list.listError ? { listError: list.listError } : {}),
     ...(list.listSkipped ? { listSkipped: list.listSkipped } : {}),
     ...(error ? { error } : {}),

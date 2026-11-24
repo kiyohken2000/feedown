@@ -57,6 +57,7 @@ function describeRun(run) {
   if (run.listSkipped) parts.push('list skipped (slow)')
   if (run.muted) parts.push(`${run.muted} muted`)
   if (run.keywordMatches) parts.push(`${run.keywordMatches} keyword`)
+  if (run.prefetched) parts.push(`${run.prefetched} prefetched`)
   if (run.notified) parts.push('notified')
   if (run.keywordNotified) parts.push('keyword notified')
   if (run.skipped) parts.push(SKIP_LABELS[run.skipped] || `skipped (${run.skipped})`)

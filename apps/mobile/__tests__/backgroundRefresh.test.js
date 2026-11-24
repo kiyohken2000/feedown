@@ -57,6 +57,8 @@ jest.mock('expo-background-task', () => ({
 
 jest.mock('../src/utils/supabase', () => ({
   getAuthToken: jest.fn(async () => 'token'),
+  getServerUrl: jest.fn(async () => 'https://feedown.example'),
+  getUser: jest.fn(async () => ({ uid: 'u1' })),
 }))
 
 jest.mock('../src/utils/api', () => ({
@@ -354,4 +356,35 @@ test('isDelivering needs the task, the switch and the OS permission', () => {
   expect(bg.isDelivering(on, 'denied')).toBe(false)
   expect(bg.isDelivering({ ...on, enabled: false }, 'granted')).toBe(false)
   expect(bg.isDelivering({ ...on, notify: false }, 'granted')).toBe(false)
+})
+
+// ---- #8: prefetch into the offline cache ------------------------------------------
+
+test('#8: adds the fetched unread articles to an existing offline cache', async () => {
+  const { saveArticleCache, loadArticleCache } = require('../src/utils/articleCache')
+  await bg.updateBgSettings({ enabled: true, notify: false })
+  await saveArticleCache([{ id: 'seen', title: 'Seen', publishedAt: OLD_ISO, isRead: true }], 1)
+
+  mockArticleList = [article('a1', 'tc', 'TechCrunch', 'New one')]
+  mockRefreshResponses = [batch(1)]
+  const result = await bg.runBackgroundRefresh()
+  expect(result.prefetched).toBe(1)
+  const cached = await loadArticleCache()
+  expect(cached.articles.map((a) => a.id)).toEqual(['a1', 'seen'])
+  expect(cached.articles[1].isRead).toBe(true)
+})
+
+test('#8: no prefetch without a cache, or when the list was not fetched', async () => {
+  const { loadArticleCache } = require('../src/utils/articleCache')
+  await bg.updateBgSettings({ enabled: true, notify: false })
+  mockArticleList = [article('a1', 'tc', 'TechCrunch', 'New one')]
+  mockRefreshResponses = [batch(1)]
+  expect((await bg.runBackgroundRefresh()).prefetched).toBeUndefined()
+  expect(await loadArticleCache()).toBeNull()
+
+  mockArticleList = null
+  mockRefreshResponses = [batch(1)]
+  const result = await bg.runBackgroundRefresh()
+  expect(result.listError).toBe('HTTP 500')
+  expect(result.prefetched).toBeUndefined()
 })

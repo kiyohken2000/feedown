@@ -11,6 +11,7 @@ import {
   clearAuthData,
 } from '../utils/supabase'
 import { createApiClientWithUrl } from '../utils/api'
+import { clearArticleCache } from '../utils/articleCache'
 
 export const UserContext = createContext()
 
@@ -109,6 +110,8 @@ export const UserContextProvider = (props) => {
 
   // Sign out
   const signOut = async () => {
+    // The offline article list belongs to this account (#8)
+    await clearArticleCache()
     await clearAuthData()
     setUser(null)
   }

@@ -1,8 +1,37 @@
 import React, { createContext, useState, useContext, useCallback, useEffect, useRef } from 'react'
 import { AppState } from 'react-native'
+import * as Network from 'expo-network'
 import { UserContext } from './UserContext'
 import { createApiClient } from '../utils/api'
 import { consumeBackgroundNewArticles, onBackgroundArticles } from '../utils/backgroundRefresh'
+import {
+  MAX_CACHED_ARTICLES,
+  clearArticleCache,
+  loadArticleCache,
+  saveArticleCache,
+} from '../utils/articleCache'
+
+/** Wait this long after the list changes before saving the offline copy. */
+const CACHE_SAVE_DELAY_MS = 1000
+
+function readSetFrom(articles) {
+  const readSet = new Set()
+  articles.forEach(article => {
+    if (article.isRead) readSet.add(article.id)
+  })
+  return readSet
+}
+
+/** False only when the OS says there is no connection; null when unknown. */
+async function isConnected() {
+  try {
+    const state = await Network.getNetworkStateAsync()
+    if (state.isConnected === false || state.isInternetReachable === false) return false
+    return true
+  } catch {
+    return null
+  }
+}
 
 export const FeedsContext = createContext()
 
@@ -19,6 +48,24 @@ export const FeedsContextProvider = ({ children }) => {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
   const [hasMore, setHasMore] = useState(true)
+  // Set while the list comes from the offline cache because fetching failed
+  // (#8): { syncedAt, offline } — offline is false when the device has a
+  // connection but the server could not be reached, null when unknown.
+  const [cacheFallback, setCacheFallback] = useState(null)
+  const cacheFallbackRef = useRef(null)
+  // When the shown list was last fetched from the server (for the cache)
+  const syncedAtRef = useRef(0)
+  // Saving starts once the cache was restored or the list was fetched, so the
+  // empty list at startup never overwrites the saved one
+  const cacheReadyRef = useRef(false)
+  // A fetch has replaced the list since sign-in: a restore that finishes
+  // later must not overwrite it
+  const fetchedRef = useRef(false)
+
+  const showCacheFallback = useCallback((value) => {
+    cacheFallbackRef.current = value
+    setCacheFallback(value)
+  }, [])
 
   // Create API client
   const getApi = useCallback(() => {
@@ -38,7 +85,8 @@ export const FeedsContextProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Failed to fetch feeds:', err)
-      setError(err.message)
+      // Offline with the cached list on screen: the banner says so already
+      if (!cacheFallbackRef.current) setError(err.message)
       return []
     }
   }, [getApi])
@@ -65,6 +113,10 @@ export const FeedsContextProvider = ({ children }) => {
 
         if (reset) {
           setArticles(newArticles)
+          fetchedRef.current = true
+          cacheReadyRef.current = true
+          syncedAtRef.current = Date.now()
+          if (cacheFallbackRef.current) showCacheFallback(null)
         } else {
           setArticles(prev => [...prev, ...newArticles])
         }
@@ -74,13 +126,7 @@ export const FeedsContextProvider = ({ children }) => {
         // Build read articles set
         if (reset) {
           // Full reset: rebuild from fetched articles only
-          const readSet = new Set()
-          newArticles.forEach(article => {
-            if (article.isRead) {
-              readSet.add(article.id)
-            }
-          })
-          setReadArticles(readSet)
+          setReadArticles(readSetFrom(newArticles))
         } else {
           // Load more: preserve existing read status and add new
           setReadArticles(prev => {
@@ -100,12 +146,31 @@ export const FeedsContextProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Failed to fetch articles:', err)
+      // Fall back to the offline copy instead of an error (#8)
+      if (reset || cacheFallbackRef.current) {
+        const cache = await loadArticleCache()
+        if (cache && cache.articles.length > 0) {
+          if (!fetchedRef.current) {
+            setArticles(cache.articles)
+            setReadArticles(readSetFrom(cache.articles))
+            syncedAtRef.current = cache.syncedAt
+            cacheReadyRef.current = true
+          }
+          setHasMore(false)
+          const connected = await isConnected()
+          showCacheFallback({
+            syncedAt: syncedAtRef.current || cache.syncedAt,
+            offline: connected === null ? null : !connected,
+          })
+          return []
+        }
+      }
       setError(err.message)
       return []
     } finally {
       setIsLoading(false)
     }
-  }, [getApi, articles.length, readArticles])
+  }, [getApi, articles.length, readArticles, showCacheFallback])
 
   // Refresh all feeds in batches to stay within Cloudflare's 50 subrequest limit
   const refreshAll = useCallback(async () => {
@@ -145,19 +210,20 @@ export const FeedsContextProvider = ({ children }) => {
 
       console.log(`Refresh complete: ${totalSuccessful}/${totalFeeds} feeds, ${totalNewArticles} new articles`)
 
+      // Articles first: if they fail, the list falls back to the offline
+      // cache, and the feed list failure that follows shows no error toast
+      await fetchArticles(true)
+
       // Always fetch the full feed list after refresh to avoid partial batch issues
       await fetchFeeds()
-
-      // Fetch articles after refresh
-      await fetchArticles(true)
 
       return { success: true, stats: { totalFeeds, successfulFeeds: totalSuccessful, newArticles: totalNewArticles } }
     } catch (err) {
       console.error('Failed to refresh:', err)
       setError(err.message)
       // On error, still try to fetch existing data
-      await fetchFeeds()
       await fetchArticles(true)
+      await fetchFeeds()
       return { success: false, error: err.message }
     } finally {
       setIsRefreshing(false)
@@ -350,6 +416,8 @@ export const FeedsContextProvider = ({ children }) => {
 
   // Reset all state (used after Clear All Data)
   const resetAll = useCallback(() => {
+    clearArticleCache()
+    showCacheFallback(null)
     setFeeds([])
     setArticles([])
     setReadArticles(new Set())
@@ -357,7 +425,54 @@ export const FeedsContextProvider = ({ children }) => {
     setFavorites([])
     setHasMore(true)
     setError(null)
-  }, [])
+  }, [showCacheFallback])
+
+  // ---- offline cache (#8) -----------------------------------------------------
+
+  // Sign-in: show the cached list until the first fetch replaces it.
+  // Sign-out: drop the list so the next account never sees it.
+  const userId = user?.uid || user?.id || null
+  useEffect(() => {
+    fetchedRef.current = false
+    cacheReadyRef.current = false
+    syncedAtRef.current = 0
+    showCacheFallback(null)
+    if (!userId) {
+      setArticles([])
+      setReadArticles(new Set())
+      setFavoritedArticles(new Set())
+      setFavorites([])
+      setFeeds([])
+      setHasMore(true)
+      return undefined
+    }
+    let active = true
+    loadArticleCache().then((cache) => {
+      if (!active || fetchedRef.current) return
+      if (cache && cache.articles.length > 0) {
+        setArticles(cache.articles)
+        setReadArticles(readSetFrom(cache.articles))
+        syncedAtRef.current = cache.syncedAt
+      }
+      cacheReadyRef.current = true
+    })
+    return () => {
+      active = false
+    }
+  }, [userId, showCacheFallback])
+
+  // Save the first MAX_CACHED_ARTICLES with their read state whenever the list
+  // changes (read, deleted, feed removed, refreshed...), debounced
+  useEffect(() => {
+    if (!userId || !cacheReadyRef.current) return undefined
+    const timer = setTimeout(() => {
+      const snapshot = articles
+        .slice(0, MAX_CACHED_ARTICLES)
+        .map(a => ({ ...a, isRead: readArticles.has(a.id) }))
+      saveArticleCache(snapshot, syncedAtRef.current)
+    }, CACHE_SAVE_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [articles, readArticles, userId])
 
   // Background refresh stores new articles on the server while the app is in
   // the background. On returning to the foreground, clear its counters and
@@ -402,6 +517,7 @@ export const FeedsContextProvider = ({ children }) => {
         isRefreshing,
         error,
         hasMore,
+        cacheFallback,
         // Actions
         fetchFeeds,
         fetchArticles,
