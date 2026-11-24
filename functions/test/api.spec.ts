@@ -181,6 +181,44 @@ describe('FeedOwn API Integration Tests', () => {
       expect(data.feed).toHaveProperty('url', 'https://hnrss.org/frontpage');
     });
 
+    it('POST /api/feeds - should discover the feed from a site URL', async () => {
+      const response = await fetch(`${BASE_URL}/api/feeds`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: 'https://github.blog/' }),
+      });
+      expect(response.status).toBe(201);
+
+      const data = await response.json();
+      expect(data).toHaveProperty('discoveredFrom', 'https://github.blog/');
+      expect(data.feed.url).toBe('https://github.blog/feed/');
+
+      // Remove it so the test-account limit test below starts from one feed
+      const del = await fetch(`${BASE_URL}/api/feeds/${data.feed.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      expect(del.ok).toBe(true);
+    });
+
+    it('POST /api/feeds - should reject a page without a feed link', async () => {
+      const response = await fetch(`${BASE_URL}/api/feeds`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: 'https://example.com/' }),
+      });
+      expect(response.status).toBe(400);
+
+      const data = await response.json();
+      expect(data.error).toContain('no feed link');
+    });
+
     it('GET /api/articles - should return 401 without auth', async () => {
       const response = await fetch(`${BASE_URL}/api/articles`);
       expect(response.status).toBe(401);

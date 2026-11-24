@@ -233,8 +233,26 @@ Authorization: Bearer <token>
 }
 ```
 
+**サイト URL からの自動発見:**
+
+`url` がフィードではなく HTML ページだった場合、`<link rel="alternate" type="application/rss+xml">`（または `application/atom+xml`）を探し、文書順で最初の 1 件を検証してその URL で登録する。相対 `href` はページ URL を基準に解決する。発見は 1 段のみで、発見先がまたフィードでなければ 400。
+
+このときレスポンスに `discoveredFrom`（入力された元の URL）が付き、`feed.url` は発見したフィードの URL になる。`faviconUrl` は元のサイトのホストから作る。
+
+```json
+{
+  "feed": { "url": "https://github.blog/feed/", "...": "..." },
+  "discoveredFrom": "https://github.blog/"
+}
+```
+
 **Error Responses:**
 - `400`: Feed URL is required
+- `400`: Invalid URL / Only http:// or https:// URLs are supported
+- `400`: Feed URL returned HTTP {status} / Could not reach feed URL
+- `400`: URL is not an RSS or Atom feed, and no feed link was found on the page
+- `400`: Found a feed link on the page ({url}), but it could not be used: {理由}
+- `400`: Feed contains no articles
 - `400`: Feed already exists
 - `400`: Test accounts can only have up to 3 feeds (テストアカウント制限)
 - `400`: Maximum 100 feeds allowed

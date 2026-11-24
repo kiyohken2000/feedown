@@ -6,6 +6,7 @@
 
 import { requireAuth, isTestAccount } from '../../lib/auth';
 import { createSupabaseClient } from '../../lib/supabase';
+import { fetchAndValidateFeed, discoverFeedUrl } from '../../lib/feedDiscovery';
 
 /**
  * GET /api/feeds
@@ -141,64 +142,52 @@ export async function onRequestPost(context: any): Promise<Response> {
 
     // Reachability + feed-shape check — always run so OPML imports with broken
     // URLs are rejected too, not only the manual "type a URL" path.
-    let xmlText: string;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      const rssResponse = await fetch(url, {
-        method: 'GET',
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'FeedOwn/1.0 (RSS Reader)',
-        },
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!rssResponse.ok) {
+    // When the URL is a web page, look for a feed advertised in its <head>
+    // and register that instead. Discovery is one level deep: if the
+    // advertised URL is not a feed either, the request fails.
+    let feedUrl = url;
+    let discoveredFrom: string | null = null;
+    let result = await fetchAndValidateFeed(url);
+    if (!result.ok && result.body !== undefined) {
+      const candidate = discoverFeedUrl(result.body, url);
+      if (!candidate) {
         return new Response(
-          JSON.stringify({ error: `Feed URL returned HTTP ${rssResponse.status}` }),
+          JSON.stringify({ error: 'URL is not an RSS or Atom feed, and no feed link was found on the page' }),
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
-
-      xmlText = await rssResponse.text();
-    } catch (error) {
-      console.error('Failed to fetch feed:', error);
+      const discovered = await fetchAndValidateFeed(candidate);
+      if (!discovered.ok) {
+        return new Response(
+          JSON.stringify({ error: `Found a feed link on the page (${candidate}), but it could not be used: ${discovered.error}` }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      feedUrl = candidate;
+      discoveredFrom = url;
+      result = discovered;
+    }
+    if (!result.ok) {
       return new Response(
-        JSON.stringify({ error: 'Could not reach feed URL' }),
+        JSON.stringify({ error: result.error }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!looksLikeFeed(xmlText)) {
-      return new Response(
-        JSON.stringify({ error: 'URL does not appear to be an RSS or Atom feed' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!hasFeedItems(xmlText)) {
-      return new Response(
-        JSON.stringify({ error: 'Feed contains no articles' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const parsedFeed = await parseFeedBasicInfo(xmlText);
+    const parsedFeed = await parseFeedBasicInfo(result.xmlText);
     const feedTitle = title || parsedFeed.title || '';
     const feedDescription = description || parsedFeed.description || '';
 
-    // Extract favicon URL
-    const faviconUrl = extractFaviconUrl(url);
+    // Favicon comes from the site the user entered: a discovered feed may live
+    // on another host (e.g. feeds.feedburner.com).
+    const faviconUrl = extractFaviconUrl(discoveredFrom || feedUrl);
 
     // Add feed to database
     const { data: feed, error } = await supabase
       .from('feeds')
       .insert({
         user_id: uid,
-        url,
+        url: feedUrl,
         title: feedTitle,
         description: feedDescription,
         favicon_url: faviconUrl,
@@ -242,7 +231,7 @@ export async function onRequestPost(context: any): Promise<Response> {
     };
 
     return new Response(
-      JSON.stringify({ feed: newFeed }),
+      JSON.stringify(discoveredFrom ? { feed: newFeed, discoveredFrom } : { feed: newFeed }),
       {
         status: 201,
         headers: { 'Content-Type': 'application/json' },
@@ -289,19 +278,6 @@ async function parseFeedBasicInfo(xmlText: string): Promise<{ title: string; des
   }
 
   return result;
-}
-
-function looksLikeFeed(xmlText: string): boolean {
-  const head = xmlText.replace(/^\uFEFF/, '').trimStart().slice(0, 2000);
-  if (/^<!DOCTYPE\s+html/i.test(head) || /^<html[\s>]/i.test(head)) return false;
-  if (/<rss[\s>]/i.test(head)) return true;
-  if (/<feed[\s>]/i.test(head) && head.includes('http://www.w3.org/2005/Atom')) return true;
-  if (/<rdf:RDF[\s>]/i.test(head)) return true;
-  return false;
-}
-
-function hasFeedItems(xmlText: string): boolean {
-  return /<item[\s>]/i.test(xmlText) || /<entry[\s>]/i.test(xmlText);
 }
 
 function stripHtmlTags(html: string): string {
