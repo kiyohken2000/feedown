@@ -18,6 +18,7 @@ import { UserContext } from '../../contexts/UserContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
+import { describeLastSuccess, isFeedFailing } from '../../utils/feedHealth'
 
 export default function Read() {
   const { isDarkMode } = useTheme()
@@ -153,8 +154,24 @@ export default function Read() {
     )
   }, [deleteFeed])
 
+  // Explain a failing feed (#4), with a way on to deleting it
+  const handleFailingFeedPress = useCallback((feed) => {
+    Alert.alert(
+      'Not updating',
+      `"${feed.title || feed.url}" has failed to refresh several times in a row. ` +
+        `${describeLastSuccess(feed.lastSuccessAt)}.\n\n` +
+        'The site may have moved or removed its feed. You can delete it and add the new URL.',
+      [
+        { text: 'OK', style: 'cancel' },
+        { text: 'Delete Feed', style: 'destructive', onPress: () => handleDeleteFeed(feed) },
+      ]
+    )
+  }, [handleDeleteFeed])
+
   // Render feed item
-  const renderFeed = ({ item: feed }) => (
+  const renderFeed = ({ item: feed }) => {
+    const failing = isFeedFailing(feed)
+    return (
     <View style={[styles.feedCard, { backgroundColor: theme.card }]}>
       <View style={styles.feedInfo}>
         {feed.faviconUrl ? (
@@ -170,12 +187,30 @@ export default function Read() {
           </View>
         )}
         <View style={styles.feedDetails}>
-          <Text style={[styles.feedTitle, { color: theme.text }]} numberOfLines={1}>
-            {feed.title || 'Untitled Feed'}
-          </Text>
+          <View style={styles.feedTitleRow}>
+            {failing && (
+              <TouchableOpacity
+                testID={`feed-failing-${feed.id}`}
+                accessibilityRole="button"
+                accessibilityLabel="Not updating. Tap for details"
+                onPress={() => handleFailingFeedPress(feed)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+              >
+                <Text style={styles.failingIcon}>⚠</Text>
+              </TouchableOpacity>
+            )}
+            <Text style={[styles.feedTitle, styles.feedTitleText, { color: theme.text }]} numberOfLines={1}>
+              {feed.title || 'Untitled Feed'}
+            </Text>
+          </View>
           <Text style={[styles.feedUrl, { color: theme.textMuted }]} numberOfLines={1}>
             {feed.url}
           </Text>
+          {failing && (
+            <Text style={styles.failingNote} numberOfLines={1}>
+              Not updating · {describeLastSuccess(feed.lastSuccessAt)}
+            </Text>
+          )}
         </View>
       </View>
       <TouchableOpacity
@@ -185,7 +220,8 @@ export default function Read() {
         <Text style={styles.deleteButtonText}>Delete</Text>
       </TouchableOpacity>
     </View>
-  )
+    )
+  }
 
   // Render recommended feed item
   const renderRecommendedFeed = (recommendedFeed) => {
@@ -331,6 +367,9 @@ export default function Read() {
     </ScreenTemplate>
   )
 }
+
+// Amber, readable on both the light and dark card backgrounds
+const FAILING_COLOR = '#d97706'
 
 const styles = StyleSheet.create({
   container: {
@@ -499,6 +538,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.black,
     marginBottom: 2,
+  },
+  feedTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  feedTitleText: {
+    flexShrink: 1,
+  },
+  failingIcon: {
+    color: FAILING_COLOR,
+    fontSize: fontSize.normal,
+    marginRight: 4,
+    marginBottom: 2,
+  },
+  failingNote: {
+    color: FAILING_COLOR,
+    fontSize: fontSize.small,
+    marginTop: 2,
   },
   feedUrl: {
     fontSize: fontSize.small,
