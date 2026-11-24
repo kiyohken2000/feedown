@@ -158,6 +158,22 @@
 - **ローカル確認の注意**: `apps/web/.env` の `VITE_API_BASE_URL` は本番を指している。`wrangler pages dev` でローカルの API を試すときは、`VITE_API_BASE_URL=http://localhost:8788` を付けてビルドし直す。PowerShell で空文字を代入すると変数が消えて `.env` の値が使われるので、空文字では上書きできない。デプロイ前には `.env` のままビルドし直すこと。
 - **Mac で残っているもの**: A、B のモバイル部分、C、D、E のモバイル部分（`addFeed` に `discoveredFrom` を足してトーストを出し分ける）、1.0.17 のリリース。
 
+## 進捗（2026-11-24, Mac）
+
+- **モバイルの A〜E を実装済み**（1 項目 1 コミット。E cb61881、B c0a11f0、A 738085a、D 4f30a4b、C 6ad7bb1）。実機での確認はまだ。
+- **計画から変えた点・補足**
+  - **C のバナーの時刻**: `savedAt` は既読にするたびに更新されるので、バナーには別に持った `syncedAt`（最後にサーバーから取れた時刻）を使う。キャッシュの値は `{ v, serverUrl, userId, savedAt, syncedAt, articles }`。`userId` は保存済みユーザーの `uid`。
+  - **C のバナーの文言**: `expo-network` で接続なしと分かれば「Offline — …」、接続はあるのに取れなければ「Can't reach the server — …」。
+  - **C の取得順**: `refreshAll()` で記事一覧をフィード一覧より先に取るよう入れ替えた。逆だと、オフライン時にフィード一覧の失敗が先にエラートーストを出してしまうため。キャッシュを表示している間は、フィード一覧の失敗でもトーストを出さない。
+  - **C のサインアウト**: ユーザーがいなくなったら FeedsContext の記事・フィード・お気に入りの state も空にする。次にサインインしたアカウントに前の一覧が見えないようにするため。
+  - **C の説明文の長さ**: Android の AsyncStorage は 1 件あたり約 2MB までなので、保存する `description` は 2000 文字で切る。
+  - **C の先読みの件数**: Recent Runs の `prefetched` は、キャッシュに新しく加わった記事の数。
+  - **B**: ⚠ をタップすると Alert で説明を出し、「Delete Feed」から既存の削除確認に進む。URL の下に「Not updating · Last success: …」を出す。
+- **テスト**: `__tests__/` に `aiCache`、`articleCache`、`feedHealth` のテストと、バックグラウンド先読みのテスト 2 件を足した。
+  - この Mac には `jest` 本体が入っていない（`jest-expo` だけ）。`npx -y -p jest@29 jest` で流すと 36 件すべて通る。
+  - `app.test.js` は以前から構文解析エラーで失敗している（今回の変更とは無関係）。
+- **残り**: 実機での確認（下の各「検証」）、1.0.17 のリリース。
+
 ## 実装順とリリース
 
 **実装順**: E → B → A → D → C
@@ -170,7 +186,7 @@
 
 **リリース**
 1. functions と Web: E と B の Web 部分ができたら、`yarn build:web` のあとルートから `npx wrangler pages deploy`（パス引数なし）。そのあと `api.spec.ts` を流す。
-2. モバイル: A〜E のモバイル部分を全部入れてから、**1.0.17 としてストアに提出する**（2026-11-24 決定。JS だけの変更なので OTA でも出せるが、OTA にはしない）。`apps/mobile/app.json` の `version` を 1.0.17、iOS `buildNumber` を 23、Android `versionCode` を 18 に上げる（1.0.16 は 22 / 17）。ビルドと提出の前にユーザーに確認する。
+2. モバイル: A〜E のモバイル部分を全部入れてから、**1.0.17 としてストアに提出する**（2026-11-24 決定。JS だけの変更なので OTA でも出せるが、OTA にはしない）。`apps/mobile/app.json` の `version` を 1.0.17 に上げる。iOS `buildNumber` と Android `versionCode` は手で上げない。`eas.json` が `appVersionSource: remote` と `autoIncrement` なので EAS 側で自動的に上がり、app.json の値は使われない（1.0.16 の Android は失敗したビルドでも番号が進み、versionCode 24 になった）。ビルドと提出の前にユーザーに確認する。
 3. 完了したら、`BRUSHUP_PLAN.md` の #4 / #8（Phase 1 部分）/ #14 / #18 に ✅ を付け、D を判断記録に書く。#27 の ✅ も付け忘れているので、そのとき一緒に直す。
 
 **この計画に入れないもの**
