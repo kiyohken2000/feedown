@@ -307,7 +307,13 @@ export const FeedsContextProvider = ({ children }) => {
 
       if (response.success) {
         await fetchFeeds()
-        return { success: true, feed: response.data.feed }
+        // discoveredFrom: the site URL that was entered, when the server
+        // found the feed on that page instead of being given the feed itself
+        return {
+          success: true,
+          feed: response.data.feed,
+          discoveredFrom: response.data.discoveredFrom || null,
+        }
       } else {
         throw new Error(response.error)
       }

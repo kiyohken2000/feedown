@@ -97,7 +97,11 @@ export default function Read() {
     try {
       const result = await addFeed(url)
       if (result.success) {
-        showToast({ title: 'Success', body: 'Feed added successfully' })
+        showToast(
+          result.discoveredFrom
+            ? { title: 'Feed found', body: `Found a feed on this site and added it: ${result.feed?.url || ''}` }
+            : { title: 'Success', body: 'Feed added successfully' }
+        )
         setNewFeedUrl('')
       } else {
         showErrorToast({ title: 'Error', body: result.error || 'Failed to add feed' })
@@ -284,7 +288,7 @@ export default function Read() {
         <View style={styles.addFeedContainer}>
           <TextInput
             style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text }]}
-            placeholder="Enter RSS feed URL..."
+            placeholder="Feed URL or site URL..."
             placeholderTextColor={theme.textMuted}
             value={newFeedUrl}
             onChangeText={setNewFeedUrl}
