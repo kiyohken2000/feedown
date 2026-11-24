@@ -13,6 +13,7 @@ import {
   // KOKORO_VOICE_BM_DANIEL,
 } from 'react-native-executorch/legacy'
 */
+import { InteractionManager } from 'react-native'
 import { initLlama } from 'llama.rn'
 import {
   FEEDOWN_DEFAULT_LLM_ID,
@@ -25,6 +26,7 @@ import {
   saveAiSettings,
 } from '../ai/aiStorage'
 import { modelPathFor, toNativePath } from '../ai/llama'
+import { sweepExpiredAiCache } from '../ai/aiCache'
 import { canRunOnDevice } from '../ai/llama/models'
 import { useExecutorchLLM } from '../ai/executorch/useExecutorchLLM'
 import {
@@ -85,6 +87,16 @@ export function AiProvider({ children }) {
         setSettings(loaded)
         setInitialized(true)
       })
+  }, [])
+
+  // Drop AI results older than 7 days (#14), after startup has settled
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      sweepExpiredAiCache().then((n) => {
+        if (n > 0) console.log(`[ai] removed ${n} expired cache records`)
+      })
+    })
+    return () => task.cancel()
   }, [])
 
   const selectedModel = useMemo(() => {
