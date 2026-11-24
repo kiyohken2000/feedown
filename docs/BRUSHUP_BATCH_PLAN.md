@@ -153,6 +153,9 @@
   - 統合テストは `api.spec.ts` に 2 件足した（github.blog の発見、example.com の拒否）。
   - 成功レスポンスは `{ feed, discoveredFrom }`。`discoveredFrom` は発見したときだけ付く。
 - **B の Web 部分は実装済み。** 閾値は `FeedsPage.jsx` に `FEED_ERROR_THRESHOLD = 3` で直書きしてある。コメントでモバイル側の置き場所を `apps/mobile/src/utils/feedHealth.js` としたので、モバイルはその名前で作る。
+- **本番デプロイ済み**（2026-11-24）。`api.spec.ts` は本番に対して 31 件すべて通った。ローカルの画面で、サイト URL からの追加、フィードの無いページの拒否、バッジの表示をユーザーが確認した。
+- **テストの修正（d518610）**: テスト用のメールアドレスが `isTestAccount()` の形式（`test-{数字}@test.com`）に合っておらず、3 件制限のテストは前から通らない状態だった。あわせて、準備用のフィードを不安定な BBC から github.blog に替え、`functions/vitest.config.ts` でタイムアウトを 20 秒にした。
+- **ローカル確認の注意**: `apps/web/.env` の `VITE_API_BASE_URL` は本番を指している。`wrangler pages dev` でローカルの API を試すときは、`VITE_API_BASE_URL=http://localhost:8788` を付けてビルドし直す。PowerShell で空文字を代入すると変数が消えて `.env` の値が使われるので、空文字では上書きできない。デプロイ前には `.env` のままビルドし直すこと。
 - **Mac で残っているもの**: A、B のモバイル部分、C、D、E のモバイル部分（`addFeed` に `discoveredFrom` を足してトーストを出し分ける）、1.0.17 のリリース。
 
 ## 実装順とリリース
