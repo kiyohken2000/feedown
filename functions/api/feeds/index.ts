@@ -6,7 +6,7 @@
 
 import { requireAuth, isTestAccount } from '../../lib/auth';
 import { createSupabaseClient } from '../../lib/supabase';
-import { fetchAndValidateFeed, discoverFeedUrl } from '../../lib/feedDiscovery';
+import { fetchAndValidateFeed, discoverFeedUrl, feedFaviconUrl } from '../../lib/feedDiscovery';
 
 /**
  * GET /api/feeds
@@ -178,9 +178,9 @@ export async function onRequestPost(context: any): Promise<Response> {
     const feedTitle = title || parsedFeed.title || '';
     const feedDescription = description || parsedFeed.description || '';
 
-    // Favicon comes from the site the user entered: a discovered feed may live
-    // on another host (e.g. feeds.feedburner.com).
-    const faviconUrl = extractFaviconUrl(discoveredFrom || feedUrl);
+    // Favicon from the site, not the feed host: a feed may live on a host of
+    // its own (feeds.example.com, feeds.feedburner.com) that has no icon.
+    const faviconUrl = feedFaviconUrl(feedUrl, result.xmlText, discoveredFrom);
 
     // Add feed to database
     const { data: feed, error } = await supabase
@@ -293,13 +293,3 @@ function stripHtmlTags(html: string): string {
     .trim();
 }
 
-function extractFaviconUrl(feedUrl: string): string {
-  try {
-    const url = new URL(feedUrl);
-    const domain = url.hostname;
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-  } catch (error) {
-    console.error('Error extracting favicon URL:', error);
-    return '';
-  }
-}

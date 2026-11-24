@@ -18,6 +18,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import NotificationBell from './NotificationBell'
+import FeedIcon from '../../components/FeedIcon'
 import { loadBgSettings } from '../../utils/backgroundRefresh'
 import { keywordRanges, matchKeyword } from '../../utils/newArticleNotifications'
 
@@ -297,12 +298,13 @@ export default function Home() {
         )}
         <View style={styles.articleContent}>
           <View style={styles.articleMeta}>
-            {feed?.faviconUrl && (
-              <Image
-                source={{ uri: feed.faviconUrl }}
-                style={styles.favicon}
-              />
-            )}
+            <FeedIcon
+              uri={feed?.faviconUrl}
+              title={article.feedTitle || feed?.title}
+              size={14}
+              radius={2}
+              style={styles.favicon}
+            />
             <Text style={styles.feedTitle} numberOfLines={1}>
               {article.feedTitle || 'Unknown Feed'}
             </Text>

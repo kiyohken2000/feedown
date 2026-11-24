@@ -5,7 +5,6 @@ import {
   View,
   FlatList,
   TouchableOpacity,
-  Image,
   TextInput,
   Alert,
   ActivityIndicator,
@@ -20,6 +19,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import { describeLastSuccess, isFeedFailing } from '../../utils/feedHealth'
+import FeedIcon from '../../components/FeedIcon'
 
 export default function Read() {
   const { isDarkMode } = useTheme()
@@ -175,18 +175,13 @@ export default function Read() {
     return (
     <View style={[styles.feedCard, { backgroundColor: theme.card }]}>
       <View style={styles.feedInfo}>
-        {feed.faviconUrl ? (
-          <Image
-            source={{ uri: feed.faviconUrl }}
-            style={styles.favicon}
-          />
-        ) : (
-          <View style={[styles.favicon, styles.faviconPlaceholder]}>
-            <Text style={styles.faviconPlaceholderText}>
-              {feed.title?.charAt(0)?.toUpperCase() || 'F'}
-            </Text>
-          </View>
-        )}
+        <FeedIcon
+          uri={feed.faviconUrl}
+          title={feed.title}
+          size={36}
+          radius={6}
+          style={styles.favicon}
+        />
         <View style={styles.feedDetails}>
           <View style={styles.feedTitleRow}>
             {failing && (
@@ -551,16 +546,6 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 6,
     marginRight: 12,
-  },
-  faviconPlaceholder: {
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  faviconPlaceholderText: {
-    color: colors.white,
-    fontWeight: 'bold',
-    fontSize: fontSize.large,
   },
   feedDetails: {
     flex: 1,

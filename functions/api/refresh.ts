@@ -6,6 +6,7 @@
 
 import { requireAuth } from '../lib/auth';
 import { createSupabaseClient } from '../lib/supabase';
+import { faviconUrlFor, feedFaviconUrl } from '../lib/feedDiscovery';
 
 interface RefreshStats {
   totalFeeds: number;
@@ -189,10 +190,13 @@ export async function onRequestPost(context: any): Promise<Response> {
         stats.newArticles += storeResult.count;
         stats.successfulFeeds++;
 
-        // Extract favicon if not already set
+        // Favicon from the site the feed belongs to. Also replaces one made
+        // from the feed's own host (the old behaviour), which has no icon when
+        // the feed lives on a host of its own (feeds.example.com). Favicons
+        // set any other way (e.g. from the site URL the user entered) stay.
         let faviconUrl = feed.favicon_url || null;
-        if (!faviconUrl) {
-          faviconUrl = extractFaviconUrl(feedUrl);
+        if (!faviconUrl || faviconUrl === faviconUrlFor(feedUrl)) {
+          faviconUrl = feedFaviconUrl(feedUrl, xmlText) || faviconUrl;
         }
 
         // Update feed metadata
@@ -467,18 +471,6 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-/**
- * Extract favicon URL from feed URL
- */
-function extractFaviconUrl(feedUrl: string): string {
-  try {
-    const url = new URL(feedUrl);
-    const domain = url.hostname;
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-  } catch (error) {
-    return '';
-  }
-}
 
 interface StoreArticlesResult {
   count: number;

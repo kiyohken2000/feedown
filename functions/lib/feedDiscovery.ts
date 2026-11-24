@@ -98,3 +98,56 @@ export function looksLikeFeed(xmlText: string): boolean {
 export function hasFeedItems(xmlText: string): boolean {
   return /<item[\s>]/i.test(xmlText) || /<entry[\s>]/i.test(xmlText);
 }
+
+/**
+ * The website a feed belongs to, from the feed header (before the first
+ * item): RSS / RDF `<channel><link>`, or Atom `<link rel="alternate">` (or a
+ * `<link>` without rel). Relative URLs are resolved against the feed URL.
+ * Returns null when there is none or it is not http(s).
+ */
+export function extractSiteUrl(xmlText: string, feedUrl: string): string | null {
+  const firstItem = xmlText.search(/<(item|entry)[\s>]/i);
+  const header = firstItem === -1 ? xmlText : xmlText.slice(0, firstItem);
+
+  let href: string | null = null;
+  // Atom: <link rel="alternate" href="..."/>, rel defaults to alternate
+  for (const tag of header.match(/<link\b[^>]*\bhref\s*=\s*["'][^"']+["'][^>]*>/gi) || []) {
+    const rel = tag.match(/\brel\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase() || 'alternate';
+    if (rel !== 'alternate') continue;
+    href = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1] || null;
+    if (href) break;
+  }
+  // RSS / RDF: <link>https://example.com/</link> (not <atom:link .../>)
+  if (!href) {
+    href = header.match(/<link(?:\s[^>]*)?>\s*(?:<!\[CDATA\[)?\s*([^<\]\s]+)/i)?.[1] || null;
+  }
+  if (!href) return null;
+
+  try {
+    const site = new URL(href.replace(/&amp;/g, '&'), feedUrl);
+    return site.protocol === 'http:' || site.protocol === 'https:' ? site.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Favicon for a page's host, through Google's favicon service. '' if the URL is invalid. */
+export function faviconUrlFor(pageUrl: string): string {
+  try {
+    const domain = new URL(pageUrl).hostname;
+    return domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * The favicon for a feed. Feeds often live on a host of their own
+ * (feeds.example.com, feeds.feedburner.com) that has no icon, so prefer, in
+ * order: the site URL the user entered (discovery), the site the feed names
+ * as its home, and the feed URL itself.
+ */
+export function feedFaviconUrl(feedUrl: string, xmlText: string, enteredSiteUrl?: string | null): string {
+  const siteUrl = enteredSiteUrl || extractSiteUrl(xmlText, feedUrl);
+  return faviconUrlFor(siteUrl || feedUrl) || faviconUrlFor(feedUrl);
+}
