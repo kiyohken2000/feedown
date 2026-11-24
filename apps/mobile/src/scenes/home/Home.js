@@ -132,7 +132,9 @@ export default function Home() {
     ranges.forEach(([start, end]) => {
       if (start > pos) parts.push(title.slice(pos, start))
       parts.push(
-        <Text key={start} style={styles.keywordMarker}>{title.slice(start, end)}</Text>
+        <Text key={start} style={isDarkMode ? styles.keywordMarkerDark : styles.keywordMarker}>
+          {title.slice(start, end)}
+        </Text>
       )
       pos = end
     })
@@ -641,6 +643,11 @@ const styles = StyleSheet.create({
   // Highlighter-pen marker on the keyword in the title
   keywordMarker: {
     backgroundColor: 'rgba(255, 107, 53, 0.28)',
+  },
+  // On the dark card the light marker sinks in: stronger, with lighter text
+  keywordMarkerDark: {
+    backgroundColor: 'rgba(255, 107, 53, 0.55)',
+    color: '#ffffff',
   },
   keywordChip: {
     marginLeft: 6,
