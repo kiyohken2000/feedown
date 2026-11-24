@@ -13,7 +13,6 @@ import {
   // KOKORO_VOICE_BM_DANIEL,
 } from 'react-native-executorch/legacy'
 */
-import { InteractionManager } from 'react-native'
 import { initLlama } from 'llama.rn'
 import {
   FEEDOWN_DEFAULT_LLM_ID,
@@ -89,14 +88,20 @@ export function AiProvider({ children }) {
       })
   }, [])
 
-  // Drop AI results older than 7 days (#14), after startup has settled
+  // Drop AI results older than 7 days (#14) once startup has settled
+  // (InteractionManager is gone from RN core; requestIdleCallback replaces it)
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
+    const sweep = () => {
       sweepExpiredAiCache().then((n) => {
         if (n > 0) console.log(`[ai] removed ${n} expired cache records`)
       })
-    })
-    return () => task.cancel()
+    }
+    if (typeof requestIdleCallback === 'function') {
+      const id = requestIdleCallback(sweep, { timeout: 10000 })
+      return () => cancelIdleCallback(id)
+    }
+    const timer = setTimeout(sweep, 3000)
+    return () => clearTimeout(timer)
   }, [])
 
   const selectedModel = useMemo(() => {
