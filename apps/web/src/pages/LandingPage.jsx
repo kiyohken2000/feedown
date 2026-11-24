@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LuNewspaper, LuStar, LuMoon, LuLock, LuArrowRight, LuBookOpen, LuServer, LuRocket, LuBrain, LuShieldCheck, LuMessagesSquare, LuLanguages, LuList, LuBell, LuRefreshCw, LuSlidersHorizontal } from 'react-icons/lu';
+import { LuNewspaper, LuStar, LuMoon, LuLock, LuArrowRight, LuBookOpen, LuServer, LuRocket, LuBrain, LuShieldCheck, LuMessagesSquare, LuLanguages, LuList, LuBell, LuRefreshCw, LuSlidersHorizontal, LuTag } from 'react-icons/lu';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { translations } from '../i18n/translations';
@@ -31,6 +31,7 @@ import aiChat from '../assets/images/on_device_ai/04_chat.png';
 import aiTranslation from '../assets/images/on_device_ai/05_translation.png';
 // Background refresh screenshots
 import bgNotification from '../assets/images/background_refresh/notification.jpg';
+import bgHomeBell from '../assets/images/background_refresh/home_bell.jpg';
 import bgSettings from '../assets/images/background_refresh/settings.jpg';
 
 export default function LandingPage() {
@@ -292,20 +293,19 @@ export default function LandingPage() {
       backgroundColor: color.appBg,
     },
     bgContent: {
-      maxWidth: '1000px',
+      maxWidth: '1100px',
       margin: '0 auto',
-      display: 'grid',
-      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-      gap: isMobile ? '36px' : '56px',
-      alignItems: 'center',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: isMobile ? '40px' : '56px',
     },
     bgPoints: {
       listStyle: 'none',
       margin: 0,
       padding: 0,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '22px',
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+      gap: isMobile ? '22px' : '28px 40px',
     },
     bgPoint: {
       display: 'flex',
@@ -326,7 +326,7 @@ export default function LandingPage() {
     },
     bgScreens: {
       display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
+      gridTemplateColumns: 'repeat(3, 1fr)',
       gap: isMobile ? '14px' : '20px',
       alignItems: 'start',
       justifyItems: 'center',
@@ -653,7 +653,9 @@ export default function LandingPage() {
             {[
               { Icon: LuRefreshCw, title: t.bgPoint1Title, desc: t.bgPoint1Desc },
               { Icon: LuBell, title: t.bgPoint2Title, desc: t.bgPoint2Desc },
-              { Icon: LuSlidersHorizontal, title: t.bgPoint3Title, desc: t.bgPoint3Desc },
+              { Icon: LuTag, title: t.bgPoint3Title, desc: t.bgPoint3Desc },
+              { Icon: LuSlidersHorizontal, title: t.bgPoint4Title, desc: t.bgPoint4Desc },
+              { Icon: LuShieldCheck, title: t.bgPoint5Title, desc: t.bgPoint5Desc },
             ].map(({ Icon, title, desc }) => (
               <li key={title} style={styles.bgPoint}>
                 <span style={styles.bgPointIcon}><Icon /></span>
@@ -667,6 +669,7 @@ export default function LandingPage() {
           <div style={styles.bgScreens}>
             {[
               { src: bgNotification, label: t.bgShotNotification },
+              { src: bgHomeBell, label: t.bgShotHomeBell },
               { src: bgSettings, label: t.bgShotSettings },
             ].map(({ src, label }) => (
               <div key={label} style={styles.mobileScreenshot}>
