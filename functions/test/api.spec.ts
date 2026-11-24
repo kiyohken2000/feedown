@@ -10,7 +10,8 @@ import { describe, it, expect, beforeAll } from 'vitest';
 const BASE_URL = process.env.API_BASE_URL || 'https://feedown.pages.dev';
 
 // Test account credentials
-const TEST_EMAIL = `api-test-${Date.now()}@test.com`;
+// Must match isTestAccount() (test-{digits}@test.com) for the 3-feed limit test
+const TEST_EMAIL = `test-${Date.now()}@test.com`;
 const TEST_PASSWORD = '111111';
 
 let authToken: string | null = null;
@@ -283,17 +284,20 @@ describe('FeedOwn API Integration Tests', () => {
 
   describe('Test Account Limits', () => {
     it('POST /api/feeds - should enforce 3 feed limit for test accounts', async () => {
-      // First, add 2 more feeds to hit the limit
-      await fetch(`${BASE_URL}/api/feeds`, {
+      // First, add 2 more feeds to hit the limit. Check that they were added:
+      // if one fails (e.g. the remote feed times out), the 4th add below would
+      // succeed and the failure would look like a broken limit.
+      const second = await fetch(`${BASE_URL}/api/feeds`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${authToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: 'https://feeds.bbci.co.uk/news/rss.xml' }),
+        body: JSON.stringify({ url: 'https://github.blog/feed/' }),
       });
+      expect(second.status).toBe(201);
 
-      await fetch(`${BASE_URL}/api/feeds`, {
+      const third = await fetch(`${BASE_URL}/api/feeds`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -301,6 +305,7 @@ describe('FeedOwn API Integration Tests', () => {
         },
         body: JSON.stringify({ url: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml' }),
       });
+      expect(third.status).toBe(201);
 
       // Try to add a 4th feed - should fail
       const response = await fetch(`${BASE_URL}/api/feeds`, {
