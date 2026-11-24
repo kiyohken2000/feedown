@@ -108,7 +108,8 @@ export default function Home() {
     if (keywords.length === 0) return map
     articles.forEach((article) => {
       const keyword = matchKeyword(article.title, keywords)
-      if (keyword) map.set(article.id, keyword)
+      // Shown in NFKC so a full-width keyword ("ＩＰＨＯＮＥ") fits the chip
+      if (keyword) map.set(article.id, keyword.normalize('NFKC'))
     })
     return map
   }, [articles, keywords])
