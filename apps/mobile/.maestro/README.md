@@ -5,7 +5,7 @@ UI checks for the mobile app, run against a simulator or device with
 
 | Flow | Checks |
 |---|---|
-| `feed_discovery.yaml` | A site URL adds the feed it links to; a page without a feed is rejected (BRUSHUP #18) |
+| `feed_discovery.yaml` | A site URL adds the feed it links to; a page without a feed is rejected (BRUSHUP #18); the URL field's clear button |
 | `keyword_highlight.yaml` | Articles matching a notification keyword get the chip and the title marker; removing the keyword removes them |
 
 `subflows/` holds shared steps and is not run on its own.

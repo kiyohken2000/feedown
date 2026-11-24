@@ -23,6 +23,13 @@ name: Feed discovery from a site URL
 - extendedWaitUntil:
     visible: "URL is not an RSS or Atom feed.*"
     timeout: 20000
+
+# The clear button empties the field in one tap
+- tapOn:
+    id: "feed-url-clear"
+- assertVisible: "Feed URL or site URL..."
+- assertNotVisible:
+    id: "feed-url-clear"
 - hideKeyboard
 
 # Clean up

@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
+import FontIcon from '@expo/vector-icons/FontAwesome'
 import { colors, fontSize, getThemeColors } from '../../theme'
 import { FeedsContext } from '../../contexts/FeedsContext'
 import { UserContext } from '../../contexts/UserContext'
@@ -323,8 +324,14 @@ export default function Read() {
 
         {/* Add feed form */}
         <View style={styles.addFeedContainer}>
+          <View style={styles.inputWrapper}>
           <TextInput
-            style={[styles.input, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text }]}
+            testID="feed-url-input"
+            style={[
+              styles.input,
+              { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder, color: theme.text },
+              newFeedUrl.length > 0 && styles.inputWithClear,
+            ]}
             placeholder="Feed URL or site URL..."
             placeholderTextColor={theme.textMuted}
             value={newFeedUrl}
@@ -335,6 +342,19 @@ export default function Read() {
             returnKeyType="done"
             onSubmitEditing={handleAddFeed}
           />
+          {newFeedUrl.length > 0 && (
+            <TouchableOpacity
+              testID="feed-url-clear"
+              accessibilityRole="button"
+              accessibilityLabel="Clear URL"
+              style={styles.clearButton}
+              onPress={() => setNewFeedUrl('')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <FontIcon name="times-circle" size={18} color={theme.textMuted} />
+            </TouchableOpacity>
+          )}
+          </View>
           <TouchableOpacity
             style={[styles.addButton, isAdding && styles.addButtonDisabled]}
             onPress={handleAddFeed}
@@ -400,8 +420,19 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 8,
   },
-  input: {
+  inputWrapper: {
     flex: 1,
+    justifyContent: 'center',
+  },
+  inputWithClear: {
+    paddingRight: 36,
+  },
+  clearButton: {
+    position: 'absolute',
+    right: 10,
+    padding: 2,
+  },
+  input: {
     height: 44,
     backgroundColor: colors.white,
     borderRadius: 8,
