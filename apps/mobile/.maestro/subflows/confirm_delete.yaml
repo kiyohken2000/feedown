@@ -1,0 +1,13 @@
+# Confirm the "Delete Feed" alert for the feed titled TITLE (pass it with env).
+#
+# The alert's Delete button cannot be picked by text: the selector also matches
+# the Delete buttons of the feed rows behind the alert, and the alert container
+# is not selectable. The alert is centered, so tap where its Delete button is
+# for a two-line message (checked on a 6.3" iPhone, iOS 27).
+appId: net.votepurchase.feedown
+---
+- extendedWaitUntil:
+    visible: ".*delete \"${TITLE}\"\\?"
+    timeout: 5000
+- tapOn:
+    point: "68%,57%"

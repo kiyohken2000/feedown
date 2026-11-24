@@ -1,0 +1,43 @@
+# Keyword highlight: an article whose title contains a notification keyword
+# gets a strip on the card, a chip with the keyword, and a marker on the
+# keyword in the title. Matching ignores full-width / half-width and case, so
+# the keyword is entered in full width. Needs an article with "iPhone" in its
+# title (the test account follows iPhone Mania). Removes the keyword at the end.
+appId: net.votepurchase.feedown
+name: Keyword highlight in the article list
+---
+- runFlow: subflows/launch.yaml
+- tapOn: "Settings, tab.*"
+- tapOn: "Background Refresh.*"
+- scrollUntilVisible:
+    element:
+      id: "bg-keyword-input"
+    direction: DOWN
+- assertVisible: ".*also highlighted in the article list.*"
+- tapOn:
+    id: "bg-keyword-input"
+- inputText: "ｉＰｈｏｎｅ"
+- tapOn:
+    id: "bg-keyword-add"
+- assertVisible:
+    id: "bg-keyword-ｉＰｈｏｎｅ"
+
+# The chip shows the keyword in NFKC
+- tapOn: "Articles, tab.*"
+- extendedWaitUntil:
+    visible: ".*Matches keyword iPhone.*"
+    timeout: 10000
+- takeScreenshot: keyword_highlight
+
+# Removing the keyword removes the highlight
+- tapOn: "Settings, tab.*"
+- scrollUntilVisible:
+    element:
+      id: "bg-keyword-ｉＰｈｏｎｅ"
+    direction: DOWN
+- tapOn:
+    id: "bg-keyword-ｉＰｈｏｎｅ"
+- assertNotVisible:
+    id: "bg-keyword-ｉＰｈｏｎｅ"
+- tapOn: "Articles, tab.*"
+- assertNotVisible: ".*Matches keyword.*"

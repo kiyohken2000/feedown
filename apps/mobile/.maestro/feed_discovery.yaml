@@ -1,0 +1,42 @@
+# BRUSHUP #18: adding a site URL finds and adds its feed; a page without a
+# feed is rejected. Adds https://github.blog/feed/ and deletes it at the end,
+# so the account must not already follow it.
+appId: net.votepurchase.feedown
+name: Feed discovery from a site URL
+---
+- runFlow: subflows/launch.yaml
+- tapOn: "Feeds, tab.*"
+- assertVisible: "Feed URL or site URL..."
+
+# Site URL → the feed it links to
+- tapOn: "Feed URL or site URL..."
+- inputText: "https://github.blog/"
+- tapOn: "^Add$"
+- extendedWaitUntil:
+    visible: "Found a feed on this site and added it.*"
+    timeout: 20000
+
+# A page without a feed link
+- tapOn: "Feed URL or site URL..."
+- inputText: "https://example.com/"
+- tapOn: "^Add$"
+- extendedWaitUntil:
+    visible: "URL is not an RSS or Atom feed.*"
+    timeout: 20000
+- hideKeyboard
+
+# Clean up
+- scrollUntilVisible:
+    element:
+      id: "feed-delete-https://github.blog/feed/"
+    direction: DOWN
+- tapOn:
+    id: "feed-delete-https://github.blog/feed/"
+- runFlow:
+    file: subflows/confirm_delete.yaml
+    env:
+      TITLE: "The GitHub Blog"
+- extendedWaitUntil:
+    notVisible:
+      id: "feed-delete-https://github.blog/feed/"
+    timeout: 10000

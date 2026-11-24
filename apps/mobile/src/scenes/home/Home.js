@@ -19,7 +19,7 @@ import ScreenTemplate from '../../components/ScreenTemplate'
 import { showToast, showErrorToast } from '../../utils/showToast'
 import NotificationBell from './NotificationBell'
 import { loadBgSettings } from '../../utils/backgroundRefresh'
-import { matchKeyword } from '../../utils/newArticleNotifications'
+import { keywordRanges, matchKeyword } from '../../utils/newArticleNotifications'
 
 export default function Home() {
   const navigation = useNavigation()
@@ -100,19 +100,44 @@ export default function Home() {
     }, [])
   )
 
-  // Article id → the keyword its title matches. Same matching as the keyword
-  // notification, so the highlight and the alert agree. Muted feeds are still
-  // highlighted: muting only turns off their notifications.
+  // Article id → { label, ranges } for titles that match a keyword. Same
+  // matching as the keyword notification, so the highlight and the alert
+  // agree. Muted feeds are still highlighted: muting only turns off their
+  // notifications.
   const keywordMatches = useMemo(() => {
     const map = new Map()
     if (keywords.length === 0) return map
     articles.forEach((article) => {
       const keyword = matchKeyword(article.title, keywords)
-      // Shown in NFKC so a full-width keyword ("ＩＰＨＯＮＥ") fits the chip
-      if (keyword) map.set(article.id, keyword.normalize('NFKC'))
+      if (!keyword) return
+      map.set(article.id, {
+        // NFKC so a full-width keyword ("ＩＰＨＯＮＥ") fits the chip
+        label: keyword.normalize('NFKC'),
+        // Every keyword found in the title gets the marker, not just the first
+        ranges: keywords
+          .flatMap((k) => keywordRanges(article.title, k))
+          .sort((a, b) => a[0] - b[0])
+          .filter((r, i, all) => i === 0 || r[0] >= all[i - 1][1]),
+      })
     })
     return map
   }, [articles, keywords])
+
+  // The title with the keyword parts in a marker-style background
+  const renderTitle = (title, ranges) => {
+    if (!ranges || ranges.length === 0) return title
+    const parts = []
+    let pos = 0
+    ranges.forEach(([start, end]) => {
+      if (start > pos) parts.push(title.slice(pos, start))
+      parts.push(
+        <Text key={start} style={styles.keywordMarker}>{title.slice(start, end)}</Text>
+      )
+      pos = end
+    })
+    if (pos < title.length) parts.push(title.slice(pos))
+    return parts
+  }
 
   // Show error toast
   useEffect(() => {
@@ -245,7 +270,8 @@ export default function Home() {
   const renderArticle = ({ item: article }) => {
     const isRead = readArticles.has(article.id)
     const feed = getFeed(article.feedId)
-    const keyword = keywordMatches.get(article.id)
+    const match = keywordMatches.get(article.id)
+    const keyword = match?.label
 
     return (
       <TouchableOpacity
@@ -290,7 +316,7 @@ export default function Home() {
             )}
           </View>
           <Text style={[styles.articleTitle, { color: theme.text }]} numberOfLines={2}>
-            {article.title}
+            {renderTitle(article.title || '', match?.ranges)}
           </Text>
           <Text style={[styles.articleDescription, { color: theme.textSecondary }]} numberOfLines={2}>
             {article.description || ''}
@@ -617,6 +643,10 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: colors.primary,
     paddingLeft: 9,
+  },
+  // Highlighter-pen marker on the keyword in the title
+  keywordMarker: {
+    backgroundColor: 'rgba(255, 107, 53, 0.28)',
   },
   keywordChip: {
     marginLeft: 6,

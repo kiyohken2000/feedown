@@ -214,6 +214,7 @@ export default function Read() {
         </View>
       </View>
       <TouchableOpacity
+        testID={`feed-delete-${feed.url}`}
         style={styles.deleteButton}
         onPress={() => handleDeleteFeed(feed)}
       >

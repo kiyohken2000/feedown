@@ -88,6 +88,40 @@ export function matchKeyword(title, keywords) {
   }) || null
 }
 
+/**
+ * Where `keyword` occurs in `text`, as [start, end) indexes into the original
+ * text, matched the same way as matchKeyword (NFKC, case-insensitive). Used to
+ * mark the keyword in a title. Normalizes one character at a time to map the
+ * positions back, so a match that only exists across a combining sequence is
+ * not marked (the title is still highlighted as a match).
+ */
+export function keywordRanges(text, keyword) {
+  const source = String(text || '')
+  const needle = normalizeForMatch(keyword).trim()
+  if (!source || !needle) return []
+  let normalized = ''
+  // origin[i]: index in `source` of the character normalized char i came from
+  const origin = []
+  for (let i = 0; i < source.length;) {
+    const ch = String.fromCodePoint(source.codePointAt(i))
+    const n = normalizeForMatch(ch)
+    for (let k = 0; k < n.length; k += 1) origin.push(i)
+    normalized += n
+    i += ch.length
+  }
+  const ranges = []
+  let from = 0
+  for (;;) {
+    const at = normalized.indexOf(needle, from)
+    if (at === -1) break
+    const last = origin[at + needle.length - 1]
+    const end = last + String.fromCodePoint(source.codePointAt(last)).length
+    ranges.push([origin[at], end])
+    from = at + needle.length
+  }
+  return ranges
+}
+
 /** Articles whose titles contain a keyword, tagged with the keyword. */
 export function findKeywordMatches(articles, keywords) {
   if (!keywords || keywords.length === 0) return []

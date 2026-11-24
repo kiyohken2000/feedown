@@ -1,0 +1,22 @@
+# Open the app on the article list. Expects a signed-in account.
+#   - With METRO_URL (dev client, e.g. -e METRO_URL=http://localhost:8081):
+#     connect to that Metro server.
+#   - Without it: launch the installed build as is.
+appId: net.votepurchase.feedown
+---
+- runFlow:
+    when:
+      true: ${typeof METRO_URL !== 'undefined' && METRO_URL !== ''}
+    commands:
+      # Stop first: reloading a running dev client can crash in
+      # react-native-worklets' runtime cleanup
+      - stopApp
+      - openLink: ${'exp+feedown://expo-development-client/?url=' + encodeURIComponent(METRO_URL)}
+- runFlow:
+    when:
+      true: ${typeof METRO_URL === 'undefined' || METRO_URL === ''}
+    commands:
+      - launchApp
+- extendedWaitUntil:
+    visible: "Mark All Read"
+    timeout: 30000
